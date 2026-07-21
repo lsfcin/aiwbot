@@ -9,21 +9,16 @@ become interchangeable data. Full design + research: brain/goals/workspace-os.md
 
 Phase A (seam proven live) complete — archived in [HISTORY.md](HISTORY.md).
 
-## Phase B — Telegram frontend on the seam (done, unverified live)
-- [x] Reuse from core/tools/telegram_daemon.py (provider-agnostic parts): allowlist/config, INBOX $0
-      capture, `_safe_reply`/chunking/reply_map, `_format_body` (md→TG-HTML + tables), phrase banks.
-      Ported into `frontend/` (own config dir `~/.config/aiwbot/`, own bot handle @lsfaiwbot — not
-      shared storage with the old bot). Scope trimmed to `/new` + reply-to-continue + `/help` +
-      capture. `/select`/`/notify` deferred — no cross-backend session-listing capability in the
-      seam yet; `/stop`/`/status` are obsolete — `send()` is one subprocess call per turn, no
-      backgrounded pid to kill/inspect anymore (old bot's `/new` used `claude --bg`).
-- [x] Replace claude-specific dispatch with calls through `AgentBackend` (`frontend/dispatch.py`).
-      Per-session backend pick via `/new --backend claude|opencode` (default claude).
-- [x] Frontend stores latest `result.session_id` each turn (AD-3) — `frontend/sessions.py` registry
-      also remembers which backend each session belongs to (no seam equivalent to `claude agents
-      --json` exists across providers, so this must be tracked locally).
-- [ ] **Live smoke pending** — Lucas to run `python -m frontend.bot` and test `/new`, reply-continue
-      (both backends), and plain-text capture end-to-end via @lsfaiwbot before calling Phase B done.
+Phase B (Telegram frontend + single-lineage fix + ⏳-morph UX) — done, live-confirmed by Lucas.
+Archived in [HISTORY.md](HISTORY.md).
+
+## Niceties (near-term, small each) — in progress
+- [ ] **Titles** — kill "(SEM TÍTULO)": derive a session title from the opening prompt
+      (provider-agnostic, stored in the sessions registry), carry it forward across turns. Optional
+      later: claude's own AI-title read from the transcript (claude-specific).
+- [ ] `/select` resume picker — list recent sessions from the registry, tap to resume. Now buildable
+      without `claude agents --json` (the registry already knows each session's backend + title).
+- [ ] Show the full session id in the reply for manual `claude --resume <id>` / opencode reattach.
 
 ## Phase C — streaming display (linuz90 mold)
 - [ ] claude `--output-format stream-json`; edit a "working…" message live with tool status.
