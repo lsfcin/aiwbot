@@ -22,11 +22,15 @@ def _matches(entry: dict, query: str) -> bool:
 
 
 def recent(n: int, query: str = "") -> list[dict]:
-    """Sessions newest-first (optionally filtered by title substring) for the /resume picker."""
+    """Sessions newest-first (optionally filtered by title substring) for the /resume picker.
+
+    Untitled entries (saved before the title feature shipped) are ghosts — skip them."""
     sessions = config.load_config().get("sessions", {})
     q = query.lower()
     items = []
     for sid, entry in sessions.items():
+        if not entry.get("title"):
+            continue
         if not _matches(entry, q):
             continue
         item = {"session_id": sid, "backend": entry.get("backend"), "title": entry.get("title"), "updated_at": entry.get("updated_at", 0)}
@@ -40,6 +44,8 @@ def count(query: str = "") -> int:
     q = query.lower()
     total = 0
     for entry in sessions.values():
+        if not entry.get("title"):
+            continue
         if _matches(entry, q):
             total += 1
     return total
