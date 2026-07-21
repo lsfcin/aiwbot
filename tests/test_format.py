@@ -1,5 +1,5 @@
 # test_format.py — free unit test: markdown/table -> Telegram HTML conversion.
-from frontend.format import format_body, session_block, title_words
+from frontend.format import format_body, session_block, title_words, title_from_prompt, relative_time
 
 
 def test_plain_markdown_to_html():
@@ -33,3 +33,16 @@ def test_session_block_includes_header_and_body():
     assert "[ABC]" in block
     assert "HELLO WORLD SESSION" in block
     assert "oi" in block
+
+
+def test_title_from_prompt_takes_leading_words():
+    title = title_from_prompt("revisa o arquivo de configuração agora por favor com calma", n=4)
+    assert title == "revisa o arquivo de"
+
+
+def test_relative_time_buckets():
+    now = 1_000_000.0
+    assert relative_time(now - 10, now) == "agora"
+    assert relative_time(now - 300, now) == "5m atrás"
+    assert relative_time(now - 7200, now) == "2h atrás"
+    assert relative_time(now - 259200, now) == "3d atrás"

@@ -54,10 +54,21 @@ SESSION_LIVE_ELSEWHERE_PHRASES = [
     "Não consigo continuar: essa sessão já tá em uso em outro lugar. Fecha lá primeiro.",
     "Essa sessão parece estar aberta em outra janela — só dá pra seguir por aqui quando ela não estiver aberta em nenhum outro lugar.",
 ]
+RESUME_EMPTY_PHRASES = [
+    "Nenhuma sessão pra retomar ainda.",
+    "Sem sessões no histórico — começa uma com /new.",
+    "Ainda não tem sessão nenhuma pra retomar.",
+]
+RESUME_ANCHOR_PHRASES = [
+    "Sessão retomada — responde aqui pra continuar.",
+    "Pronto, essa é a ativa. Responde essa mensagem pra seguir.",
+    "Retomei essa sessão. Manda a próxima como resposta a essa mensagem.",
+]
 
 HELP_TEXT = (
     "<b>Comandos</b>\n"
     "<code>/new</code> [--backend claude|opencode] &lt;prompt&gt; — inicia sessão nova, já fica selecionada\n"
+    "<code>/resume</code> [busca] — lista sessões recentes pra retomar (filtra por título se você passar um termo)\n"
     "<code>/help</code> — essa mensagem\n\n"
     "Texto, foto, áudio ou documento mandado sem <code>/</code> vai direto pro brain/INBOX.md.\n\n"
     "Responder a qualquer mensagem de sessão continua aquela sessão — não precisa digitar id."

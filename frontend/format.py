@@ -2,8 +2,28 @@
 from __future__ import annotations
 import html
 import re
+import time
 
 SESSION_ID_LABEL_LEN = 3
+
+
+def relative_time(ts: float, now: float | None = None) -> str:
+    """Human relative age like Claude Code's resume picker: agora / 5m atrás / 2h atrás / 3d atrás."""
+    ref = now
+    if ref is None:
+        ref = time.time()
+    delta = ref - ts
+    result = "agora"
+    if delta >= 86400:
+        days = int(delta // 86400)
+        result = f"{days}d atrás"
+    elif delta >= 3600:
+        hours = int(delta // 3600)
+        result = f"{hours}h atrás"
+    elif delta >= 60:
+        mins = int(delta // 60)
+        result = f"{mins}m atrás"
+    return result
 
 
 def plain(text: str) -> str:
@@ -15,6 +35,12 @@ def title_words(name: str | None, n: int = 3) -> str:
     if name and name.strip():
         result = " ".join(name.split()[:n]).upper()
     return result
+
+
+def title_from_prompt(prompt: str, n: int = 8) -> str:
+    """Provider-agnostic session title: the first few words of the opening prompt."""
+    words = prompt.split()
+    return " ".join(words[:n])
 
 
 def _is_table_row(line: str) -> bool:
