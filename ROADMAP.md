@@ -7,12 +7,7 @@ sync but lock us 100% into Claude Code — against the provider-agnostic princip
 single-lineage, with a swappable backend seam (linuz90's architecture, rebuilt in Python). Providers
 become interchangeable data. Full design + research: brain/goals/workspace-os.md.
 
-## Phase A — prove the seam ✅ (done 2026-07-21)
-- [x] `AgentBackend`/`AgentEvent` seam + `CliBackend` driver + `check_contract`.
-- [x] `claude` + `opencode` backends (build_args + pure parse_events).
-- [x] Free fixture unit tests (6 green, `make test`).
-- [x] Live smoke (`make smoke`): both backends pass end-to-end + single-lineage resume. Risk retired:
-      the one interface holds across a forking backend (claude) and a same-lineage backend (opencode).
+Phase A (seam proven live) complete — archived in [HISTORY.md](HISTORY.md).
 
 ## Phase B — Telegram frontend on the seam (next)
 - [ ] Reuse from core/tools/telegram_daemon.py (provider-agnostic parts): allowlist/config, INBOX $0
