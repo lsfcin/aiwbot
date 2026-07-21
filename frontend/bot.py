@@ -33,11 +33,36 @@ async def _safe_reply(msg, html_text: str) -> "telegram.Message | None":
     return result
 
 
-async def _send_chunked(msg, html_text: str) -> "telegram.Message | None":
+def _chunks(html_text: str, size: int) -> list[str]:
+    parts = []
+    for i in range(0, len(html_text), size):
+        parts.append(html_text[i:i + size])
+    if not parts:
+        parts = [html_text]
+    return parts
+
+
+async def _edit_or_send(working_msg, msg, html_text: str) -> "telegram.Message | None":
+    """Morph the ⏳ working message into the final text (feels like a substitution);
+    fall back to a fresh reply if the edit is rejected (too old, identical, etc.)."""
     sent = None
-    for i in range(0, len(html_text), TELEGRAM_MSG_LIMIT):
-        sent = await _safe_reply(msg, html_text[i:i + TELEGRAM_MSG_LIMIT])
+    if working_msg is not None:
+        try:
+            sent = await working_msg.edit_text(html_text, parse_mode="HTML")
+        except TelegramError as e:
+            print(f"edit failed, sending instead: {e}")
+    if sent is None:
+        sent = await _safe_reply(msg, html_text)
     return sent
+
+
+async def _deliver(working_msg, msg, html_text: str) -> "telegram.Message | None":
+    chunks = _chunks(html_text, TELEGRAM_MSG_LIMIT)
+    first = chunks[0]
+    last = await _edit_or_send(working_msg, msg, first)
+    for chunk in chunks[1:]:
+        last = await _safe_reply(msg, chunk)
+    return last
 
 
 def _parse_new_arg(arg: str) -> tuple[str, str]:
@@ -56,31 +81,31 @@ async def _cmd_new(msg, arg: str) -> None:
     if not prompt.strip():
         await _safe_reply(msg, format.plain(phrases.pick(phrases.NEW_EMPTY_PROMPT_PHRASES)))
         return
-    await _safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
+    working = await _safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
     try:
         result = await dispatch.turn(prompt, session_id=None, backend_name=backend_name, cwd=WORKSPACE_DIR)
     except dispatch.DispatchError as e:
-        await _safe_reply(msg, _friendly_error(e))
+        await _deliver(working, msg, _friendly_error(e))
         return
     sessions.remember(result.session_id, backend_name)
     block = format.session_block(phrases.pick(phrases.NEW_STARTED_PHRASES), result.session_id, None, body=result.text)
-    sent = await _send_chunked(msg, block)
+    sent = await _deliver(working, msg, block)
     if sent is not None:
         sessions.remember_reply(sent.message_id, result.session_id)
 
 
 async def _handle_reply_continue(msg, sid: str) -> None:
     backend_name = sessions.backend_for(sid) or DEFAULT_BACKEND
-    await _safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
+    working = await _safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
     try:
         result = await dispatch.turn(msg.text, session_id=sid, backend_name=backend_name, cwd=WORKSPACE_DIR)
     except dispatch.DispatchError as e:
-        await _safe_reply(msg, _friendly_error(e))
+        await _deliver(working, msg, _friendly_error(e))
         return
     sessions.remember(result.session_id, backend_name)
     extra = f"${result.cost_usd:.3f}" if result.cost_usd else None
     block = format.session_block(phrases.pick(phrases.CONTINUE_REPLY_PHRASES), result.session_id, None, body=result.text, extra=extra)
-    sent = await _send_chunked(msg, block)
+    sent = await _deliver(working, msg, block)
     if sent is not None:
         sessions.remember_reply(sent.message_id, result.session_id)
 
