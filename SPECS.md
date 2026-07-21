@@ -12,11 +12,20 @@ thing the frontend depends on — providers are interchangeable data behind it.
 Avoids per-backend duplication of the subprocess loop and run-result handling (`proc.events_from_run`).
 `parse_events` stays a module-level pure function per backend → free to unit-test with fixtures.
 
-### AD-3 — Session lineage differs per backend; the frontend must chase `result.session_id`
-Proven live: **claude** resumes via `--resume <id> --fork-session` and mints a NEW session id each turn
-(registered agents refuse a plain --resume — learned the hard way). **opencode** resumes via `-s <id>`
-and keeps the SAME id. Both preserve context. The frontend must always store the latest
-`result.session_id` from each turn, never the id it sent — the seam surfaces it uniformly.
+### AD-3 — Both backends keep one lineage; the frontend still chases `result.session_id`
+**Revised 2026-07-21** (Phase B). Both backends now resume into a SINGLE lineage — one session id,
+one transcript, one VSCode entry that grows in place: **claude** via plain `--resume <id>` (same id
+back), **opencode** via `-s <id>` (same id). Earlier this doc claimed `--fork-session` was mandatory
+for claude — that was true only in the old bot's `--bg` era, where a live/registered background agent
+locked the session id and refused a plain `--resume`. Phase B dropped `--bg`: `send()` is a one-shot
+`-p` subprocess that exits after each turn, so the session is never locked between turns and plain
+`--resume` succeeds (verified live). Forking was producing cumulative VSCode sessions (N forks = N
+entries) for no benefit, so it's gone — this also matches linuz90's SDK design (plain resume, capture
+id once; see [[reference_linuz90_bot]]). The frontend still stores the latest `result.session_id` each
+turn and the seam surfaces it uniformly — that contract is unchanged and cheap insurance even though
+both ids now happen to be stable. **Edge case**: plain `--resume` IS refused if that exact session is
+concurrently open live elsewhere (interactive VSCode / a still-running agent) — the frontend detects
+the busy/not-found error and shows a "close it there first" message rather than a raw error.
 
 ### AD-4 — cwd must be pinned on dispatch
 Subprocesses run with explicit `cwd` (not the daemon's inherited $HOME) or the session registers under
