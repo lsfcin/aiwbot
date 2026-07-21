@@ -2,8 +2,28 @@
 from __future__ import annotations
 import html
 import re
+import time
 
 SESSION_ID_LABEL_LEN = 3
+
+
+def relative_time(ts: float, now: float | None = None) -> str:
+    """Human relative age like Claude Code's resume picker: agora / 5m atrás / 2h atrás / 3d atrás."""
+    ref = now
+    if ref is None:
+        ref = time.time()
+    delta = ref - ts
+    result = "agora"
+    if delta >= 86400:
+        days = int(delta // 86400)
+        result = f"{days}d atrás"
+    elif delta >= 3600:
+        hours = int(delta // 3600)
+        result = f"{hours}h atrás"
+    elif delta >= 60:
+        mins = int(delta // 60)
+        result = f"{mins}m atrás"
+    return result
 
 
 def plain(text: str) -> str:
@@ -15,6 +35,12 @@ def title_words(name: str | None, n: int = 3) -> str:
     if name and name.strip():
         result = " ".join(name.split()[:n]).upper()
     return result
+
+
+def title_from_prompt(prompt: str, n: int = 8) -> str:
+    """Provider-agnostic session title: the first few words of the opening prompt."""
+    words = prompt.split()
+    return " ".join(words[:n])
 
 
 def _is_table_row(line: str) -> bool:
@@ -78,4 +104,43 @@ def session_block(phrase: str, sid: str | None, title: str | None, body: str | N
         lines.append(html.escape(header))
     if body:
         lines.append(format_body(body))
+    return "\n".join(lines)
+
+
+_MODEL_FAMILIES = ("sonnet", "opus", "haiku", "fable")
+
+
+def short_model(model: str | None) -> str | None:
+    """claude-sonnet-5 -> sonnet; unknown families fall back to the raw string."""
+    result = model
+    if model:
+        for family in _MODEL_FAMILIES:
+            if family in model:
+                result = family
+                break
+    return result
+
+
+def _meta_line(provider: str | None, model: str | None, cost_usd: float | None) -> str:
+    bits = []
+    if provider:
+        bits.append(provider)
+    short = short_model(model)
+    if short:
+        bits.append(short)
+    if cost_usd:
+        bits.append(f"${cost_usd:.3f}")
+    return " · ".join(bits)
+
+
+def answer_block(body: str, sid: str | None, title: str | None, provider: str | None = None,
+                 model: str | None = None, cost_usd: float | None = None) -> str:
+    """The network's answer with the session header as a footer (everything here is a response)."""
+    lines = [format_body(body), "· · ·"]
+    if sid:
+        label = f"[{sid[:SESSION_ID_LABEL_LEN].upper()}] {title_words(title)}"
+        lines.append(html.escape(label))
+    meta = _meta_line(provider, model, cost_usd)
+    if meta:
+        lines.append(html.escape(meta))
     return "\n".join(lines)
