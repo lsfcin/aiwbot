@@ -22,9 +22,9 @@ Archived in [HISTORY.md](HISTORY.md).
 - [x] **Message format** — no intro phrase; answer stands alone with a footer: `<answer>` · `· · ·` ·
       `[XXX] TÍTULO` · `provider · model · $cost`. Model plumbed through the seam (claude from
       `modelUsage`, shortened; opencode degrades to `provider · $cost`). Live-confirmed.
-- [ ] **Ghost sessions in `/resume`** — the picker lists pre-title sessions with no title (saved
-      before titles existed). Filter untitled entries out of the picker, and/or prune stale registry
-      entries (e.g. drop sessions whose transcript no longer exists or older than N days).
+- [x] **Ghost sessions in `/resume`** — `sessions.recent`/`sessions.count` now skip entries with no
+      title (pre-title registry saves). New sessions always get a title (`bot.py`), so this self-heals;
+      old ghost entries stay in the registry file but never surface in the picker.
 - [ ] **`/resume` 3-line buttons** — line 2 = first 6 words … last 6 words of that session's LAST
       agent response. Requires storing the last response text (or a head/tail preview) in the registry
       each turn — the seam already surfaces the text; just persist a preview alongside title/backend.
