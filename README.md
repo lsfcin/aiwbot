@@ -20,8 +20,8 @@ make smoke   # live: run a real prompt through each backend (~$0.20)
 ```
 
 ## Status
-Phase A complete: seam proven live against claude + opencode (single-lineage resume). Next: Telegram
-frontend on the seam (Phase B). Full plan → ROADMAP.md.
+Phase A complete: seam proven live against claude + opencode (single-lineage resume). Phase B
+(Telegram frontend, `frontend/`) coded + free-tested, live smoke pending. Full plan → ROADMAP.md.
 
 ## License
 TBD

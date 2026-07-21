@@ -9,11 +9,21 @@ become interchangeable data. Full design + research: brain/goals/workspace-os.md
 
 Phase A (seam proven live) complete — archived in [HISTORY.md](HISTORY.md).
 
-## Phase B — Telegram frontend on the seam (next)
-- [ ] Reuse from core/tools/telegram_daemon.py (provider-agnostic parts): allowlist/config, INBOX $0
+## Phase B — Telegram frontend on the seam (done, unverified live)
+- [x] Reuse from core/tools/telegram_daemon.py (provider-agnostic parts): allowlist/config, INBOX $0
       capture, `_safe_reply`/chunking/reply_map, `_format_body` (md→TG-HTML + tables), phrase banks.
-- [ ] Replace claude-specific dispatch with calls through `AgentBackend`. Per-session backend pick.
-- [ ] Frontend stores latest `result.session_id` each turn (AD-3).
+      Ported into `frontend/` (own config dir `~/.config/aiwbot/`, own bot handle @lsfaiwbot — not
+      shared storage with the old bot). Scope trimmed to `/new` + reply-to-continue + `/help` +
+      capture. `/select`/`/notify` deferred — no cross-backend session-listing capability in the
+      seam yet; `/stop`/`/status` are obsolete — `send()` is one subprocess call per turn, no
+      backgrounded pid to kill/inspect anymore (old bot's `/new` used `claude --bg`).
+- [x] Replace claude-specific dispatch with calls through `AgentBackend` (`frontend/dispatch.py`).
+      Per-session backend pick via `/new --backend claude|opencode` (default claude).
+- [x] Frontend stores latest `result.session_id` each turn (AD-3) — `frontend/sessions.py` registry
+      also remembers which backend each session belongs to (no seam equivalent to `claude agents
+      --json` exists across providers, so this must be tracked locally).
+- [ ] **Live smoke pending** — Lucas to run `python -m frontend.bot` and test `/new`, reply-continue
+      (both backends), and plain-text capture end-to-end via @lsfaiwbot before calling Phase B done.
 
 ## Phase C — streaming display (linuz90 mold)
 - [ ] claude `--output-format stream-json`; edit a "working…" message live with tool status.
