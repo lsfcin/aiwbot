@@ -10,6 +10,7 @@ class TurnResult:
     text: str
     session_id: str
     cost_usd: float | None
+    model: str | None = None
 
 
 class DispatchError(Exception):
@@ -26,7 +27,8 @@ def events_to_result(events: list) -> TurnResult:
         raise DispatchError(reason)
     texts = [e.text for e in events if e.kind == "text"]
     result = [e for e in events if e.kind == "result"][-1]
-    return TurnResult(text="\n".join(texts), session_id=result.session_id, cost_usd=result.cost_usd)
+    body = "\n".join(texts)
+    return TurnResult(text=body, session_id=result.session_id, cost_usd=result.cost_usd, model=result.model)
 
 
 async def turn(prompt: str, *, session_id: str | None, backend_name: str, cwd: str) -> TurnResult:

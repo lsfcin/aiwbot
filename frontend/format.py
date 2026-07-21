@@ -105,3 +105,42 @@ def session_block(phrase: str, sid: str | None, title: str | None, body: str | N
     if body:
         lines.append(format_body(body))
     return "\n".join(lines)
+
+
+_MODEL_FAMILIES = ("sonnet", "opus", "haiku", "fable")
+
+
+def short_model(model: str | None) -> str | None:
+    """claude-sonnet-5 -> sonnet; unknown families fall back to the raw string."""
+    result = model
+    if model:
+        for family in _MODEL_FAMILIES:
+            if family in model:
+                result = family
+                break
+    return result
+
+
+def _meta_line(provider: str | None, model: str | None, cost_usd: float | None) -> str:
+    bits = []
+    if provider:
+        bits.append(provider)
+    short = short_model(model)
+    if short:
+        bits.append(short)
+    if cost_usd:
+        bits.append(f"${cost_usd:.3f}")
+    return " · ".join(bits)
+
+
+def answer_block(body: str, sid: str | None, title: str | None, provider: str | None = None,
+                 model: str | None = None, cost_usd: float | None = None) -> str:
+    """The network's answer with the session header as a footer (everything here is a response)."""
+    lines = [format_body(body), "· · ·"]
+    if sid:
+        label = f"[{sid[:SESSION_ID_LABEL_LEN].upper()}] {title_words(title)}"
+        lines.append(html.escape(label))
+    meta = _meta_line(provider, model, cost_usd)
+    if meta:
+        lines.append(html.escape(meta))
+    return "\n".join(lines)

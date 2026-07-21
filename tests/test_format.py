@@ -1,5 +1,5 @@
 # test_format.py — free unit test: markdown/table -> Telegram HTML conversion.
-from frontend.format import format_body, session_block, title_words, title_from_prompt, relative_time
+from frontend.format import format_body, session_block, title_words, title_from_prompt, relative_time, short_model, answer_block
 
 
 def test_plain_markdown_to_html():
@@ -46,3 +46,26 @@ def test_relative_time_buckets():
     assert relative_time(now - 300, now) == "5m atrás"
     assert relative_time(now - 7200, now) == "2h atrás"
     assert relative_time(now - 259200, now) == "3d atrás"
+
+
+def test_short_model_extracts_family():
+    assert short_model("claude-sonnet-5") == "sonnet"
+    assert short_model("claude-opus-4-8") == "opus"
+    assert short_model(None) is None
+    assert short_model("gpt-4o") == "gpt-4o"
+
+
+def test_answer_block_body_first_footer_last():
+    block = answer_block("oi tudo bem", "abc12345", "titulo da sessao",
+                         provider="claude", model="claude-sonnet-5", cost_usd=0.022)
+    lines = block.split("\n")
+    assert lines[0] == "oi tudo bem"
+    assert "· · ·" in block
+    assert "[ABC] TITULO DA SESSAO" in block
+    assert "claude · sonnet · $0.022" in block
+
+
+def test_answer_block_omits_missing_meta():
+    block = answer_block("resposta", "abc12345", None, provider="opencode", model=None, cost_usd=None)
+    lines = block.split("\n")
+    assert lines[-1] == "opencode"

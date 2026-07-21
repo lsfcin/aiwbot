@@ -35,6 +35,14 @@ def _last_json_object(stdout: str) -> dict | None:
     return found
 
 
+def _model_of(obj: dict) -> str | None:
+    """claude reports the model as the key of `modelUsage` (e.g. claude-sonnet-5)."""
+    usage = obj.get("modelUsage") or {}
+    keys = list(usage)
+    result = keys[0] if keys else None
+    return result
+
+
 def _object_to_events(obj: dict) -> list[AgentEvent]:
     sid = obj.get("session_id")
     is_error = obj.get("is_error")
@@ -45,8 +53,9 @@ def _object_to_events(obj: dict) -> list[AgentEvent]:
     else:
         text = obj.get("result", "")
         cost = obj.get("total_cost_usd")
+        model = _model_of(obj)
         events.append(AgentEvent(kind="text", text=text, session_id=sid))
-        events.append(AgentEvent(kind="result", session_id=sid, cost_usd=cost))
+        events.append(AgentEvent(kind="result", session_id=sid, cost_usd=cost, model=model))
     return events
 
 

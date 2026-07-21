@@ -43,7 +43,7 @@ async def _cmd_new(msg, arg: str) -> None:
         return
     title = format.title_from_prompt(prompt)
     sessions.remember(result.session_id, backend_name, title)
-    block = format.session_block(phrases.pick(phrases.NEW_STARTED_PHRASES), result.session_id, title, body=result.text)
+    block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd)
     sent = await reply.deliver(working, msg, block)
     if sent is not None:
         sessions.remember_reply(sent.message_id, result.session_id)
@@ -59,8 +59,7 @@ async def _handle_reply_continue(msg, sid: str) -> None:
         return
     title = sessions.title_for(sid)
     sessions.remember(result.session_id, backend_name, title)
-    extra = f"${result.cost_usd:.3f}" if result.cost_usd else None
-    block = format.session_block(phrases.pick(phrases.CONTINUE_REPLY_PHRASES), result.session_id, title, body=result.text, extra=extra)
+    block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd)
     sent = await reply.deliver(working, msg, block)
     if sent is not None:
         sessions.remember_reply(sent.message_id, result.session_id)

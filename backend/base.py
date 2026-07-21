@@ -14,6 +14,7 @@ class AgentEvent:
     tool: str | None = None
     session_id: str | None = None
     cost_usd: float | None = None
+    model: str | None = None
 
 
 @runtime_checkable

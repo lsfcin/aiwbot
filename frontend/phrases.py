@@ -16,24 +16,10 @@ WORKING_PHRASES = [
     "⏳ um instante…",
     "⏳ pensando…",
 ]
-NEW_STARTED_PHRASES = [
-    "Sessão iniciada — agora é a ativa.",
-    "Sessão criada e selecionada.",
-    "Nova sessão no ar, já selecionada.",
-    "Iniciada. Selecionada.",
-    "Comecei a sessão — ela é a ativa agora.",
-]
 NEW_EMPTY_PROMPT_PHRASES = [
     "Manda o prompt junto: /new <o que você quer que essa sessão faça>",
     "Faltou o prompt — /new precisa de um texto depois, tipo /new revisa esse arquivo",
     "/new sem prompt não dispara nada. Escreve o que quer depois do comando.",
-]
-CONTINUE_REPLY_PHRASES = [
-    "Terminei.",
-    "Pronto.",
-    "Rodei o prompt.",
-    "Feito.",
-    "Aqui está.",
 ]
 ERROR_PHRASES = [
     "Deu erro: {e}",

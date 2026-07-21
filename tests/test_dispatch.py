@@ -34,3 +34,12 @@ def test_missing_result_event_raises_dispatch_error():
     events = [AgentEvent(kind="text", text="hi")]
     with pytest.raises(DispatchError):
         events_to_result(events)
+
+
+def test_model_flows_from_result_event():
+    events = [
+        AgentEvent(kind="text", text="hi", session_id="s1"),
+        AgentEvent(kind="result", session_id="s1", cost_usd=0.01, model="claude-sonnet-5"),
+    ]
+    result = events_to_result(events)
+    assert result.model == "claude-sonnet-5"
