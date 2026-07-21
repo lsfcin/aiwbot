@@ -8,6 +8,17 @@ from . import config, dispatch, format, inbox, phrases, sessions
 WORKSPACE_DIR = "/mnt/workspace"
 TELEGRAM_MSG_LIMIT = 4096
 DEFAULT_BACKEND = "claude"
+_BUSY_MARKERS = ("no conversation found", "currently running as a background agent")
+
+
+def _friendly_error(e: Exception) -> str:
+    text = str(e).lower()
+    busy = any(marker in text for marker in _BUSY_MARKERS)
+    if busy:
+        result = format.plain(phrases.pick(phrases.SESSION_LIVE_ELSEWHERE_PHRASES))
+    else:
+        result = format.plain(phrases.pick(phrases.ERROR_PHRASES, e=e))
+    return result
 
 
 async def _safe_reply(msg, html_text: str) -> "telegram.Message | None":
@@ -49,7 +60,7 @@ async def _cmd_new(msg, arg: str) -> None:
     try:
         result = await dispatch.turn(prompt, session_id=None, backend_name=backend_name, cwd=WORKSPACE_DIR)
     except dispatch.DispatchError as e:
-        await _safe_reply(msg, format.plain(phrases.pick(phrases.ERROR_PHRASES, e=e)))
+        await _safe_reply(msg, _friendly_error(e))
         return
     sessions.remember(result.session_id, backend_name)
     block = format.session_block(phrases.pick(phrases.NEW_STARTED_PHRASES), result.session_id, None, body=result.text)
@@ -64,7 +75,7 @@ async def _handle_reply_continue(msg, sid: str) -> None:
     try:
         result = await dispatch.turn(msg.text, session_id=sid, backend_name=backend_name, cwd=WORKSPACE_DIR)
     except dispatch.DispatchError as e:
-        await _safe_reply(msg, format.plain(phrases.pick(phrases.ERROR_PHRASES, e=e)))
+        await _safe_reply(msg, _friendly_error(e))
         return
     sessions.remember(result.session_id, backend_name)
     extra = f"${result.cost_usd:.3f}" if result.cost_usd else None

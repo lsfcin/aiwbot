@@ -65,13 +65,13 @@ class ClaudeBackend(CliBackend):
     name = "claude"
 
     def build_args(self, prompt: str, session_id: str | None) -> list[str]:
-        """--fork-session is mandatory on resume: registered agents refuse a plain --resume."""
+        """Plain --resume, no fork: keeps one lineage (same id, same transcript) per AD-3.
+        Fork was only needed in the old bot's --bg era, where a live agent locked the id."""
         binary = _claude_bin()
         args = [binary, "-p", "--output-format", "json", "--permission-mode", "bypassPermissions"]
         if session_id:
             args.append("--resume")
             args.append(session_id)
-            args.append("--fork-session")
         args.append(prompt)
         return args
 

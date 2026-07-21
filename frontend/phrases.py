@@ -49,6 +49,11 @@ UNKNOWN_CMD_PHRASES = [
     "Não entendi {cmd}. Tenta /help.",
     "{cmd}? Não conheço. /help lista o que dá pra fazer.",
 ]
+SESSION_LIVE_ELSEWHERE_PHRASES = [
+    "Essa sessão tá aberta ao vivo em outro lugar (VSCode?) agora — fecha lá e tenta de novo.",
+    "Não consigo continuar: essa sessão já tá em uso em outro lugar. Fecha lá primeiro.",
+    "Essa sessão parece estar aberta em outra janela — só dá pra seguir por aqui quando ela não estiver aberta em nenhum outro lugar.",
+]
 
 HELP_TEXT = (
     "<b>Comandos</b>\n"
