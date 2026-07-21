@@ -16,6 +16,7 @@ before any Telegram wiring. Reuses plumbing from the workspace bot (core/tools/t
 |------|-----------|-----|-------------|
 | [`backend/__init__.py`](backend/__init__.py) | — | `get_backend` | **facade** — __init__.py — facade: seam types + backend registry. Import backends only through here. |
 | [`tests/__init__.py`](tests/__init__.py) | — | — | **facade** — __init__.py — marks tests as a package. |
+| [`HISTORY.md`](HISTORY.md) | — | — | aiwbot — History |
 | [`KNOWN-BUGS.md`](KNOWN-BUGS.md) | — | — | aiwbot — Known Bugs |
 | [`README.md`](README.md) | — | — | aiwbot |
 | [`ROADMAP.md`](ROADMAP.md) | — | — | aiwbot — Roadmap |
@@ -25,7 +26,7 @@ before any Telegram wiring. Reuses plumbing from the workspace bot (core/tools/t
 | [`backend/cli.py`](backend/cli.py) | — | `CliBackend`, `build_args`, `parse`, `send` | cli.py — CliBackend: the single subprocess-driven send() loop; subclasses supply build_args + parse. |
 | [`backend/opencode.py`](backend/opencode.py) | — | `parse_events`, `OpencodeBackend`, `build_args`, `parse` | opencode.py — OpencodeBackend: normalizes `opencode run --format json` (JSONL stream). |
 | [`backend/proc.py`](backend/proc.py) | — | `run_capture`, `events_from_run` | proc.py — subprocess driver + run-result → events handling (shared by all CLI backends). |
-| [`conftest.py`](conftest.py) | [`conftest.pyi`](conftest.pyi) | — | conftest.py — pytest anchor: puts the project root on sys.path so `backend` imports resolve. |
+| [`conftest.py`](conftest.py) | — | — | conftest.py — pytest anchor: puts the project root on sys.path so `backend` imports resolve. |
 | [`proto.py`](proto.py) | — | — | proto.py — live smoke: run one prompt through each backend + prove single-lineage resume. ~$0.10/run. |
 | [`tests/test_parse_claude.py`](tests/test_parse_claude.py) | — | `test_claude_has_text_and_result`, `test_claude_text_and_session`, `test_claude_contract` | test_parse_claude.py — free unit test: claude fixture -> normalized AgentEvents satisfy the contract. |
 | [`tests/test_parse_opencode.py`](tests/test_parse_opencode.py) | — | `test_opencode_has_text_and_result`, `test_opencode_text_and_session`, `test_opencode_contract` | test_parse_opencode.py — free unit test: opencode JSONL fixture -> AgentEvents satisfy the contract. |
