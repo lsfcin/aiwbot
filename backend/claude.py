@@ -6,6 +6,34 @@ from .base import AgentEvent, TurnOptions, try_json
 from .cli import CliBackend
 
 _EXT_GLOB = ".vscode/extensions/anthropic.claude-code-*/resources/native-binary/claude"
+_PROJECTS = ".claude/projects"
+
+
+def _project_dir(cwd: str) -> pathlib.Path:
+    """Claude Code stores a cwd's transcripts under ~/.claude/projects/<cwd, / -> ->."""
+    slug = cwd.replace("/", "-")
+    return pathlib.Path.home() / _PROJECTS / slug
+
+
+def _opening_prompt(path: pathlib.Path) -> str:
+    """First `last-prompt` line = the session's opening prompt (near the top -> cheap scan)."""
+    title = ""
+    with path.open() as handle:
+        for line in handle:
+            if '"type":"last-prompt"' not in line:
+                continue
+            obj = try_json(line.strip())
+            if obj is not None:
+                title = obj.get("lastPrompt") or ""
+            break
+    return title
+
+
+def _session_item(path: pathlib.Path) -> dict:
+    sid = path.stem
+    title = _opening_prompt(path)
+    updated = path.stat().st_mtime
+    return {"session_id": sid, "title": title, "updated_at": updated}
 
 
 def _claude_bin() -> str:
@@ -83,8 +111,22 @@ class ClaudeBackend(CliBackend):
         if session_id:
             args.append("--resume")
             args.append(session_id)
+        elif options.title:
+            args.append("--name")
+            args.append(options.title)
         args.append(prompt)
         return args
 
     def parse(self, stdout: str) -> list[AgentEvent]:
         return parse_events(stdout)
+
+    def list_sessions(self, cwd: str) -> list[dict]:
+        """Read the canonical store (~/.claude/projects/<cwd>/*.jsonl) so the picker shows
+        every resumable session for cwd — including ones started in VSCode, not just the bot's."""
+        directory = _project_dir(cwd)
+        items: list[dict] = []
+        if directory.is_dir():
+            for path in directory.glob("*.jsonl"):
+                item = _session_item(path)
+                items.append(item)
+        return items

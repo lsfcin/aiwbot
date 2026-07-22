@@ -17,5 +17,5 @@
 | [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |
 | [`reply.py`](reply.py) | — | `safe_reply`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |
 | [`resume.py`](resume.py) | — | `cmd_resume`, `handle_callback` | resume.py — /resume picker (Claude-Code-style): list recent sessions, tap to re-anchor + continue. |
-| [`sessions.py`](sessions.py) | — | `remember`, `recent`, `count`, `backend_for`, `title_for` | sessions.py — local registry: session_id -> backend (no cross-backend `agents --json` equivalent |
+| [`sessions.py`](sessions.py) | — | `remember`, `adopt`, `recent`, `count`, `backend_for` | sessions.py — session registry (backend/mode/reply_map, bot-only state) + cross-backend listing: |
 <!-- routing:end -->

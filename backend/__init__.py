@@ -14,4 +14,10 @@ def get_backend(name: str) -> AgentBackend:
     return instance
 
 
-__all__ = ["AgentEvent", "AgentBackend", "EventKind", "TurnOptions", "get_backend"]
+def backend_names() -> list[str]:
+    """Registered backend names — the set the session picker aggregates across."""
+    return list(_BACKENDS)
+
+
+__all__ = ["AgentEvent", "AgentBackend", "EventKind", "TurnOptions",
+           "get_backend", "backend_names"]
