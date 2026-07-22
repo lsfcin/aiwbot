@@ -1,6 +1,8 @@
 # test_parse_opencode.py — free unit test: opencode JSONL fixture -> AgentEvents satisfy the contract.
 import pathlib
-from backend.opencode import parse_events
+import sqlite3
+from backend.opencode import parse_events, OpencodeBackend
+import backend.opencode as O
 from backend.base import check_contract
 
 _FIX = pathlib.Path(__file__).parent / "fixtures" / "opencode_pong.jsonl"
@@ -31,3 +33,30 @@ def test_opencode_contract():
     events = _events()
     ok, reason = check_contract(events)
     assert ok, reason
+
+
+def _seed_db(path):
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE session (id TEXT, parent_id TEXT, directory TEXT, title TEXT, time_updated INTEGER)")
+    rows = [("ses_a", None, "/mnt/workspace", "top here", 2000),
+            ("ses_child", "ses_a", "/mnt/workspace", "sub", 3000),
+            ("ses_other", None, "/home/lucas", "elsewhere", 4000)]
+    con.executemany("INSERT INTO session VALUES (?,?,?,?,?)", rows)
+    con.commit()
+    con.close()
+
+
+def test_list_sessions_filters_dir_and_toplevel(tmp_path, monkeypatch):
+    db = tmp_path / "opencode.db"
+    _seed_db(str(db))
+    monkeypatch.setattr(O, "_db_path", lambda: db)
+    items = OpencodeBackend().list_sessions("/mnt/workspace")
+    assert len(items) == 1
+    assert items[0]["session_id"] == "ses_a"
+    assert items[0]["title"] == "top here"
+    assert items[0]["updated_at"] == 2.0  # ms -> s
+
+
+def test_list_sessions_no_db_is_empty(tmp_path, monkeypatch):
+    monkeypatch.setattr(O, "_db_path", lambda: tmp_path / "absent.db")
+    assert OpencodeBackend().list_sessions("/mnt/workspace") == []

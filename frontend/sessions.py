@@ -1,7 +1,8 @@
-# sessions.py — local registry: session_id -> backend (no cross-backend `agents --json` equivalent
-# exists, so the frontend must remember this itself) + reply_map (message_id -> session_id).
+# sessions.py — session registry (backend/mode/reply_map, bot-only state) + cross-backend listing:
+# the /resume picker aggregates each backend's own store so it sees VSCode sessions too, not just ours.
 from __future__ import annotations
 import time
+from backend import get_backend, backend_names
 from . import config
 
 REPLY_MAP_MAX = 50
@@ -15,39 +16,59 @@ def remember(session_id: str, backend: str, title: str | None = None, preview: s
     config.save_config(sessions=sessions)
 
 
-def _matches(entry: dict, query: str) -> bool:
-    title = entry.get("title") or ""
-    lowered = title.lower()
+def adopt(session_id: str, backend: str, title: str | None, updated_at: float) -> None:
+    """Cache a store-listed session's backend/title into the registry (preserving any existing
+    mode/preview) so anchor + reply-to-continue resolve it — even VSCode sessions we didn't create."""
+    cfg = config.load_config()
+    sessions = cfg.get("sessions", {})
+    entry = sessions.get(session_id, {})
+    entry["backend"] = backend
+    entry["title"] = title
+    entry["updated_at"] = updated_at
+    entry.setdefault("preview", None)
+    sessions[session_id] = entry
+    config.save_config(sessions=sessions)
+
+
+def _title_matches(title: str | None, query: str) -> bool:
+    lowered = (title or "").lower()
     return (not query) or (query in lowered)
 
 
-def recent(n: int, query: str = "") -> list[dict]:
-    """Sessions newest-first (optionally filtered by title substring) for the /resume picker.
+def _all(cwd: str) -> list[dict]:
+    """Every resumable session for cwd, aggregated across backends, each tagged with its backend."""
+    items: list[dict] = []
+    for name in backend_names():
+        backend = get_backend(name)
+        listed = backend.list_sessions(cwd)
+        for item in listed:
+            item["backend"] = name
+            items.append(item)
+    items.sort(key=lambda e: e["updated_at"], reverse=True)
+    return items
 
-    Untitled entries (saved before the title feature shipped) are ghosts — skip them."""
-    sessions = config.load_config().get("sessions", {})
+
+def recent(n: int, query: str, cwd: str) -> list[dict]:
+    """Newest-first sessions (optionally title-filtered) for the /resume picker, from the backend
+    stores. Adopts each shown session into the registry so a later tap can resolve backend+title."""
     q = query.lower()
     items = []
-    for sid, entry in sessions.items():
-        if not entry.get("title"):
+    for item in _all(cwd):
+        if not _title_matches(item.get("title"), q):
             continue
-        if not _matches(entry, q):
-            continue
-        item = {"session_id": sid, "backend": entry.get("backend"), "title": entry.get("title"),
-                "preview": entry.get("preview"), "updated_at": entry.get("updated_at", 0)}
+        item.setdefault("preview", None)
         items.append(item)
-    items.sort(key=lambda e: e["updated_at"], reverse=True)
-    return items[:n]
+    page = items[:n]
+    for item in page:
+        adopt(item["session_id"], item["backend"], item.get("title"), item["updated_at"])
+    return page
 
 
-def count(query: str = "") -> int:
-    sessions = config.load_config().get("sessions", {})
+def count(query: str, cwd: str) -> int:
     q = query.lower()
     total = 0
-    for entry in sessions.values():
-        if not entry.get("title"):
-            continue
-        if _matches(entry, q):
+    for item in _all(cwd):
+        if _title_matches(item.get("title"), q):
             total += 1
     return total
 

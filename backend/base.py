@@ -21,8 +21,10 @@ class AgentEvent:
 class TurnOptions:
     """Per-turn knobs threaded from the frontend to a backend's build_args.
     Provider-agnostic: each backend maps what it can and ignores the rest.
-    mode ∈ {build, plan}. Room to grow (model, effort) for the next tier."""
+    mode ∈ {build, plan}. title names a new session (claude --name -> visible in its /resume).
+    Room to grow (model, effort) for the next tier."""
     mode: str = "build"
+    title: str | None = None
 
 
 @runtime_checkable
@@ -31,6 +33,12 @@ class AgentBackend(Protocol):
 
     def send(self, prompt: str, *, session_id: str | None, cwd: str,
              options: TurnOptions = TurnOptions()) -> AsyncIterator[AgentEvent]:
+        ...
+
+    def list_sessions(self, cwd: str) -> list[dict]:
+        """Resumable sessions for cwd from the provider's own store, newest-first-agnostic.
+        Each item: {session_id, title, updated_at}. Lets the frontend picker show sessions
+        started anywhere (e.g. VSCode), not just ones the bot created."""
         ...
 
 

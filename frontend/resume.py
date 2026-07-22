@@ -65,13 +65,13 @@ def _parse_arg(arg: str) -> tuple[str, int]:
     return query, count
 
 
-async def cmd_resume(msg, arg: str) -> None:
+async def cmd_resume(msg, arg: str, cwd: str) -> None:
     query, count = _parse_arg(arg.strip())
-    items = sessions.recent(count, query)
+    items = sessions.recent(count, query, cwd)
     if not items:
         await reply.safe_reply(msg, format.plain(phrases.pick(phrases.RESUME_EMPTY_PHRASES)))
         return
-    total = sessions.count(query)
+    total = sessions.count(query, cwd)
     header = _header(total, len(items), query)
     text = f"{header}\n\n{_list_text(items)}"
     keyboard = _keyboard(items)

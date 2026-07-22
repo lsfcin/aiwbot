@@ -43,7 +43,7 @@ async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     """Shared tail: dispatch one turn in the session's sticky mode, then deliver the answer
     with its footer + plan↔build toggle button. New sessions default to build."""
     session_mode = sessions.mode_for(session_id) if session_id else "build"
-    options = TurnOptions(mode=session_mode)
+    options = TurnOptions(mode=session_mode, title=title)
     try:
         result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name, cwd=WORKSPACE_DIR, options=options)
     except dispatch.DispatchError as e:
@@ -84,7 +84,7 @@ async def _dispatch_command(text: str, msg) -> None:
     elif cmd == "/new":
         await _cmd_new(msg, arg)
     elif cmd == "/resume":
-        await resume.cmd_resume(msg, arg)
+        await resume.cmd_resume(msg, arg, WORKSPACE_DIR)
     else:
         await reply.safe_reply(msg, format.plain(phrases.pick(phrases.UNKNOWN_CMD_PHRASES, cmd=cmd)))
 

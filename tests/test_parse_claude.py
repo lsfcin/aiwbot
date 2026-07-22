@@ -57,3 +57,40 @@ def test_build_args_plan_mode_sets_permission_plan():
     backend = ClaudeBackend()
     args = backend.build_args("hi", None, TurnOptions(mode="plan"))
     assert _perm_value(args) == "plan"
+
+
+def test_build_args_new_session_sets_name():
+    backend = ClaudeBackend()
+    args = backend.build_args("hi", None, TurnOptions(title="my title"))
+    idx = args.index("--name")
+    assert args[idx + 1] == "my title"
+
+
+def test_build_args_resume_omits_name():
+    backend = ClaudeBackend()
+    args = backend.build_args("hi", "sid-1", TurnOptions(title="my title"))
+    assert "--name" not in args
+
+
+def test_build_args_new_without_title_omits_name():
+    backend = ClaudeBackend()
+    args = backend.build_args("hi", None, TurnOptions())
+    assert "--name" not in args
+
+
+def test_list_sessions_reads_store(tmp_path, monkeypatch):
+    import backend.claude as C
+    sid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    line = '{"type":"last-prompt","lastPrompt":"olá mundo"}\n'
+    (tmp_path / f"{sid}.jsonl").write_text(line)
+    monkeypatch.setattr(C, "_project_dir", lambda cwd: tmp_path)
+    items = ClaudeBackend().list_sessions("/mnt/workspace")
+    assert len(items) == 1
+    assert items[0]["session_id"] == sid
+    assert items[0]["title"] == "olá mundo"
+
+
+def test_list_sessions_missing_dir_is_empty(tmp_path, monkeypatch):
+    import backend.claude as C
+    monkeypatch.setattr(C, "_project_dir", lambda cwd: tmp_path / "nope")
+    assert ClaudeBackend().list_sessions("/x") == []

@@ -14,6 +14,10 @@ class CliBackend:
     def parse(self, stdout: str) -> list[AgentEvent]:
         raise NotImplementedError
 
+    def list_sessions(self, cwd: str) -> list[dict]:
+        """Default: provider exposes no session store. Backends with one override this."""
+        return []
+
     async def send(self, prompt: str, *, session_id: str | None, cwd: str,
                    options: TurnOptions = TurnOptions()) -> AsyncIterator[AgentEvent]:
         args = self.build_args(prompt, session_id, options)
