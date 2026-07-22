@@ -11,7 +11,7 @@
 | [`bot.py`](bot.py) | — | `main` | bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX. |
 | [`config.py`](config.py) | [`config.pyi`](config.pyi) | `config_dir`, `load_config`, `save_config`, `bot_token`, `allowed_chat_id` | config.py — aiwbot's own Telegram config dir (separate token/storage from the old workspace bot). |
 | [`dispatch.py`](dispatch.py) | [`dispatch.pyi`](dispatch.pyi) | `TurnResult`, `DispatchError`, `events_to_result`, `turn` | dispatch.py — one call site that drains any AgentBackend.send() into a single reply. |
-| [`format.py`](format.py) | [`format.pyi`](format.pyi) | `relative_time`, `plain`, `title_words`, `title_from_prompt`, `format_body` | format.py — pure text formatting: markdown/tables -> Telegram HTML, session headers. No I/O. |
+| [`format.py`](format.py) | [`format.pyi`](format.pyi) | `relative_time`, `plain`, `title_words`, `title_from_prompt`, `response_preview` | format.py — pure text formatting: markdown/tables -> Telegram HTML, session headers. No I/O. |
 | [`inbox.py`](inbox.py) | [`inbox.pyi`](inbox.pyi) | `append_entry`, `build_entry`, `save_media` | inbox.py — capture plain text/media into brain/INBOX.md ($0, no backend call). |
 | [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |
 | [`reply.py`](reply.py) | — | `safe_reply`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |

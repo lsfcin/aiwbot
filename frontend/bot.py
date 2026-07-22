@@ -49,7 +49,8 @@ async def _cmd_new(msg, arg: str) -> None:
         await reply.deliver(working, msg, _friendly_error(e))
         return
     title = format.title_from_prompt(prompt)
-    sessions.remember(result.session_id, backend_name, title)
+    preview = format.response_preview(result.text)
+    sessions.remember(result.session_id, backend_name, title, preview)
     block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd)
     sent = await reply.deliver(working, msg, block)
     if sent is not None:
@@ -65,7 +66,8 @@ async def _handle_reply_continue(msg, sid: str) -> None:
         await reply.deliver(working, msg, _friendly_error(e))
         return
     title = sessions.title_for(sid)
-    sessions.remember(result.session_id, backend_name, title)
+    preview = format.response_preview(result.text)
+    sessions.remember(result.session_id, backend_name, title, preview)
     block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd)
     sent = await reply.deliver(working, msg, block)
     if sent is not None:

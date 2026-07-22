@@ -7,11 +7,11 @@ from . import config
 REPLY_MAP_MAX = 50
 
 
-def remember(session_id: str, backend: str, title: str | None = None) -> None:
+def remember(session_id: str, backend: str, title: str | None = None, preview: str | None = None) -> None:
     cfg = config.load_config()
     sessions = cfg.get("sessions", {})
     now = time.time()
-    sessions[session_id] = {"backend": backend, "title": title, "updated_at": now}
+    sessions[session_id] = {"backend": backend, "title": title, "preview": preview, "updated_at": now}
     config.save_config(sessions=sessions)
 
 
@@ -33,7 +33,8 @@ def recent(n: int, query: str = "") -> list[dict]:
             continue
         if not _matches(entry, q):
             continue
-        item = {"session_id": sid, "backend": entry.get("backend"), "title": entry.get("title"), "updated_at": entry.get("updated_at", 0)}
+        item = {"session_id": sid, "backend": entry.get("backend"), "title": entry.get("title"),
+                "preview": entry.get("preview"), "updated_at": entry.get("updated_at", 0)}
         items.append(item)
     items.sort(key=lambda e: e["updated_at"], reverse=True)
     return items[:n]
