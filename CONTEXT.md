@@ -15,7 +15,7 @@ before any Telegram wiring. Reuses plumbing from the workspace bot (core/tools/t
 | Subdirectory | Description |
 |--------------|-------------|
 | [`frontend/`](frontend/CONTEXT.md) | Telegram frontend on the AgentBackend seam — /new + reply-to-continue + INBOX ca |
-| [`tests/`](tests/CONTEXT.md) | — |
+| [`tests/`](tests/CONTEXT.md) | Free unit tests — pure-logic fixtures/parsers/formatting, no network or cost. |
 
 | File | Interface | API | Description |
 |------|-----------|-----|-------------|
