@@ -1,6 +1,34 @@
 # aiwbot — History
 > Archive of completed work. Open work lives in [ROADMAP.md](ROADMAP.md).
 
+## Completed — 2026-07-22
+
+### Tier 1 — bot-prefix trigger, native title source, operate docs
+- **"bot"-prefix trigger**: text starting "bot " / "bot," routes to `/new` instead of INBOX capture
+  (`bot.py::_strip_bot_prefix`).
+- **Native title source investigated**: Claude Code writes a `{"type":"ai-title","aiTitle":...}` line
+  into the session's own `~/.claude/projects/<proj>/<sid>.jsonl` — fixed for the session's life once
+  written, zero-cost read (no LLM call). ~27/103 local transcripts lack it (mostly short/aborted
+  sessions). opencode exposes an equivalent `session.title` column directly in its sqlite db
+  (`~/.local/share/opencode/opencode.db`), placeholder value `"New session - <ts>"` before a real
+  title lands. Findings fed directly into the Tier 2 picker below.
+- **Operate docs**: README.md now documents systemd start/stop/restart/logs commands, the
+  restart-after-code-change gotcha (service reads straight off the working tree), and the
+  no-linger-yet reboot caveat.
+
+### Tier 2 — `/resume` picker with preview + simplified pagination
+- Preview (first 6 … last 6 words of the session's last agent response) added to `/resume`, persisted
+  in the registry alongside title (`format.response_preview`, `sessions.remember`).
+- **Redesigned after a live test**: the original plan (3-line inline buttons) doesn't work — Telegram
+  inline buttons don't render multi-line labels, confirmed live (text collapsed into one truncated
+  line; see SPECS.md AD-5). Shipped instead: a numbered list with preview in the message *text*
+  (`resume._list_text`/`_entry_line`), numeral-only buttons in a single row, order-matched to the list.
+- Pagination simplified: default shown count 5 (was 8, felt like too many); `/resume <n>` overrides the
+  count directly (e.g. `/resume 15`) instead of a Next/Prev pager; header hints the override when more
+  sessions exist than shown.
+- Gitflow: `feature/roadmap-tier1`, `feature/resume-3line-buttons`, `feature/resume-list-and-count`,
+  `feature/resume-numeral-buttons` (+ small routing-sync branches) → `develop` → `main`, all pushed.
+
 ## Completed — 2026-07-21
 
 ### Phase B — Telegram frontend on the seam (live-confirmed)

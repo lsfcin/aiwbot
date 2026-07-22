@@ -31,6 +31,12 @@ the busy/not-found error and shows a "close it there first" message rather than 
 Subprocesses run with explicit `cwd` (not the daemon's inherited $HOME) or the session registers under
 the wrong directory and becomes invisible to later lookups. Carried from the workspace-bot cwd bug.
 
+### AD-5 — Telegram `InlineKeyboardButton` labels don't render multi-line
+Discovered live (2026-07-22): a `\n` inside a button's `text` doesn't produce a multi-line button —
+Telegram clients render everything as one line and truncate it. Any "rich" per-item display (title +
+preview + meta) has to live in the *message text* instead, where `\n` works normally; buttons stay
+single-line tap targets, order-matched to a numbered list in the text (see `frontend/resume.py`).
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.
