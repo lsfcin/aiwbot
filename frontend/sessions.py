@@ -64,6 +64,23 @@ def title_for(session_id: str) -> str | None:
     return entry.get("title")
 
 
+def mode_for(session_id: str) -> str:
+    """Sticky per-session mode ∈ {build, plan}; defaults to build when unset."""
+    sessions = config.load_config().get("sessions", {})
+    entry = sessions.get(session_id, {})
+    return entry.get("mode") or "build"
+
+
+def set_mode(session_id: str, mode: str) -> None:
+    """Persist the session's mode, preserving the rest of its registry entry."""
+    cfg = config.load_config()
+    sessions = cfg.get("sessions", {})
+    entry = sessions.get(session_id)
+    if entry is not None:
+        entry["mode"] = mode
+        config.save_config(sessions=sessions)
+
+
 def remember_reply(message_id: int, session_id: str) -> None:
     cfg = config.load_config()
     reply_map = cfg.get("reply_map", {})

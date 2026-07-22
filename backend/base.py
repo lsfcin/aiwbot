@@ -17,11 +17,20 @@ class AgentEvent:
     model: str | None = None
 
 
+@dataclass
+class TurnOptions:
+    """Per-turn knobs threaded from the frontend to a backend's build_args.
+    Provider-agnostic: each backend maps what it can and ignores the rest.
+    mode ∈ {build, plan}. Room to grow (model, effort) for the next tier."""
+    mode: str = "build"
+
+
 @runtime_checkable
 class AgentBackend(Protocol):
     name: str
 
-    def send(self, prompt: str, *, session_id: str | None, cwd: str) -> AsyncIterator[AgentEvent]:
+    def send(self, prompt: str, *, session_id: str | None, cwd: str,
+             options: TurnOptions = TurnOptions()) -> AsyncIterator[AgentEvent]:
         ...
 
 
