@@ -3,18 +3,18 @@ import pytest
 from frontend import mode, sessions, config
 
 
-def test_toggle_markup_build_shows_flip_to_plan():
+def test_toggle_markup_build_selected_brackets_build():
     markup = mode.toggle_markup("sid-x", "build")
-    button = markup.inline_keyboard[0][0]
-    assert button.text == "🧭 → plan"
-    assert button.callback_data == "mode:sid-x"
+    row = markup.inline_keyboard[0]
+    assert [b.text for b in row] == ["[ BUILD ]", "PLAN"]
+    assert [b.callback_data for b in row] == ["mode:build:sid-x", "mode:plan:sid-x"]
 
 
-def test_toggle_markup_plan_shows_flip_to_build():
+def test_toggle_markup_plan_selected_brackets_plan():
     markup = mode.toggle_markup("sid-y", "plan")
-    button = markup.inline_keyboard[0][0]
-    assert button.text == "🔨 → build"
-    assert button.callback_data == "mode:sid-y"
+    row = markup.inline_keyboard[0]
+    assert [b.text for b in row] == ["BUILD", "[ PLAN ]"]
+    assert [b.callback_data for b in row] == ["mode:build:sid-y", "mode:plan:sid-y"]
 
 
 @pytest.fixture
