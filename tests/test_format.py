@@ -1,5 +1,5 @@
 # test_format.py — free unit test: markdown/table -> Telegram HTML conversion.
-from frontend.format import format_body, session_block, title_words, title_from_prompt, relative_time, short_model, answer_block
+from frontend.format import format_body, session_block, title_words, title_from_prompt, response_preview, relative_time, short_model, answer_block
 
 
 def test_plain_markdown_to_html():
@@ -38,6 +38,15 @@ def test_session_block_includes_header_and_body():
 def test_title_from_prompt_takes_leading_words():
     title = title_from_prompt("revisa o arquivo de configuração agora por favor com calma", n=4)
     assert title == "revisa o arquivo de"
+
+
+def test_response_preview_head_and_tail():
+    text = "one two three four five six seven eight nine ten eleven twelve thirteen"
+    assert response_preview(text) == "one two three four five six … eight nine ten eleven twelve thirteen"
+
+
+def test_response_preview_short_text_untouched():
+    assert response_preview("resposta curta") == "resposta curta"
 
 
 def test_relative_time_buckets():
