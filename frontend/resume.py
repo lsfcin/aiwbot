@@ -10,7 +10,7 @@ LABEL_MAX = 60
 def _truncate(text: str, limit: int) -> str:
     result = text
     if len(text) > limit:
-        result = text[:limit - 1] + "…"
+        result = text[:limit - 1] + ". . ."
     return result
 
 
@@ -27,7 +27,7 @@ def _entry_line(i: int, item: dict) -> str:
     preview = item.get("preview")
     result = header
     if preview:
-        result = f"{header}\n   ↳ {preview}"
+        result = f"{header}\n{preview}\n"
     return result
 
 
