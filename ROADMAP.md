@@ -52,15 +52,11 @@ session id in reply" (Niceties, old) — the `[XXX]` prefix already disambiguate
       a real title is generated; filter that pattern the same way `sessions.py` already filters
       `(SEM TÍTULO)` ghosts.
       Feeds Tier 2's 3-line buttons directly.
-      Code itself displays, for both backends. Read-only research, no code change — informs Tier 2's
-      3-line buttons before that work is done, so it doesn't get built twice. Bonus if the source also
-      enumerates sessions Claude Code started outside aiwbot (e.g. CLI-only sessions like the ementas
-      one) — would close that visibility gap too.
 
 ### Tier 2 — small, self-contained
-- [ ] **`/resume` 3-line buttons** — line 2 = first 6 words … last 6 words of that session's LAST
-      agent response. Requires storing the last response text (or a head/tail preview) in the registry
-      each turn — the seam already surfaces the text; just persist a preview alongside title/backend.
+- [x] **`/resume` 3-line buttons** — line 1 = title, line 2 = preview (first 6 … last 6 words of that
+      session's last agent response), line 3 = time · backend. Preview persisted in the registry
+      alongside title, written from the same seam-surfaced text already used for the reply.
 - [ ] **Pagination past the top 8 in `/resume`** — today only the 8 most recent sessions show, no
       Next/Prev button; older ones are reachable only via `/resume <termo>` if you remember a title
       word (live search-as-you-type isn't possible in a TG inline keyboard). Add paging.
