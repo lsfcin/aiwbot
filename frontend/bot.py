@@ -19,6 +19,13 @@ def _friendly_error(e: Exception) -> str:
     return result
 
 
+def _strip_bot_prefix(text: str) -> str | None:
+    lowered = text.lower()
+    has_prefix = lowered.startswith("bot ") or lowered.startswith("bot,")
+    prompt = text[4:].strip() if has_prefix else None
+    return prompt
+
+
 def _parse_new_arg(arg: str) -> tuple[str, str]:
     backend_name = DEFAULT_BACKEND
     prompt = arg
@@ -89,6 +96,11 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         sid = sessions.session_for_reply(msg.reply_to_message.message_id)
         if sid:
             context.application.create_task(_handle_reply_continue(msg, sid))
+            return
+    if msg.text:
+        bot_prompt = _strip_bot_prefix(msg.text)
+        if bot_prompt is not None:
+            context.application.create_task(_cmd_new(msg, bot_prompt))
             return
     if msg.voice is not None:
         path = await inbox.save_media(msg.voice.file_id, context, ".ogg")
