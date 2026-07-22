@@ -4,17 +4,27 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from . import config, format, phrases, reply, sessions
 
 RESUME_COUNT = 8
-LABEL_MAX = 60
+LINE_MAX = 40
+
+
+def _truncate(text: str, limit: int) -> str:
+    result = text
+    if len(text) > limit:
+        result = text[:limit - 1] + "…"
+    return result
 
 
 def _label(item: dict) -> str:
-    title = format.title_words(item["title"])
+    title = _truncate(format.title_words(item["title"]), LINE_MAX)
     when = format.relative_time(item["updated_at"])
     backend = item["backend"]
-    label = f"{title} · {when} · {backend}"
-    if len(label) > LABEL_MAX:
-        label = label[:LABEL_MAX - 1] + "…"
-    return label
+    meta = _truncate(f"{when} · {backend}", LINE_MAX)
+    lines = [title]
+    preview = item.get("preview")
+    if preview:
+        lines.append(_truncate(preview, LINE_MAX))
+    lines.append(meta)
+    return "\n".join(lines)
 
 
 def _keyboard(items: list[dict]) -> InlineKeyboardMarkup:

@@ -43,6 +43,17 @@ def title_from_prompt(prompt: str, n: int = 8) -> str:
     return " ".join(words[:n])
 
 
+def response_preview(text: str, n: int = 6) -> str:
+    """First n … last n words of a response, for the /resume picker preview line."""
+    words = text.split()
+    result = " ".join(words)
+    if len(words) > 2 * n:
+        head = " ".join(words[:n])
+        tail = " ".join(words[-n:])
+        result = f"{head} … {tail}"
+    return result
+
+
 def _is_table_row(line: str) -> bool:
     s = line.strip()
     return s.startswith("|") and s.endswith("|") and s.count("|") >= 2
