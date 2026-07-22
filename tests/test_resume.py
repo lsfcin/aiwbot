@@ -1,6 +1,6 @@
 # test_resume.py — free unit test: /resume picker list/label/pagination assembly.
 import time
-from frontend.resume import _label, _entry_line, _list_text, _header, _parse_arg, _truncate
+from frontend.resume import _label, _entry_line, _list_text, _header, _parse_arg, _truncate, _keyboard
 
 _NOW = time.time()
 
@@ -14,7 +14,7 @@ def test_entry_line_appends_preview_on_second_line():
     item = {"title": "hello world session", "preview": "faz isso … resposta pronta",
             "backend": "claude", "updated_at": _NOW}
     line = _entry_line(1, item)
-    assert line == "1. HELLO WORLD SESSION · agora · claude\n   faz isso … resposta pronta"
+    assert line == "1. HELLO WORLD SESSION · agora · claude\n   ↳ faz isso … resposta pronta"
 
 
 def test_entry_line_omits_preview_when_absent():
@@ -52,3 +52,12 @@ def test_truncate_adds_ellipsis_over_limit():
 
 def test_truncate_leaves_short_text_untouched():
     assert _truncate("short", 60) == "short"
+
+
+def test_keyboard_is_single_row_of_numerals():
+    items = [{"session_id": "sid-a", "title": "a", "backend": "claude", "updated_at": _NOW},
+              {"session_id": "sid-b", "title": "b", "backend": "opencode", "updated_at": _NOW}]
+    markup = _keyboard(items)
+    row = markup.inline_keyboard[0]
+    assert [b.text for b in row] == ["1", "2"]
+    assert [b.callback_data for b in row] == ["resume:sid-a", "resume:sid-b"]

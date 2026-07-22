@@ -27,7 +27,7 @@ def _entry_line(i: int, item: dict) -> str:
     preview = item.get("preview")
     result = header
     if preview:
-        result = f"{header}\n   {preview}"
+        result = f"{header}\n   ↳ {preview}"
     return result
 
 
@@ -39,13 +39,12 @@ def _list_text(items: list[dict]) -> str:
 
 
 def _keyboard(items: list[dict]) -> InlineKeyboardMarkup:
-    rows = []
-    for item in items:
-        text = _label(item)
+    row = []
+    for i, item in enumerate(items, start=1):
         data = f"resume:{item['session_id']}"
-        button = InlineKeyboardButton(text, callback_data=data)
-        rows.append([button])
-    return InlineKeyboardMarkup(rows)
+        button = InlineKeyboardButton(str(i), callback_data=data)
+        row.append(button)
+    return InlineKeyboardMarkup([row])
 
 
 def _header(total: int, shown: int, query: str) -> str:
