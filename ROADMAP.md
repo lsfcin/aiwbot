@@ -26,44 +26,10 @@ Archived in [HISTORY.md](HISTORY.md).
       title (pre-title registry saves). New sessions always get a title (`bot.py`), so this self-heals;
       old ghost entries stay in the registry file but never surface in the picker.
 
-## Up next — sequenced easiest → hardest (2026-07-21)
-Ordered so each tier ships value fast without forcing rework in a later tier. Dropped "show full
-session id in reply" (Niceties, old) — the `[XXX]` prefix already disambiguates fine, not worth a line.
-
-### Tier 1 — trivial, no deps
-- [x] **"bot"-prefix trigger for text** — a message starting with "bot " or "bot," → treat as `/new`
-      (new session) instead of INBOX capture. Self-contained routing change in `bot.py`.
-- [x] **Native title source — investigated, findings below** — solved. Claude Code (VSCode ext +
-      terminal, confirmed both write the same store) appends a `{"type":"ai-title","sessionId":...,
-      "aiTitle":"..."}` line to the session's own `~/.claude/projects/<proj>/<sid>.jsonl` — written once
-      in the background after an early turn, then re-emitted with the *same* value on later turns (title
-      is fixed for the session's life, confirmed by scanning all 103 local transcripts: never saw a
-      value change within one file). Read = grep the last `ai-title` line, take `aiTitle`. Zero-cost, no
-      LLM call — Claude Code already paid for the generation.
-      Gap: ~27/103 transcripts have no `ai-title` line at all (all `entrypoint:"claude-vscode"`, mix of
-      very short/aborted sessions and a few unexpectedly long ones — looks like the async title-gen
-      sometimes just doesn't fire or the session closed before it landed). The 5 `entrypoint:"cli"` /
-      `"sdk-cli"` sessions sampled all had one. Fall back to today's `title_from_prompt` when absent.
-      Bonus closed for free: since this reads every `*.jsonl` in the project dir (not just sessions
-      aiwbot's own registry remembers), it naturally surfaces CLI-only sessions Lucas starts outside
-      aiwbot too (e.g. the ementas one) — no extra plumbing needed.
-      opencode: SQLite at `~/.local/share/opencode/opencode.db`, table `session`, column `title` (plain
-      TEXT, no parsing) — direct read. Placeholder value `"New session - <ISO timestamp>"` shows before
-      a real title is generated; filter that pattern the same way `sessions.py` already filters
-      `(SEM TÍTULO)` ghosts.
-      Feeds Tier 2's 3-line buttons directly.
-
-### Tier 2 — small, self-contained
-- [x] **`/resume` picker with preview** — corrected from the original 3-line-button plan: Telegram
-      inline buttons don't render multi-line labels (confirmed live — text collapsed into one
-      truncated line). Preview now lives in a numbered list in the message text (first 6 … last 6
-      words of the session's last agent response, one line under each numbered entry); buttons stay
-      single-line title chips, order-matched to the list. Preview persisted in the registry alongside
-      title.
-- [x] **Pagination, simplified** — default shown dropped 8 → 5 (felt like too many); `/resume <n>`
-      overrides the count directly (e.g. `/resume 15`), header hints it when more sessions exist than
-      shown (`· /resume 12 pra ver todas`). No Next/Prev pager — a plain number covers the same need
-      with less UI.
+## Up next — sequenced easiest → hardest
+Tier 1-2 (bot-prefix trigger, native title source, operate docs, `/resume` preview + pagination) shipped
+2026-07-22 — archived in [HISTORY.md](HISTORY.md). Ordered so each tier ships value fast without
+forcing rework in a later tier.
 
 ### Tier 3 — medium, new plumbing but scoped
 - [ ] **plan ↔ build mode** toggle, very low-friction (one tap / short command). Claude Code has a
