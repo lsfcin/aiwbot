@@ -32,12 +32,43 @@ Tier 1-2 (bot-prefix trigger, native title source, operate docs, `/resume` previ
 forcing rework in a later tier.
 
 ### Tier 3 — medium, new plumbing but scoped
-- [ ] **plan ↔ build mode** toggle, very low-friction (one tap / short command). Claude Code has a
-      plan mode; surface an easy switch so a dispatched turn can run in plan vs build.
+plan↔build toggle (sticky, segmented button) + session-parity groundwork shipped 2026-07-22 —
+archived in [HISTORY.md](HISTORY.md). Live feedback opened the follow-ups below.
+
+#### Session-parity polish (live feedback 2026-07-22) — do next, cheap → deep
+- [ ] **claude title = `aiTitle`, not the opening prompt** (2b). `/resume` shows `[A06] ## RESUME —`
+      because `_opening_prompt` reads the first `last-prompt` event. Claude Code's real picker title is
+      the **`aiTitle`** jsonl event (verified: session `a064881a` carries
+      `"aiTitle":"Resume video tool core M4 implementation"`). Fix `backend/claude.py` `_opening_prompt`/
+      `_session_item` to prefer the **latest** `aiTitle` (tail-scan the file; it recurs ~24×), fall back
+      to `lastPrompt`. Cheap: read last ~64 KB, grep last `aiTitle`.
+- [ ] **3-line `/resume` entry redesign** (extra) — each session over 3 lines in the message text
+      (buttons stay numeral-only, AD-5): L1 `N. TÍTULO` (6-word cap); L2 `<first 6 words> … <last 6
+      words>` of the session's **last response**; L3 `tempo · modo · provider · model · custo · %contexto`.
+      The 6…6 preview we agreed on isn't rendering today — wire it in. `frontend/resume.py` `_entry_line`
+      + a real preview source (registry `preview` only exists for bot-created turns; VSCode sessions need
+      it derived from the jsonl last assistant message). Depends on context-% (below) for L3.
+- [ ] **bot sessions invisible to VSCode/terminal pickers** (2a) — `--name` did NOT surface a
+      bot-created session ("JUST A TEST") in VSCode `/resume` **or** terminal `claude --resume`; it shows
+      only in the bot's own `/resume`. So `-p` sessions are systematically hidden from Claude Code's
+      native picker. Investigate the filter (compare a bot `-p` jsonl vs an interactive one for the field
+      the picker keys on — `kind`/`entrypoint`/persistence flag; check `--session-id` + no
+      `--no-session-persistence`). May be unfixable from outside the closed extension — if so, document
+      and drop.
+- [ ] **instant mode-button feedback** (1) — the segmented toggle takes ~2 s to reflect a tap (the
+      `answer()` + `edit_message_reply_markup` round-trip). Answer the callback immediately / make the
+      markup edit optimistic so the bracket flips instantly.
+
+#### Tier 3 remainder
 - [ ] **model + effort selection** — pick the model and the reasoning effort per session/turn (claude:
-      medium/high/…; model family), with optimized UX (tap, not typing flags). Sequenced after the plan
-      ↔ build toggle since the footer's `effort/mode` slot depends on a real effort signal that doesn't
-      exist yet from `claude -p`.
+      `--effort {low,medium,high,xhigh,max}`; `--model <family>`), tap-not-type UX. Reuses the
+      `TurnOptions` seam (add `model`/`effort` fields; claude maps to flags, opencode maps what it can).
+- [ ] **output-format translation** — translate the markdown that Claude Code / opencode emit
+      (`**bold**`, `##` headings, code fences) into what Telegram actually renders (MarkdownV2 or HTML).
+      Today bold sometimes shows, `##` never does — inconsistent. A translation layer sits between agent
+      output and the Telegram send. (INBOX 2026-07-22)
+- [ ] **context % in footer** — show the session's context-window usage % alongside `$cost` in each
+      message footer. Pairs with the session-size monitor idea (workspace-os TODO:104). (INBOX 2026-07-22)
 
 ### Tier 4 — large, architecturally heavy — do last, on purpose
 Sequenced last specifically so Tier 1-3 UI work (resume picker, buttons) doesn't get rebuilt once the

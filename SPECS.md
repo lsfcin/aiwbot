@@ -37,6 +37,30 @@ Telegram clients render everything as one line and truncate it. Any "rich" per-i
 preview + meta) has to live in the *message text* instead, where `\n` works normally; buttons stay
 single-line tap targets, order-matched to a numbered list in the text (see `frontend/resume.py`).
 
+### AD-6 — Session listing sources from each backend's own store, not a private registry
+The `/resume` picker aggregates `AgentBackend.list_sessions(cwd)` across backends so it sees sessions
+started anywhere, not just ones the bot created. Stores: **claude** =
+`~/.claude/projects/<cwd with / → ->/*.jsonl` (one file per session, id = filename stem, timestamp =
+mtime); **opencode** = `~/.local/share/opencode/opencode.db` sqlite `session` table (top-level rows
+where `parent_id IS NULL`, `time_updated` is ms). The bot's own `config.json` registry is now only
+side-state — sticky `mode`, `reply_map`, and an `adopt()` cache (backend+title) written for shown
+sessions so a later tap resolves the backend for reply-to-continue.
+
+### AD-7 — Claude Code's picker title is the `aiTitle` event (not the opening prompt)
+Discovered live (2026-07-22). A session's transcript carries a recurring `"aiTitle":"…"` jsonl event
+— the AI-generated title Claude Code's own `/resume` shows (e.g. `Resume video tool core M4
+implementation`). The **latest** occurrence is the current title. Deriving a title from the opening
+`last-prompt` instead (as the first cut did) yields ugly labels like `[A06] ## RESUME —`. Prefer
+`aiTitle` (tail-scan), fall back to `lastPrompt`.
+
+### AD-8 — `--name` does NOT make a headless `-p` session visible in Claude Code's picker
+Discovered live (2026-07-22). A bot-created session passed `--name "JUST A TEST"` appeared **only** in
+the bot's own `/resume` — never in VSCode `/resume` nor terminal `claude --resume`, despite a valid
+`.jsonl` transcript existing in the project dir. So `-p` sessions are systematically hidden from Claude
+Code's native picker by a filter internal to the (closed) extension/CLI — the name flag doesn't
+override it. Making bot sessions natively resumable elsewhere is an open investigation (ROADMAP), not a
+solved feature; may be impossible from outside the extension.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.
