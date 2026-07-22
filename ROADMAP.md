@@ -54,12 +54,16 @@ session id in reply" (Niceties, old) — the `[XXX]` prefix already disambiguate
       Feeds Tier 2's 3-line buttons directly.
 
 ### Tier 2 — small, self-contained
-- [x] **`/resume` 3-line buttons** — line 1 = title, line 2 = preview (first 6 … last 6 words of that
-      session's last agent response), line 3 = time · backend. Preview persisted in the registry
-      alongside title, written from the same seam-surfaced text already used for the reply.
-- [ ] **Pagination past the top 8 in `/resume`** — today only the 8 most recent sessions show, no
-      Next/Prev button; older ones are reachable only via `/resume <termo>` if you remember a title
-      word (live search-as-you-type isn't possible in a TG inline keyboard). Add paging.
+- [x] **`/resume` picker with preview** — corrected from the original 3-line-button plan: Telegram
+      inline buttons don't render multi-line labels (confirmed live — text collapsed into one
+      truncated line). Preview now lives in a numbered list in the message text (first 6 … last 6
+      words of the session's last agent response, one line under each numbered entry); buttons stay
+      single-line title chips, order-matched to the list. Preview persisted in the registry alongside
+      title.
+- [x] **Pagination, simplified** — default shown dropped 8 → 5 (felt like too many); `/resume <n>`
+      overrides the count directly (e.g. `/resume 15`), header hints it when more sessions exist than
+      shown (`· /resume 12 pra ver todas`). No Next/Prev pager — a plain number covers the same need
+      with less UI.
 
 ### Tier 3 — medium, new plumbing but scoped
 - [ ] **plan ↔ build mode** toggle, very low-friction (one tap / short command). Claude Code has a
