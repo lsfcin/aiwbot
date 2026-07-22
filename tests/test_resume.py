@@ -14,7 +14,7 @@ def test_entry_line_appends_preview_on_second_line():
     item = {"title": "hello world session", "preview": "faz isso … resposta pronta",
             "backend": "claude", "updated_at": _NOW}
     line = _entry_line(1, item)
-    assert line == "1. HELLO WORLD SESSION · agora · claude\n   ↳ faz isso … resposta pronta"
+    assert line == "1. HELLO WORLD SESSION · agora · claude\nfaz isso … resposta pronta\n"
 
 
 def test_entry_line_omits_preview_when_absent():
@@ -47,7 +47,7 @@ def test_parse_arg_text_is_query():
 
 
 def test_truncate_adds_ellipsis_over_limit():
-    assert _truncate("a" * 70, 60) == "a" * 59 + "…"
+    assert _truncate("a" * 70, 60) == "a" * 59 + ". . ."
 
 
 def test_truncate_leaves_short_text_untouched():
