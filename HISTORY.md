@@ -58,3 +58,23 @@
   the one interface holds across a forking backend (claude, `--fork-session`, new id/turn) and a
   same-lineage backend (opencode, `-s`, same id). Frontend chases `result.session_id` (AD-3, SPECS.md).
 - Gitflow: scaffold on `main` → Phase A on `feature/agent-backend-seam` → merged to `develop`.
+
+## Completed — 2026-07-22 (Tier 3 first-half + session parity)
+- **plan ↔ build mode toggle, sticky per-session** (Tier 3, first half). Seam `TurnOptions(mode)`
+  threaded frontend→send→build_args; claude maps `mode=plan` → `--permission-mode plan` (agent plans,
+  no edits) vs build → `bypassPermissions`; opencode ignores. `sessions.mode_for/set_mode` persist in
+  the registry, re-applied after `remember()`. Footer leads with the mode. Callbacks prefix-routed
+  (`^mode:`/`^resume:`). Refactor: extracted shared dispatch→deliver tail into `_run_and_deliver`.
+- **Segmented mode button** — replaced the single flip-button with a 2-button control: BUILD left /
+  PLAN right (fixed), selected one bracketed `[ BUILD ]`; only the bracket moves. Callback carries the
+  target mode (`mode:<target>:<sid>`); identical-markup edit guarded.
+- **Session parity bot↔VSCode via canonical stores** — `/resume` stopped reading only the private
+  registry; new seam `AgentBackend.list_sessions(cwd)` aggregates each backend's own store: claude
+  scans `~/.claude/projects/<cwd>/*.jsonl`, opencode reads `opencode.db` (session table). Sessions
+  shown are adopted into the registry (backend+title, mode preserved) so a tap resolves backend for
+  reply-to-continue. Bot-created claude sessions now pass `--name`. Live: 108 claude + 58 opencode
+  sessions listed for /mnt/workspace. **Caveats found live (see ROADMAP "Up next"):** claude title
+  should use the `aiTitle` event not the opening prompt; `--name` did NOT surface bot sessions in
+  VSCode/terminal pickers (deeper filter); button feedback ~2s; `/resume` needs the 3-line redesign.
+- **resume picker tweak + test sync** — adopted Lucas's hand-tested `resume.py` edits (ellipsis
+  `…`→`. . .`, dropped `↳` marker), synced the 2 pinning tests.
