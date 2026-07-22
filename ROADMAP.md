@@ -31,17 +31,27 @@ Ordered so each tier ships value fast without forcing rework in a later tier. Dr
 session id in reply" (Niceties, old) — the `[XXX]` prefix already disambiguates fine, not worth a line.
 
 ### Tier 1 — trivial, no deps
-- [ ] **"bot"-prefix trigger for text** — a message starting with "bot " or "bot," → treat as `/new`
+- [x] **"bot"-prefix trigger for text** — a message starting with "bot " or "bot," → treat as `/new`
       (new session) instead of INBOX capture. Self-contained routing change in `bot.py`.
-- [ ] **Native title source — investigate first** — Claude Code (VSCode ext + terminal both, per
-      Lucas — same titles in both) shows a title that stays fixed for the whole session — NOT the last
-      message (an earlier guess here, "read the transcript's last user entry," was wrong: one
-      coincidental match, unverified across a session's lifetime; retracted). Investigation step before
-      any implementation: find where/how Claude Code actually derives/stores that fixed title (check
-      the full `~/.claude/projects/<proj>/<sid>.jsonl` for a summary/title event type beyond what's
-      been grepped so far; check sibling `<sid>/` subdirs; check `claude --resume` CLI list
-      source/output; check VSCode extension storage). Separately check opencode's own session store for
-      an equivalent title field. Goal: zero-token-cost read (no LLM call) of the *same* title Claude
+- [x] **Native title source — investigated, findings below** — solved. Claude Code (VSCode ext +
+      terminal, confirmed both write the same store) appends a `{"type":"ai-title","sessionId":...,
+      "aiTitle":"..."}` line to the session's own `~/.claude/projects/<proj>/<sid>.jsonl` — written once
+      in the background after an early turn, then re-emitted with the *same* value on later turns (title
+      is fixed for the session's life, confirmed by scanning all 103 local transcripts: never saw a
+      value change within one file). Read = grep the last `ai-title` line, take `aiTitle`. Zero-cost, no
+      LLM call — Claude Code already paid for the generation.
+      Gap: ~27/103 transcripts have no `ai-title` line at all (all `entrypoint:"claude-vscode"`, mix of
+      very short/aborted sessions and a few unexpectedly long ones — looks like the async title-gen
+      sometimes just doesn't fire or the session closed before it landed). The 5 `entrypoint:"cli"` /
+      `"sdk-cli"` sessions sampled all had one. Fall back to today's `title_from_prompt` when absent.
+      Bonus closed for free: since this reads every `*.jsonl` in the project dir (not just sessions
+      aiwbot's own registry remembers), it naturally surfaces CLI-only sessions Lucas starts outside
+      aiwbot too (e.g. the ementas one) — no extra plumbing needed.
+      opencode: SQLite at `~/.local/share/opencode/opencode.db`, table `session`, column `title` (plain
+      TEXT, no parsing) — direct read. Placeholder value `"New session - <ISO timestamp>"` shows before
+      a real title is generated; filter that pattern the same way `sessions.py` already filters
+      `(SEM TÍTULO)` ghosts.
+      Feeds Tier 2's 3-line buttons directly.
       Code itself displays, for both backends. Read-only research, no code change — informs Tier 2's
       3-line buttons before that work is done, so it doesn't get built twice. Bonus if the source also
       enumerates sessions Claude Code started outside aiwbot (e.g. CLI-only sessions like the ementas
