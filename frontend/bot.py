@@ -2,7 +2,8 @@
 from __future__ import annotations
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from . import config, dispatch, format, inbox, phrases, reply, resume, sessions
+from backend import TurnOptions
+from . import config, dispatch, format, inbox, mode, phrases, reply, resume, sessions
 
 WORKSPACE_DIR = "/mnt/workspace"
 DEFAULT_BACKEND = "claude"
@@ -37,41 +38,42 @@ def _parse_new_arg(arg: str) -> tuple[str, str]:
     return backend_name, prompt
 
 
+async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
+                           backend_name: str, title: str | None) -> None:
+    """Shared tail: dispatch one turn in the session's sticky mode, then deliver the answer
+    with its footer + plan↔build toggle button. New sessions default to build."""
+    session_mode = sessions.mode_for(session_id) if session_id else "build"
+    options = TurnOptions(mode=session_mode)
+    try:
+        result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name, cwd=WORKSPACE_DIR, options=options)
+    except dispatch.DispatchError as e:
+        await reply.deliver(working, msg, _friendly_error(e))
+        return
+    preview = format.response_preview(result.text)
+    sessions.remember(result.session_id, backend_name, title, preview)
+    sessions.set_mode(result.session_id, session_mode)
+    block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd, mode=session_mode)
+    markup = mode.toggle_markup(result.session_id, session_mode)
+    sent = await reply.deliver(working, msg, block, reply_markup=markup)
+    if sent is not None:
+        sessions.remember_reply(sent.message_id, result.session_id)
+
+
 async def _cmd_new(msg, arg: str) -> None:
     backend_name, prompt = _parse_new_arg(arg)
     if not prompt.strip():
         await reply.safe_reply(msg, format.plain(phrases.pick(phrases.NEW_EMPTY_PROMPT_PHRASES)))
         return
     working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
-    try:
-        result = await dispatch.turn(prompt, session_id=None, backend_name=backend_name, cwd=WORKSPACE_DIR)
-    except dispatch.DispatchError as e:
-        await reply.deliver(working, msg, _friendly_error(e))
-        return
     title = format.title_from_prompt(prompt)
-    preview = format.response_preview(result.text)
-    sessions.remember(result.session_id, backend_name, title, preview)
-    block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd)
-    sent = await reply.deliver(working, msg, block)
-    if sent is not None:
-        sessions.remember_reply(sent.message_id, result.session_id)
+    await _run_and_deliver(msg, working, prompt, session_id=None, backend_name=backend_name, title=title)
 
 
 async def _handle_reply_continue(msg, sid: str) -> None:
     backend_name = sessions.backend_for(sid) or DEFAULT_BACKEND
     working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
-    try:
-        result = await dispatch.turn(msg.text, session_id=sid, backend_name=backend_name, cwd=WORKSPACE_DIR)
-    except dispatch.DispatchError as e:
-        await reply.deliver(working, msg, _friendly_error(e))
-        return
     title = sessions.title_for(sid)
-    preview = format.response_preview(result.text)
-    sessions.remember(result.session_id, backend_name, title, preview)
-    block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd)
-    sent = await reply.deliver(working, msg, block)
-    if sent is not None:
-        sessions.remember_reply(sent.message_id, result.session_id)
+    await _run_and_deliver(msg, working, msg.text, session_id=sid, backend_name=backend_name, title=title)
 
 
 async def _dispatch_command(text: str, msg) -> None:
@@ -131,7 +133,8 @@ async def _post_init(app: Application) -> None:
 
 def main() -> None:
     app = Application.builder().token(config.bot_token()).post_init(_post_init).build()
-    app.add_handler(CallbackQueryHandler(resume.handle_callback))
+    app.add_handler(CallbackQueryHandler(mode.handle_callback, pattern="^mode:"))
+    app.add_handler(CallbackQueryHandler(resume.handle_callback, pattern="^resume:"))
     app.add_handler(MessageHandler(filters.ALL, _handle_message))
     print("aiwbot: polling...")
     app.run_polling()

@@ -26,24 +26,28 @@ def _chunks(html_text: str, size: int) -> list[str]:
     return parts
 
 
-async def _edit_or_send(working_msg, msg, html_text: str) -> "telegram.Message | None":
+async def _edit_or_send(working_msg, msg, html_text: str, reply_markup=None) -> "telegram.Message | None":
     """Morph the ⏳ working message into the final text (feels like a substitution);
     fall back to a fresh reply if the edit is rejected (too old, identical, etc.)."""
     sent = None
     if working_msg is not None:
         try:
-            sent = await working_msg.edit_text(html_text, parse_mode="HTML")
+            sent = await working_msg.edit_text(html_text, parse_mode="HTML", reply_markup=reply_markup)
         except TelegramError as e:
             print(f"edit failed, sending instead: {e}")
     if sent is None:
-        sent = await safe_reply(msg, html_text)
+        sent = await safe_reply(msg, html_text, reply_markup=reply_markup)
     return sent
 
 
-async def deliver(working_msg, msg, html_text: str) -> "telegram.Message | None":
+async def deliver(working_msg, msg, html_text: str, reply_markup=None) -> "telegram.Message | None":
     chunks = _chunks(html_text, TELEGRAM_MSG_LIMIT)
     first = chunks[0]
-    last = await _edit_or_send(working_msg, msg, first)
-    for chunk in chunks[1:]:
-        last = await safe_reply(msg, chunk)
+    single = len(chunks) == 1
+    markup = reply_markup if single else None
+    last = await _edit_or_send(working_msg, msg, first, markup)
+    for i, chunk in enumerate(chunks[1:]):
+        is_last = i == len(chunks) - 2
+        tail_markup = reply_markup if is_last else None
+        last = await safe_reply(msg, chunk, reply_markup=tail_markup)
     return last

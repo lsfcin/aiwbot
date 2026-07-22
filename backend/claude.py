@@ -2,7 +2,7 @@
 from __future__ import annotations
 import pathlib
 import shutil
-from .base import AgentEvent, try_json
+from .base import AgentEvent, TurnOptions, try_json
 from .cli import CliBackend
 
 _EXT_GLOB = ".vscode/extensions/anthropic.claude-code-*/resources/native-binary/claude"
@@ -73,11 +73,13 @@ def parse_events(stdout: str) -> list[AgentEvent]:
 class ClaudeBackend(CliBackend):
     name = "claude"
 
-    def build_args(self, prompt: str, session_id: str | None) -> list[str]:
+    def build_args(self, prompt: str, session_id: str | None, options: TurnOptions) -> list[str]:
         """Plain --resume, no fork: keeps one lineage (same id, same transcript) per AD-3.
-        Fork was only needed in the old bot's --bg era, where a live agent locked the id."""
+        Fork was only needed in the old bot's --bg era, where a live agent locked the id.
+        mode=plan -> --permission-mode plan (agent plans, no edits); build -> bypassPermissions."""
         binary = _claude_bin()
-        args = [binary, "-p", "--output-format", "json", "--permission-mode", "bypassPermissions"]
+        perm = "plan" if options.mode == "plan" else "bypassPermissions"
+        args = [binary, "-p", "--output-format", "json", "--permission-mode", perm]
         if session_id:
             args.append("--resume")
             args.append(session_id)

@@ -1,6 +1,6 @@
 # opencode.py — OpencodeBackend: normalizes `opencode run --format json` (JSONL stream).
 from __future__ import annotations
-from .base import AgentEvent, try_json
+from .base import AgentEvent, TurnOptions, try_json
 from .cli import CliBackend
 
 
@@ -39,8 +39,10 @@ def parse_events(stdout: str) -> list[AgentEvent]:
 class OpencodeBackend(CliBackend):
     name = "opencode"
 
-    def build_args(self, prompt: str, session_id: str | None) -> list[str]:
-        """opencode continues the same lineage with -s <id> (no fork flag, unlike claude)."""
+    def build_args(self, prompt: str, session_id: str | None, options: TurnOptions) -> list[str]:
+        """opencode continues the same lineage with -s <id> (no fork flag, unlike claude).
+        options.mode is ignored: opencode's headless run has no plan/build equivalent (maps
+        what it can, per the provider-agnostic seam)."""
         args = ["opencode", "run", prompt, "--format", "json"]
         if session_id:
             args.append("-s")

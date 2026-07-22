@@ -132,8 +132,11 @@ def short_model(model: str | None) -> str | None:
     return result
 
 
-def _meta_line(provider: str | None, model: str | None, cost_usd: float | None) -> str:
+def _meta_line(provider: str | None, model: str | None, cost_usd: float | None,
+               mode: str | None) -> str:
     bits = []
+    if mode:
+        bits.append(mode)
     if provider:
         bits.append(provider)
     short = short_model(model)
@@ -145,13 +148,15 @@ def _meta_line(provider: str | None, model: str | None, cost_usd: float | None) 
 
 
 def answer_block(body: str, sid: str | None, title: str | None, provider: str | None = None,
-                 model: str | None = None, cost_usd: float | None = None) -> str:
-    """The network's answer with the session header as a footer (everything here is a response)."""
+                 model: str | None = None, cost_usd: float | None = None,
+                 mode: str | None = None) -> str:
+    """The network's answer with the session header as a footer (everything here is a response).
+    mode (build/plan) leads the meta line so the current setting reads alongside the toggle button."""
     lines = [format_body(body), "· · ·"]
     if sid:
         label = f"[{sid[:SESSION_ID_LABEL_LEN].upper()}] {title_words(title)}"
         lines.append(html.escape(label))
-    meta = _meta_line(provider, model, cost_usd)
+    meta = _meta_line(provider, model, cost_usd, mode)
     if meta:
         lines.append(html.escape(meta))
     return "\n".join(lines)

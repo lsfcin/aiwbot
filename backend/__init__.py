@@ -1,5 +1,5 @@
 # __init__.py — facade: seam types + backend registry. Import backends only through here.
-from .base import AgentEvent, AgentBackend, EventKind
+from .base import AgentEvent, AgentBackend, EventKind, TurnOptions
 from .claude import ClaudeBackend
 from .opencode import OpencodeBackend
 
@@ -14,4 +14,4 @@ def get_backend(name: str) -> AgentBackend:
     return instance
 
 
-__all__ = ["AgentEvent", "AgentBackend", "EventKind", "get_backend"]
+__all__ = ["AgentEvent", "AgentBackend", "EventKind", "TurnOptions", "get_backend"]

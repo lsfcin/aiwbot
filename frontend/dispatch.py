@@ -1,7 +1,7 @@
 # dispatch.py — one call site that drains any AgentBackend.send() into a single reply.
 from __future__ import annotations
 from dataclasses import dataclass
-from backend import get_backend
+from backend import get_backend, TurnOptions
 from backend.base import check_contract
 
 
@@ -31,7 +31,9 @@ def events_to_result(events: list) -> TurnResult:
     return TurnResult(text=body, session_id=result.session_id, cost_usd=result.cost_usd, model=result.model)
 
 
-async def turn(prompt: str, *, session_id: str | None, backend_name: str, cwd: str) -> TurnResult:
+async def turn(prompt: str, *, session_id: str | None, backend_name: str, cwd: str,
+               options: TurnOptions = TurnOptions()) -> TurnResult:
     backend = get_backend(backend_name)
-    events = [event async for event in backend.send(prompt, session_id=session_id, cwd=cwd)]
+    stream = backend.send(prompt, session_id=session_id, cwd=cwd, options=options)
+    events = [event async for event in stream]
     return events_to_result(events)
