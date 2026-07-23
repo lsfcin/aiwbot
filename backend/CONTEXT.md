@@ -1,5 +1,5 @@
 # backend
-> ← add description
+> Provider-agnostic seam: each coding-agent CLI → normalized AgentEvent stream; one class per provider.
 
 <!-- routing:start -->
 ## Routing
