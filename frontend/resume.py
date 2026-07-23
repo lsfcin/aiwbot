@@ -4,38 +4,43 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from . import config, format, phrases, reply, sessions
 
 RESUME_COUNT = 5
-LABEL_MAX = 60
+TITLE_WORDS = 6
 
 
-def _truncate(text: str, limit: int) -> str:
-    result = text
-    if len(text) > limit:
-        result = text[:limit - 1] + ". . ."
-    return result
-
-
-def _label(item: dict) -> str:
-    title = format.title_words(item["title"])
+def _meta(item: dict) -> str:
+    """L3: tempo · modo · provider · model — bits omitted when a session lacks them
+    (VSCode sessions carry no bot mode/model beyond what the transcript records)."""
     when = format.relative_time(item["updated_at"])
-    backend = item["backend"]
-    label = f"{title} · {when} · {backend}"
-    return _truncate(label, LABEL_MAX)
+    bits = [when]
+    mode = item.get("mode")
+    if mode:
+        bits.append(mode)
+    bits.append(item["backend"])
+    model = format.short_model(item.get("model"))
+    if model:
+        bits.append(model)
+    return " · ".join(bits)
 
 
 def _entry_line(i: int, item: dict) -> str:
-    header = f"{i}. {_label(item)}"
+    """3 lines: `N. TÍTULO` / `<6 words> … <6 words>` of the last response / meta line."""
+    title = format.title_words(item["title"], TITLE_WORDS)
+    lines = [f"{i}. {title}"]
     preview = item.get("preview")
-    result = header
     if preview:
-        result = f"{header}\n{preview}\n"
-    return result
+        rendered = format.response_preview(preview)
+        lines.append(rendered)
+    meta = _meta(item)
+    lines.append(meta)
+    return "\n".join(lines)
 
 
 def _list_text(items: list[dict]) -> str:
-    lines = []
+    blocks = []
     for i, item in enumerate(items, start=1):
-        lines.append(_entry_line(i, item))
-    return "\n".join(lines)
+        block = _entry_line(i, item)
+        blocks.append(block)
+    return "\n\n".join(blocks)
 
 
 def _keyboard(items: list[dict]) -> InlineKeyboardMarkup:
