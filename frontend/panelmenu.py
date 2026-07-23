@@ -1,7 +1,7 @@
 # panelmenu.py — the panel's states drawn as keyboards: mode row, dimension menu, value pickers.
 from __future__ import annotations
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from . import choices, format, keyboard, registry
+from . import choices, keyboard, labels, registry
 
 # Collapsed, the back control eats one of the four slots and the expander another, so two values
 # fit; a picker with nothing to expand keeps that slot and shows three.
@@ -26,10 +26,11 @@ def _back(target: str) -> InlineKeyboardButton:
     return keyboard.cell(_BACK, target)
 
 
-def _cells(values: list[str], current: str | None, dim: str) -> list[InlineKeyboardButton]:
+def _cells(values: list[str], current: str | None, dim: str,
+           qualify: bool = True) -> list[InlineKeyboardButton]:
     buttons = []
     for value in values:
-        short = format.model_label(value) if dim == "m" else value
+        short = labels.model_label(value, qualify=qualify) if dim == "m" else value
         label = keyboard.segment(short or value, value == current)
         button = InlineKeyboardButton(label, callback_data=f"p:s:{dim}:{value}")
         buttons.append(button)
@@ -69,18 +70,22 @@ def _pager(prefix: str, page: int, pages: int) -> list[InlineKeyboardButton]:
             keyboard.cell(_NEXT, ahead)]
 
 
-def _ordered(values: list[str], current: str | None) -> list[str]:
+def _ordered(values: list[str], current: str | None, prefer: tuple = ()) -> list[str]:
     """The picker's candidates, selected-first whenever the selection would otherwise risk
     falling off the cut — including when it came from the drill-down and is not in the shortlist
-    at all. A picker that hides what is currently set is worse than one that reorders; while
-    everything fits, natural order is kept and nothing moves."""
-    if not current:
-        ordered = values
-    elif current not in values:
+    at all. A picker that hides what is currently set is worse than one that reorders. With
+    nothing selected, `prefer` decides who gets the visible slots; the rest keep their order."""
+    if current and current not in values:
         ordered = [current] + values
-    else:
+    elif current:
         rest = [value for value in values if value != current]
         ordered = [current] + rest
+    elif prefer:
+        head = [value for value in prefer if value in values]
+        tail = [value for value in values if value not in head]
+        ordered = head + tail
+    else:
+        ordered = values
     return ordered
 
 
@@ -101,11 +106,15 @@ def values_markup(dim: str, values: list[str], current: str | None, *,
                   expanded: bool = False, page: int = 0, extra: list = ()) -> InlineKeyboardMarkup:
     """One value picker. Collapsed is a single row: `‹`, then two values and `···`, or three
     values when the list fits and there is nothing to expand. Expanded grows to three rows and
-    pages past that, with `extra` (the model picker's `all`) on the last page."""
-    candidates = _ordered(values, current)
+    pages past that, with `extra` (the model picker's `all`) on the last page. Preference only
+    reorders the collapsed slice — expanded keeps the declared order, which for effort is an
+    ordinal ladder and should read as one."""
     if expanded:
+        candidates = _ordered(values, current)
         rows = _paged(f"p:x:{dim}", candidates, current, dim, page, list(extra))
     else:
+        prefer = choices.preferred(dim)
+        candidates = _ordered(values, current, prefer)
         deeper = len(candidates) > SLOTS + 1 or bool(extra)
         slots = SLOTS if deeper else SLOTS + 1
         shown = candidates[:slots]
@@ -144,7 +153,7 @@ def provider_markup(scope: str, name: str, page: int) -> InlineKeyboardMarkup:
     pages = max(1, -(-len(models) // PAGE))
     start = page * PAGE
     shown = models[start:start + PAGE]
-    buttons = _cells(shown, current, "m")
+    buttons = _cells(shown, current, "m", qualify=False)
     tail = _pager(f"p:p:{name}", page, pages) if pages > 1 else None
     rows = keyboard.framed(_back("p:g"), buttons, None, tail)
     return InlineKeyboardMarkup(rows)

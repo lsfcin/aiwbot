@@ -1,6 +1,6 @@
 # test_registry.py — free unit test: scopes (session vs NEW), last-used defaults, message maps.
 import pytest
-from frontend import config, registry
+from frontend import config, msgmap, registry
 
 
 @pytest.fixture
@@ -44,8 +44,8 @@ def test_writes_against_an_unknown_session_are_dropped(store):
 
 
 def test_scope_resolves_from_the_message_the_keyboard_sits_on(store):
-    registry.remember_reply(100, "s1")
-    registry.remember_pending_new(200)
-    assert registry.scope_for_message(100) == "s1"
-    assert registry.scope_for_message(200) == registry.NEW
-    assert registry.scope_for_message(999) is None
+    msgmap.remember_reply(100, "s1")
+    msgmap.remember_pending_new(200)
+    assert msgmap.scope_for_message(100) == "s1"
+    assert msgmap.scope_for_message(200) == registry.NEW
+    assert msgmap.scope_for_message(999) is None

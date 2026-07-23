@@ -12,6 +12,10 @@ _SESSIONS_SQL = ("SELECT id, title, time_updated, agent, model "
                  "FROM session WHERE directory = ? AND parent_id IS NULL")
 _MESSAGES_SQL = ("SELECT id, data FROM message WHERE session_id = ? "
                  "ORDER BY time_created DESC LIMIT ?")
+# Which models Lucas actually reaches for. The curated shortlist guessed at cheap-and-good and
+# guessed wrong — it offered models used once while the real top three had 91, 42 and 15 sessions.
+_RECENT_SQL = ("SELECT model, time_updated FROM session "
+               "WHERE model IS NOT NULL AND time_updated > ?")
 _PARTS_SQL = "SELECT data FROM part WHERE message_id = ? ORDER BY time_created"
 # How far back to look for the last assistant turn. A handful of trailing user/tool messages
 # is normal; anything deeper means the session ended without an answer.
@@ -44,6 +48,25 @@ def _query(sql: str, params: tuple) -> list[tuple]:
 def session_rows(cwd: str) -> list[tuple]:
     """Top-level sessions for cwd: (id, title, time_updated_ms, agent, model_json)."""
     return _query(_SESSIONS_SQL, (cwd,))
+
+
+def recent_models(since_ms: float) -> list[tuple[str, int, float]]:
+    """(model id, sessions started, last used) since a cutoff, most-used first and ties broken
+    by recency. Session rows carry the model, so this is one query over an index the store keeps
+    anyway — no message join."""
+    rows = _query(_RECENT_SQL, (since_ms,))
+    counts: dict[str, int] = {}
+    last: dict[str, float] = {}
+    for raw, updated in rows:
+        model = model_of(raw)
+        if not model:
+            continue
+        counts[model] = counts.get(model, 0) + 1
+        previous = last.get(model, 0)
+        last[model] = max(previous, updated)
+    ranked = [(model, count, last[model]) for model, count in counts.items()]
+    ranked.sort(key=lambda item: (item[1], item[2]), reverse=True)
+    return ranked
 
 
 def model_of(model_json: str | None) -> str | None:

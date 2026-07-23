@@ -58,7 +58,7 @@ def test_clip_marks_truncation():
 
 
 def test_header_counts_shown_of_total():
-    # the "/resume N pra ver todas" hint is gone: ‹ / › arrows page through instead
+    # the "/resume N pra ver todas" hint is gone: « / » arrows page through instead
     assert _header(12, 5, "") == "Sessões recentes — 5 de 12"
 
 
@@ -71,7 +71,7 @@ def test_keyboard_is_single_row_of_numerals_between_arrows():
               {"session_id": "sid-b", "title": "b", "backend": "opencode", "updated_at": _NOW}]
     markup = _keyboard(items)
     row = markup.inline_keyboard[0]
-    assert [b.text for b in row] == ["‹", "1", "2", "›"]
+    assert [b.text for b in row] == ["«", "1", "2", "»"]
     assert [b.callback_data for b in row[1:-1]] == ["resume:sid-a", "resume:sid-b"]
 
 
@@ -94,7 +94,7 @@ def test_keyboard_row_shape_is_identical_on_every_page():
 def test_keyboard_first_page_back_arrow_is_inert():
     markup = _keyboard(_items(3), offset=0, query="", total=9)
     row = markup.inline_keyboard[0]
-    assert [b.text for b in row] == ["‹", "1", "2", "3", "›"]
+    assert [b.text for b in row] == ["«", "1", "2", "3", "»"]
     assert row[0].callback_data == "noop:"
     assert row[-1].callback_data == "page:3:"
 
@@ -102,7 +102,7 @@ def test_keyboard_first_page_back_arrow_is_inert():
 def test_keyboard_middle_page_has_both_arrows_live_and_absolute_numerals():
     markup = _keyboard(_items(3), offset=3, query="", total=9)
     row = markup.inline_keyboard[0]
-    assert [b.text for b in row] == ["‹", "4", "5", "6", "›"]
+    assert [b.text for b in row] == ["«", "4", "5", "6", "»"]
     assert row[0].callback_data == "page:0:"
     assert row[-1].callback_data == "page:6:"
 
@@ -110,7 +110,7 @@ def test_keyboard_middle_page_has_both_arrows_live_and_absolute_numerals():
 def test_keyboard_last_page_next_arrow_is_inert():
     markup = _keyboard(_items(3), offset=6, query="", total=9)
     row = markup.inline_keyboard[0]
-    assert [b.text for b in row] == ["‹", "7", "8", "9", "›"]
+    assert [b.text for b in row] == ["«", "7", "8", "9", "»"]
     assert row[0].callback_data == "page:3:"
     assert row[-1].callback_data == "noop:"
 

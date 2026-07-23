@@ -123,19 +123,6 @@ def short_model(model: str | None) -> str | None:
     return result
 
 
-def model_label(model: str | None) -> str | None:
-    """Button label inside a model picker. Family folding is right for a meta line but wrong
-    here: a provider list can hold several claude models at once, and folding them all to
-    `opus` would print the same label on buttons that pick different models. So a qualified
-    id keeps its own last segment, and only a bare alias folds."""
-    result = model
-    if model and "/" not in model:
-        result = short_model(model)
-    elif model:
-        result = model.rsplit("/", 1)[-1]
-    return result
-
-
 def context_pct(used: int | None, window: int | None) -> str | None:
     """Context occupancy as `32%`. None unless the provider reported both numbers —
     claude gets them free from the result object's modelUsage (no extra tokens)."""
