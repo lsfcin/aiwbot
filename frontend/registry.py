@@ -2,9 +2,8 @@
 # Side-state only: the provider stores stay the source of truth for what sessions exist (AD-6).
 from __future__ import annotations
 import time
-from . import config
+from . import config, msgmap
 
-REPLY_MAP_MAX = 50
 DEFAULT_BACKEND = "claude"
 DEFAULT_MODE = "build"
 
@@ -37,8 +36,9 @@ def adopt(session_id: str, backend: str, title: str | None, updated_at: float) -
 
 # The panel edits knobs for two things: a live session, or the session /new is about to create.
 # Both are addressed as a "scope" so the panel code stays scope-agnostic — NEW routes to the
-# last-used defaults, any other value is a session id.
-NEW = "*new*"
+# last-used defaults, any other value is a session id. The sentinel lives in msgmap because that
+# is what a /new config bubble is tagged with.
+NEW = msgmap.NEW
 
 
 def defaults() -> dict:
@@ -141,48 +141,3 @@ def context_window_for(model: str | None) -> int | None:
     """Observed context window for a model, or None if we've never seen a live turn on it."""
     windows = config.load_config().get("context_windows", {})
     return windows.get(model or "")
-
-
-def _remember_by_message(map_name: str, message_id: int, value: str) -> None:
-    """Bounded message_id -> value map (oldest ids evicted first). Shared by the
-    reply-to-continue map and the pending-/new map."""
-    cfg = config.load_config()
-    mapping = cfg.get(map_name, {})
-    mapping[str(message_id)] = value
-    if len(mapping) > REPLY_MAP_MAX:
-        stale = sorted(mapping, key=int)[: len(mapping) - REPLY_MAP_MAX]
-        for key in stale:
-            del mapping[key]
-    config.save_config(**{map_name: mapping})
-
-
-def _value_by_message(map_name: str, message_id: int) -> str | None:
-    mapping = config.load_config().get(map_name, {})
-    return mapping.get(str(message_id))
-
-
-def remember_reply(message_id: int, session_id: str) -> None:
-    """Anchor message -> session. Also what lets a panel tap resolve its session without
-    spending any of callback_data's 64 bytes on an id (P2 D4)."""
-    _remember_by_message("reply_map", message_id, session_id)
-
-
-def session_for_reply(message_id: int) -> str | None:
-    return _value_by_message("reply_map", message_id)
-
-
-def remember_pending_new(message_id: int) -> None:
-    """A bare /new sends a config bubble; the reply to THAT message is the prompt. Marking the
-    message is also what routes its panel taps to the NEW scope instead of to a session."""
-    _remember_by_message("pending_new", message_id, NEW)
-
-
-def pending_new(message_id: int) -> str | None:
-    return _value_by_message("pending_new", message_id)
-
-
-def scope_for_message(message_id: int) -> str | None:
-    """Which knobs a panel tap edits: an anchored session, or NEW for a /new config bubble.
-    Resolved from the message the keyboard sits on, so callback_data spends no bytes on it."""
-    sid = session_for_reply(message_id)
-    return sid or pending_new(message_id)

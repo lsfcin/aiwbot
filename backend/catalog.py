@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 import pathlib
 import subprocess
-from . import binaries
+import time
+from . import binaries, ocstore
 
 # The offline declaration opencode ships: every provider it knows (3311+ models), each model
 # carrying `reasoning_options` and `limit.context`. Free to read, no network, no key.
@@ -12,9 +13,14 @@ _MODELS_JSON = ".cache/opencode/models.json"
 # CLI (~1.1 s, 478 ids here). Both are memoized for the daemon's life — never per keyboard render.
 _LIST_ARG = "models"
 _LIST_TIMEOUT = 20
-# Cheap-first shortlist: opencode's bundled tier, then the flat-fee coding plan. Derived from
-# the configured catalogue rather than hardcoded ids, so it survives models coming and going.
-_FAVOURITE_PROVIDERS = ("opencode", "alibaba-coding-plan")
+# The shortlist is what Lucas actually reaches for, read from opencode's own history. A curated
+# "cheap and good" guess was wrong by a wide margin: it offered models used once while the real
+# top three had 91, 42 and 15 sessions in the window. Frequency ranks, recency breaks ties.
+RECENT_DAYS = 30
+SHORTLIST = 6
+# Fallback for a machine with no opencode history yet — cheap tiers first, since a first-time
+# shortlist should at least not be expensive.
+_FALLBACK_PROVIDERS = ("opencode", "alibaba-coding-plan")
 _PER_PROVIDER = 2
 
 _ids: list[str] | None = None
@@ -108,12 +114,21 @@ def groups() -> dict[str, list[str]]:
     return grouped
 
 
-def favourites() -> list[str]:
-    """The one-tap shortlist. P2 exists so a throwaway phone question costs ONE tap to route
-    off a metered model, so the cheap providers lead."""
+def _fallback() -> list[str]:
     grouped = groups()
     picks: list[str] = []
-    for provider in _FAVOURITE_PROVIDERS:
+    for provider in _FALLBACK_PROVIDERS:
         listed = grouped.get(provider) or []
         picks.extend(listed[:_PER_PROVIDER])
     return picks
+
+
+def favourites() -> list[str]:
+    """The one-tap shortlist: most-used first, from the last RECENT_DAYS of opencode history.
+    Ranked entries are intersected with the configured catalogue, so a model that lost its
+    provider stops being offered instead of failing at dispatch."""
+    cutoff = (time.time() - RECENT_DAYS * 86400) * 1000
+    ranked = ocstore.recent_models(cutoff)
+    configured = set(model_ids())
+    picks = [model for model, _, _ in ranked if model in configured]
+    return picks[:SHORTLIST] or _fallback()

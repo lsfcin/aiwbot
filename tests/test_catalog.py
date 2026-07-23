@@ -58,7 +58,26 @@ def test_groups_bucket_by_first_segment(monkeypatch):
     assert groups == {"opencode": ["opencode/a", "opencode/b"], "openrouter": ["openrouter/x/y"]}
 
 
-def test_favourites_lead_with_the_cheap_providers(monkeypatch):
+def test_favourites_rank_by_how_much_each_model_was_used(monkeypatch):
+    """The curated guess was wrong by a wide margin, so the shortlist reads real history."""
+    ids = ["nvidia/a", "nvidia/b", "opencode/c"]
+    monkeypatch.setattr(catalog, "_ids", ids)
+    ranked = [("nvidia/b", 42, 200.0), ("nvidia/a", 91, 100.0), ("gone/x", 5, 300.0)]
+    monkeypatch.setattr(catalog.ocstore, "recent_models", lambda cutoff: sorted(
+        ranked, key=lambda item: (item[1], item[2]), reverse=True))
+    assert catalog.favourites() == ["nvidia/a", "nvidia/b"]
+
+
+def test_a_model_no_longer_configured_is_not_offered(monkeypatch):
+    """Its provider may be gone; offering it would only fail at dispatch."""
+    monkeypatch.setattr(catalog, "_ids", ["nvidia/a"])
+    monkeypatch.setattr(catalog.ocstore, "recent_models",
+                        lambda cutoff: [("gone/x", 99, 1.0), ("nvidia/a", 1, 1.0)])
+    assert catalog.favourites() == ["nvidia/a"]
+
+
+def test_no_history_falls_back_to_the_cheap_tiers(monkeypatch):
     ids = ["openrouter/x", "alibaba-coding-plan/glm-5", "opencode/a", "opencode/b", "opencode/c"]
     monkeypatch.setattr(catalog, "_ids", ids)
+    monkeypatch.setattr(catalog.ocstore, "recent_models", lambda cutoff: [])
     assert catalog.favourites() == ["opencode/a", "opencode/b", "alibaba-coding-plan/glm-5"]

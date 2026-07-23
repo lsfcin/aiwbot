@@ -68,7 +68,21 @@ def test_the_selected_value_is_never_cut_off(store):
 def test_a_value_chosen_in_the_drill_down_still_shows_in_the_shortlist(store):
     """openrouter/... is not among the favourites, but it is what is set, so it leads the row."""
     markup = panelmenu.values_markup("m", _FAVS, "big/m7", extra=[panelmenu.all_button()])
-    assert "[ m7 ]" in _texts(markup)
+    assert "[ bi·m7 ]" in _texts(markup)
+
+
+def test_effort_shows_the_two_values_actually_used(store):
+    """Lucas: "medium e high, raramente uso low". By name, since opencode's vocabularies are
+    irregular and any positional rule would pick something different on each model."""
+    ladder = ["low", "medium", "high", "xhigh", "max"]
+    collapsed = _texts(panelmenu.values_markup("e", ladder, None))
+    assert collapsed[1:3] == ["medium", "high"]
+
+
+def test_the_expanded_effort_ladder_keeps_its_ordinal_order(store):
+    ladder = ["low", "medium", "high", "xhigh", "max"]
+    expanded = _texts(panelmenu.values_markup("e", ladder, None, expanded=True))
+    assert expanded[1:6] == ladder
 
 def test_expander_and_collapser_are_both_the_last_button(store):
     collapsed = panelmenu.values_markup("m", _FAVS, None)

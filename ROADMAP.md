@@ -125,6 +125,25 @@ Round 3 (same day, Lucas testing live):
       binary explicitly (`backend/binaries.py`) — which also un-breaks opencode dispatch, which
       would have failed for the same reason. SPECS AD-15.
 
+Round 4 (Lucas testing live, same day):
+- [x] **Shortlist from real usage** — 30 days of opencode history, ranked by sessions. The
+      curated list offered models used once while the top three had 91/42/15. SPECS AD-17.
+- [x] **Provider on the model button** — `nv·glm5.2`. Not decoration: `glm-5.2` exists under four
+      different providers in Lucas's own history. Labels compress progressively and only on
+      overflow, with a `config.json` alias map for the handful he reads daily. SPECS AD-16.
+- [x] **A selection returns to the level it was made at**, not to the mode row — you see the
+      bracket move without losing your place. Needed a panel-state-per-message map, since
+      callback_data has no room (`p:s:m:openrouter/qwen/qwen3-coder-next` spends 40 of 64 bytes).
+- [x] **Effort collapsed shows `medium` `high`** (Lucas: "raramente uso low"), by name rather than
+      position, since opencode's vocabularies are irregular. Expanded keeps the ordinal ladder.
+- [x] **`«` `»` in the `/resume` pager**, matching the panel.
+
+Rejected while exploring: **scrolling/marquee button text**. A button label is static; animating
+it means one `editMessageReplyMarkup` per frame, and that round trip is already measured at ~1.5 s
+in this bot (see Known limits). It would run under one frame per second, hit flood control, and
+fight the user's taps. The only genuinely richer Telegram component is a **Web App** webview,
+which needs an HTTPS-hosted page — noted as the path if buttons ever stop being enough.
+
 Found by rendering the real states rather than by reasoning: with only two visible slots, a
 collapsed picker would show `low medium ···` while `high` was set — the state invisible. The
 selected value is now pinned first whenever the list is truncated, including when it came from

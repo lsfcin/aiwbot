@@ -270,6 +270,42 @@ previously 0. The count differs slightly from a shell's 478 because a couple of 
 environment the service does not inherit — which is correct behaviour, since the picker should
 offer only what the process running the turn can actually reach.
 
+### AD-16 — Model labels: qualify by provider, compress only on overflow
+The same model name appears under several providers — Lucas's own 30-day history has `glm-5.2`
+under `nvidia/`, `openrouter/`, `opencode/` and `ollama-cloud/`. An unqualified shortlist would
+therefore show two buttons reading `glm-5.2` that do different things. So a model button is
+`<provider>·<model>`, with two-letter provider abbreviations (`opencode`/`openrouter` share a
+four-letter prefix, so the map is chosen data, not a mechanical prefix).
+
+The budget is about twelve characters. `frontend/labels.py` spends it progressively, and **a name
+that already fits is never touched** — an abbreviation you have to decode costs more than a long
+name you can read:
+
+1. separators out, **including the version dot** → `glm-5.2` → `glm52`, `kimi-k2.6` → `kimik26`
+   (Lucas: "I'll know that 52 means 5.2" — it also stops `or·glm5.2` carrying two dots that mean
+   different things)
+2. noise tokens dropped (`latest`, `instruct`, `preview`, `chat`)
+3. alpha tokens contracted to two letters, digit-bearing tokens kept whole →
+   `deepseek-v4-flash` → `dev4fl`
+4. hard cut
+
+Contraction sits before truncation because it preserves distinctions: `qwen3-coder` and
+`qwen3-coder-next` truncate to the same nine characters but contract to `qwen3co` / `qwen3cone`.
+The vendor namespace (`deepseek-ai/`) is dropped entirely — the provider prefix already says it.
+Inside one provider's own page the prefix is dropped too, since every row would repeat it.
+
+`config.json` `model_aliases` overrides any id by hand. The rule gives `nv·dev4fl`; Lucas reads
+that name daily and prefers `nv·dsv4f`, which is a preference no algorithm should be guessing.
+
+### AD-17 — The shortlist is read from usage, not curated
+`catalog.favourites()` ranks the last 30 days of opencode sessions by count, ties broken by
+recency, intersected with the configured catalogue (a model whose provider vanished stops being
+offered rather than failing at dispatch). The curated "cheap and good" guess it replaced was wrong
+by a wide margin: it offered models used once each while the real top three had 91, 42 and 15
+sessions. A machine with no history falls back to the cheap tiers.
+
+The source is one query over `session.model` + `time_updated`, which opencode indexes anyway.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

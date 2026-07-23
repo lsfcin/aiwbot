@@ -3,7 +3,7 @@ from __future__ import annotations
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from backend import TurnOptions
-from . import config, dispatch, format, inbox, panel, panelmenu, phrases, registry, reply, resume
+from . import config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 DEFAULT_BACKEND = registry.DEFAULT_BACKEND
@@ -76,7 +76,7 @@ async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     markup = panelmenu.root_markup(result.session_id, options.mode)
     sent = await reply.deliver(working, msg, block, reply_markup=markup)
     if sent is not None:
-        registry.remember_reply(sent.message_id, result.session_id)
+        msgmap.remember_reply(sent.message_id, result.session_id)
 
 
 async def _start_new(msg, prompt: str) -> None:
@@ -103,7 +103,7 @@ async def _cmd_new(msg, arg: str) -> None:
         markup = panelmenu.root_markup(registry.NEW, current)
         asked = await reply.safe_reply(msg, ask, reply_markup=markup)
         if asked is not None:
-            registry.remember_pending_new(asked.message_id)
+            msgmap.remember_pending_new(asked.message_id)
         return
     await _start_new(msg, prompt)
 
@@ -138,11 +138,11 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     if msg.text and msg.reply_to_message is not None:
         replied_to = msg.reply_to_message.message_id
-        sid = registry.session_for_reply(replied_to)
+        sid = msgmap.session_for_reply(replied_to)
         if sid:
             context.application.create_task(_handle_reply_continue(msg, sid))
             return
-        awaiting = registry.pending_new(replied_to)
+        awaiting = msgmap.pending_new(replied_to)
         if awaiting:
             context.application.create_task(_start_new(msg, msg.text))
             return

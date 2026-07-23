@@ -1,6 +1,6 @@
 # panel.py — panel routing: which grid a tap opens, and which scope it writes to.
 from __future__ import annotations
-from . import choices, config, format, panelmenu, registry
+from . import choices, config, labels, msgmap, panelmenu, registry
 
 _STALE = "Essa mensagem é antiga demais — retoma a sessão com /resume."
 # One message per dimension. A single generic "sem controle de esforço" for any empty list is
@@ -13,14 +13,19 @@ _EMPTY = {"h": "Nenhum harness disponível.",
 _KEY = {"h": "backend", "m": "model", "e": "effort"}
 
 
-async def _redraw(query, markup) -> None:
+async def _redraw(query, markup, state: str | None = None) -> None:
+    """Every render records which state the message now shows, so a later selection knows where
+    to return to (Lucas, 2026-07-23: a choice should step back one level, like `‹`)."""
+    if state is not None:
+        mid = query.message.message_id
+        msgmap.remember_panel(mid, state)
     await query.edit_message_reply_markup(reply_markup=markup)
 
 
 async def _to_root(query, scope: str) -> None:
     current = registry.mode_for(scope)
     markup = panelmenu.root_markup(scope, current)
-    await _redraw(query, markup)
+    await _redraw(query, markup, "p:root")
 
 
 async def _set_mode(query, scope: str, target: str) -> None:
@@ -30,7 +35,7 @@ async def _set_mode(query, scope: str, target: str) -> None:
     current = registry.mode_for(scope)
     if target != current:
         markup = panelmenu.root_markup(scope, target)
-        await _redraw(query, markup)
+        await _redraw(query, markup, "p:root")
         registry.set_mode(scope, target)
 
 
@@ -55,7 +60,8 @@ async def _dimension(query, scope: str, dim: str, expanded: bool, page: int) -> 
     await query.answer()
     markup = panelmenu.values_markup(dim, values, current, expanded=expanded,
                                      page=page, extra=extra)
-    await _redraw(query, markup)
+    state = f"p:x:{dim}:{page}" if expanded else f"p:d:{dim}"
+    await _redraw(query, markup, state)
 
 
 def _drop_stale_effort(scope: str) -> None:
@@ -77,26 +83,32 @@ def apply(scope: str, dim: str, value: str) -> str:
         registry.set_setting(scope, "model", None)
     if dim in ("h", "m"):
         _drop_stale_effort(scope)
-    shown = format.model_label(value) if dim == "m" else value
+    shown = labels.model_label(value) if dim == "m" else value
     return f"{choices.LABELS[dim]}: {shown}"
 
 
 async def _choose(query, scope: str, dim: str, value: str) -> None:
+    """Apply, then redraw the state the tap came from — you see the bracket move without losing
+    your place in the list. Only a harness change forces a step back, because it invalidates the
+    model and effort the deeper states were showing."""
     note = apply(scope, dim, value)
     await query.answer(note)
-    await _to_root(query, scope)
+    mid = query.message.message_id
+    state = "p:menu" if dim == "h" else msgmap.panel_state(mid)
+    parts = state.split(":", 3)
+    await _route(query, scope, parts)
 
 
-async def _open(query, markup) -> None:
+async def _open(query, markup, state: str) -> None:
     await query.answer()
-    await _redraw(query, markup)
+    await _redraw(query, markup, state)
 
 
 async def _route(query, scope: str, parts: list[str]) -> None:
     head = parts[1]
     if head == "menu":
         markup = panelmenu.menu_markup(scope)
-        await _open(query, markup)
+        await _open(query, markup, "p:menu")
     elif head == "root":
         await query.answer()
         await _to_root(query, scope)
@@ -111,11 +123,11 @@ async def _route(query, scope: str, parts: list[str]) -> None:
         await _choose(query, scope, parts[2], parts[3])
     elif head == "g":
         markup = panelmenu.providers_markup(scope)
-        await _open(query, markup)
+        await _open(query, markup, "p:g")
     elif head == "p":
         page = int(parts[3])
         markup = panelmenu.provider_markup(scope, parts[2], page)
-        await _open(query, markup)
+        await _open(query, markup, f"p:p:{parts[2]}:{page}")
 
 
 async def handle_callback(update, context) -> None:
@@ -127,7 +139,7 @@ async def handle_callback(update, context) -> None:
         return
     if query.message.chat_id != config.allowed_chat_id():
         return
-    scope = registry.scope_for_message(query.message.message_id)
+    scope = msgmap.scope_for_message(query.message.message_id)
     if scope is None:
         await query.answer(_STALE, show_alert=True)
         return
