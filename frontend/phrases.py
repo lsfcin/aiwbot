@@ -17,9 +17,9 @@ WORKING_PHRASES = [
     "⏳ pensando…",
 ]
 NEW_EMPTY_PROMPT_PHRASES = [
-    "Responde essa mensagem com o prompt da nova sessão.",
-    "Beleza — responde aqui dizendo o que essa sessão deve fazer.",
-    "Sessão nova: responde essa mensagem com o que você quer que ela faça.",
+    "Sessão nova — ajusta abaixo se quiser e responde essa mensagem com o prompt.",
+    "Beleza: configura nos botões e responde aqui com o que a sessão deve fazer.",
+    "Sessão nova. Os botões mudam harness/model/effort; responde essa mensagem com o prompt.",
 ]
 ERROR_PHRASES = [
     "Deu erro: {e}",
@@ -58,8 +58,10 @@ HELP_TEXT = (
     "<code>/help</code> — essa mensagem\n\n"
     "Texto, foto, áudio ou documento mandado sem <code>/</code> vai direto pro brain/INBOX.md.\n\n"
     "Responder a qualquer mensagem de sessão continua aquela sessão — não precisa digitar id.\n\n"
-    "O botão ⚙ embaixo de cada resposta abre provedor / modelo / esforço. Trocar de provedor "
-    "abre uma sessão nova (uma sessão não muda de provedor), e zera modelo e esforço."
+    "O botão <code>+</code> embaixo de cada resposta abre model e effort da sessão. "
+    "O harness (claude/opencode) só dá pra escolher em sessão nova — uma sessão não troca de "
+    "harness, porque nenhum dos dois importa o contexto do outro.\n\n"
+    "Sessão nova herda harness/model/effort da última interação."
 )
 
 

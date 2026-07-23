@@ -1,10 +1,26 @@
-# keyboard.py — inline-keyboard primitives shared by every picker: segments, arrows, rows.
+# keyboard.py — the panel's fixed 5-column grid: two chrome columns framing three content cells.
 from __future__ import annotations
 from telegram import InlineKeyboardButton
 
-# An arrow parked at the end of a range keeps its slot so the row never changes shape; the tap
-# is answered (spinner dismissed) and deliberately does nothing else.
+# Telegram splits a row's width evenly between its buttons and has no colspan, so a cell is only
+# square if every row holds the same number of them. Five columns is what makes ‹ › + x ··· −
+# read as squares at phone width; the count is the whole geometry, so it lives here alone.
+COLS = 5
+CONTENT_COLS = 3
 NOOP = "noop:"
+# Braille blank: a label with no ink, so a filler cell renders as an empty button rather than a
+# gap. Filler is not decoration — it is what keeps column N of one row above column N of the next.
+BLANK = "⠀"
+
+
+def blank() -> InlineKeyboardButton:
+    return InlineKeyboardButton(BLANK, callback_data=NOOP)
+
+
+def cell(label: str, data: str | None) -> InlineKeyboardButton:
+    """A chrome cell. `data=None` means the slot exists for alignment but does nothing."""
+    target = data or NOOP
+    return InlineKeyboardButton(label, callback_data=target)
 
 
 def segment(label: str, selected: bool) -> str:
@@ -15,17 +31,37 @@ def segment(label: str, selected: bool) -> str:
     return result
 
 
-def arrow(glyph: str, data: str, live: bool) -> InlineKeyboardButton:
-    """A page arrow: real callback_data while there is somewhere to go, `noop:` at the end."""
-    target = data if live else NOOP
-    return InlineKeyboardButton(glyph, callback_data=target)
-
-
 def chunk(buttons: list[InlineKeyboardButton], per_row: int) -> list[list[InlineKeyboardButton]]:
-    """Wrap a flat button list into rows. Long labels (model ids) truncate when too many share
-    a row, so anything wordier than a mode name gets two per row instead of four."""
     rows = []
     for start in range(0, len(buttons), per_row):
         row = buttons[start:start + per_row]
         rows.append(row)
     return rows
+
+
+def _slot(chrome: dict[int, InlineKeyboardButton], index: int) -> InlineKeyboardButton:
+    found = chrome.get(index)
+    result = found if found is not None else blank()
+    return result
+
+
+def grid(content: list[InlineKeyboardButton],
+         left: dict[int, InlineKeyboardButton] | None = None,
+         right: dict[int, InlineKeyboardButton] | None = None) -> list[list[InlineKeyboardButton]]:
+    """Content wrapped three per row, each row framed by one chrome cell per side and padded to
+    COLS. `left`/`right` are keyed by row index; every unclaimed slot becomes a blank, so the
+    grid never changes shape and the columns stay aligned between rows."""
+    rows = chunk(content, CONTENT_COLS)
+    if not rows:
+        rows = [[]]
+    lefts = left or {}
+    rights = right or {}
+    built = []
+    for index, row in enumerate(rows):
+        framed = [_slot(lefts, index)]
+        framed.extend(row)
+        while len(framed) < COLS - 1:
+            framed.append(blank())
+        framed.append(_slot(rights, index))
+        built.append(framed)
+    return built

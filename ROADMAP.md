@@ -92,6 +92,32 @@ it stays in [ROADMAP-p3.md](ROADMAP-p3.md). One knob left open on purpose: `resu
 is an eyeball estimate of how wide the monospace ruler must be to out-measure a 64-char preview line.
 Re-tune it if the picker bubble ever looks padded or still breathes.
 
+### P2.1 — panel redesign (Lucas's live feedback, 2026-07-23)
+Landed the same day P2 shipped, on Lucas's read of the first cut. Four changes, three of them
+corrections rather than additions:
+
+- [x] **The gear is now a square `+`** on the mode row, and the whole panel is a fixed **5-column
+      grid** — Lucas's design. Telegram splits a row evenly and has no colspan, so squareness and
+      column alignment both require a constant button count per row; empty braille-blank cells are
+      the padding that buys it. `···` expands a picker to 3×3, `−` collapses, `‹ ›` are square by
+      living in the chrome columns. Full geometry + its costs: SPECS AD-13.
+- [x] **Harness left the session panel.** Lucas: switching harness mid-session makes no sense
+      unless the context moves with it. Checked — it can't, not symmetrically: `opencode` has
+      `export`/`import`, `claude` has no counterpart. So a lineage belongs to its harness for life
+      and the knob lives only at `/new`. Killed `next_backend`, the switch toast, and the
+      new-session-on-switch dispatch path. SPECS AD-11, revised.
+- [x] **`provedor` was the wrong word.** Provider = who supplies the key (nvidia, openrouter) —
+      opencode's own sense, and the level the drill-down groups by. The CLI above it is the
+      **harness**. Buttons are English now (`harness` · `model` · `effort`), matching BUILD/PLAN.
+- [x] **`/new` carries the panel.** A bare `/new` answers with a config bubble you adjust and then
+      reply to. Telegram allows one `reply_markup` per message, so this costs ForceReply's
+      auto-focus — Lucas's call (SPECS AD-14). `/new <prompt>` and the `bot ` prefix are unchanged
+      and inherit the last interaction's knobs, which every turn now records as `defaults`.
+
+Open from this round: **label truncation.** A cell is a fifth of the bubble (~8 chars), so
+`claude-fable-latest` and `claude-haiku-latest` differ only past the cut. `keyboard.COLS = 4` is
+the one-line lever if that ever matters more than squareness.
+
 ### ~~P2 — backend + model + effort selection~~ — **SHIPPED 2026-07-23**
 Plan + measurements: [ROADMAP-p2.md](ROADMAP-p2.md). Design: [SPECS.md](SPECS.md) AD-11 (capability
 declaration, backend-switch semantics) and AD-12 (opencode picker parity). 139 tests green.
