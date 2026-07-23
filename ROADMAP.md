@@ -79,7 +79,9 @@ scored by *does it remove a reason Lucas has to go back to the PC?* — not by s
 agent really needs to show something it can publish an artifact, so it never fully blocks. And audio
 beats live streaming, with a **new ask: audio *output* too**, not just input. Final order:
 
-> **P3 → P2 → audio (in + out) → live streaming → ask_user → show-me → Phase D**
+> **~~P3~~ → ~~P2~~ → audio (in + out) → live streaming → ask_user → show-me → Phase D**
+>
+> Next up: **audio (in + out)**.
 
 The P-numbers below keep their original names so earlier notes still resolve; read the arrow above for
 the running order.
@@ -90,7 +92,26 @@ it stays in [ROADMAP-p3.md](ROADMAP-p3.md). One knob left open on purpose: `resu
 is an eyeball estimate of how wide the monospace ruler must be to out-measure a 64-char preview line.
 Re-tune it if the picker bubble ever looks padded or still breathes.
 
-### P2 — backend + model + effort selection (Lucas, 2026-07-23) ← **NEXT**
+### ~~P2 — backend + model + effort selection~~ — **SHIPPED 2026-07-23**
+Plan + measurements: [ROADMAP-p2.md](ROADMAP-p2.md). Design: [SPECS.md](SPECS.md) AD-11 (capability
+declaration, backend-switch semantics) and AD-12 (opencode picker parity). 139 tests green.
+Live-check pending Lucas.
+
+Delivered: `⚙` on every anchor opens a morphing panel (provedor / modelo / esforço) on the same
+message; claude shows its 3 aliases flat, opencode shows a cheap-first shortlist plus a
+provider → paged drill-down over 478 models; effort is offered per model and omitted when the model
+declares none; switching provider arms a new session on the next turn and clears the
+provider-specific knobs. opencode sessions now render the same 3-line `/resume` entry as claude.
+
+Not done as written: **the `frontend/` folder split**. The split that was actually needed happened
+along a different seam — `sessions.py` hit the 200-line gate and was cut into `registry.py` (what
+the bot remembers) + `sessions.py` (what the providers report), and the keyboard primitives came out
+as `keyboard.py`. Grouping the remaining 17 files into `tg/` + `text/` + interaction packages is
+still open, but it now buys layout rather than relief; see **Housekeeping**.
+
+The original entry, kept for the reasoning that produced it:
+
+### ~~P2 — backend + model + effort selection (Lucas, 2026-07-23)~~
 Three linked pickers, tap-not-type, on the `TurnOptions` seam (gains `backend`/`model`/`effort`; each
 backend maps what it can). **The design blocker is gone** — the CLI surfaces were verified live
 2026-07-23 and every knob maps on both sides:
@@ -104,14 +125,17 @@ backend maps what it can). **The design blocker is gone** — the CLI surfaces w
 Second reason this ranks high: it is a **money lever, not a nicety**. A claude turn costs ~$0.11 even
 when trivial; routing a throwaway phone question to a free opencode model is a per-message saving Lucas
 can make with one tap.
-- [ ] **switch backend** claude ↔ opencode inside an existing session (today only `/new --backend X`).
-- [ ] **switch model** — a 478-entry catalogue can't be a flat keyboard: needs provider → model drill-down,
-      or a short curated favourites list plus a typed escape hatch.
-- [ ] **effort/mode conditioned on target** — still wants a per-backend **capability declaration** on the
-      seam (the toggle offers only what the current target supports), but now as a mapping table, not an
-      open question. `frontend/mode.py`'s segmented button is the UX mould for all three.
+- [x] **switch backend** claude ↔ opencode — shipped as "arm the switch, next turn opens a new
+      session on that provider", because a lineage can't change provider (SPECS AD-11).
+- [x] **switch model** — shipped as favourites + provider → paged drill-down (Lucas's call over the
+      typed escape hatch: tap-not-type held all the way down).
+- [x] **effort/mode conditioned on target** — shipped, and the declaration turned out to belong per
+      MODEL, not per backend: `models.json` gives four different `reasoning_options` shapes and several
+      different `effort` value sets (SPECS AD-11).
 
-- [ ] **opencode picker parity** — moved here **from P3 by Lucas's scope call**: claude sessions show a
+- [x] **opencode picker parity** — shipped, see SPECS AD-12 (the `tokens_*` columns turned out to be
+      lifetime totals, not occupancy — 175% of the window on a real session).
+      Original note: — moved here **from P3 by Lucas's scope call**: claude sessions show a
       3-line entry with last-response preview, model, and context %; opencode sessions show none of it,
       because `opencode._row_to_item` returns only `{session_id, title, updated_at}`. It only starts
       mattering once opencode is genuinely in rotation, which is what P2 causes. **Proven cheap while
@@ -162,10 +186,24 @@ different sessions across pages, and anchor messages carried no mode toggle. Fut
 first, then move to KNOWN-BUGS.md with a `bN` id if they survive the round they were found in.
 
 ## Housekeeping
-- [ ] **`frontend/` is 14 files** and the size hook is nudging to split. Worth doing **with P2**, which
-      adds three pickers — not before, or the split gets redone. Natural seams: the Telegram-primitive
-      layer (`reply`, `htmlsplit`), the text layer (`format`, `markdown`, `inline`, `phrases`), and the
-      interaction layer (`bot`, `resume`, `mode`, `dispatch`, `sessions`, `config`, `inbox`).
+- [ ] **PT-BR phrase style: lowercase, no trailing period.** `frontend/phrases.py` was copied from
+      the old workspace bot and kept its sentence-case banks ("Guardado em brain/INBOX.md."). A
+      parallel session had rewritten exactly these banks in the old daemon to lowercase and
+      period-free ("guardado em brain/INBOX.md") — a deliberate tone choice for chat, where
+      sentence-case acks read stiff. That edit died with the daemon's retirement 2026-07-23; the
+      preference is recorded here so it lands in aiwbot instead. Applies to every bank in
+      `phrases.py`, not just the capture acks.
+- [~] **`frontend/` file count** — partly addressed by P2, but along a seam this note didn't name.
+      What actually hit the 200-line block was `sessions.py`, so the cut was by responsibility
+      rather than by layer: `registry.py` (bot-owned per-session state — knobs, titles, message
+      maps) vs `sessions.py` (cross-backend listing), plus `keyboard.py` for the inline-keyboard
+      primitives both pickers now share and `panelmenu.py` for the panel's states. 17 files, none
+      near the gate.
+      Still open, and now optional: grouping them into `tg/` (`reply`, `htmlsplit`, `keyboard`),
+      `text/` (`format`, `markdown`, `inline`, `phrases`) and an interaction package. That buys
+      layout, not relief — and each package costs a facade plus a CONTEXT.md — so it is churn with
+      no behaviour change. Worth doing when the audio work or a third picker makes the flat
+      directory genuinely hard to read, not before.
 
 ## Verification
 - Free (every change): `make test`. Live milestone (~$0.20): `make smoke`.

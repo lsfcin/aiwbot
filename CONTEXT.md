@@ -24,6 +24,7 @@ before any Telegram wiring. Reuses plumbing from the workspace bot (core/tools/t
 | [`KNOWN-BUGS.md`](KNOWN-BUGS.md) | — | — | aiwbot — Known Bugs |
 | [`README.md`](README.md) | — | — | aiwbot |
 | [`REFS.md`](REFS.md) | — | — | aiwbot — References |
+| [`ROADMAP-p2.md`](ROADMAP-p2.md) | — | — | aiwbot — P2: backend + model + effort selection |
 | [`ROADMAP-p3.md`](ROADMAP-p3.md) | — | — | aiwbot — P3: Telegram output fidelity + `/resume` stability |
 | [`ROADMAP.md`](ROADMAP.md) | — | — | aiwbot — Roadmap |
 | [`SPECS.md`](SPECS.md) | — | — | aiwbot — Specs |
