@@ -6,6 +6,11 @@ from . import registry
 # harness is absent from a live session on purpose: no CLI can import the other's transcript, so
 # a running lineage can never change harness (SPECS AD-11). It exists only in the NEW scope.
 LABELS = {"h": "harness", "m": "model", "e": "effort"}
+# Which effort values earn the two visible slots when the ladder has to be cut. By NAME, not by
+# position: claude's ladder is low..max but opencode's vocabularies are irregular ([high, max],
+# [minimal, low, medium, high]), so any positional rule picks something different on each.
+# Lucas: "medium e high, raramente uso low".
+EFFORT_PREFERRED = ("medium", "high")
 _SESSION_DIMS = ("m", "e")
 _NEW_DIMS = ("h", "m", "e")
 
@@ -45,6 +50,11 @@ def effort_values(scope: str) -> list[str]:
     backend = get_backend(name)
     model = registry.setting_for(scope, "model")
     return backend.efforts(model)
+
+
+def preferred(dim: str) -> tuple[str, ...]:
+    """Values that get the visible slots when the list is cut. Only effort has an opinion."""
+    return EFFORT_PREFERRED if dim == "e" else ()
 
 
 def values_for(scope: str, dim: str) -> tuple[list[str], bool]:

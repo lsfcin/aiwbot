@@ -1,7 +1,7 @@
 # resume.py — /resume picker (Claude-Code-style): list recent sessions, tap to re-anchor + continue.
 from __future__ import annotations
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from . import config, format, panelmenu, phrases, registry, reply, sessions
+from . import config, format, msgmap, panelmenu, phrases, registry, reply, sessions
 
 RESUME_COUNT = 3
 TITLE_WORDS = 5
@@ -66,13 +66,13 @@ def _keyboard(items: list[dict], offset: int = 0, query: str = "", total: int = 
     back = offset - RESUME_COUNT
     if back < 0:
         back = 0
-    row = [_arrow("‹", back, query, offset > 0)]
+    row = [_arrow("«", back, query, offset > 0)]
     for i, item in enumerate(items, start=offset + 1):
         data = f"resume:{item['session_id']}"
         button = InlineKeyboardButton(str(i), callback_data=data)
         row.append(button)
     shown = offset + len(items)
-    row.append(_arrow("›", shown, query, shown < total))
+    row.append(_arrow("»", shown, query, shown < total))
     return InlineKeyboardMarkup([row])
 
 
@@ -157,7 +157,7 @@ async def _anchor(query, sid: str) -> None:
     markup = panelmenu.root_markup(sid, current)
     sent = await reply.safe_reply(query.message, block, reply_markup=markup)
     if sent is not None:
-        registry.remember_reply(sent.message_id, sid)
+        msgmap.remember_reply(sent.message_id, sid)
 
 
 async def handle_callback(update, context) -> None:
