@@ -1,12 +1,23 @@
 # resume.py — /resume picker (Claude-Code-style): list recent sessions, tap to re-anchor + continue.
 from __future__ import annotations
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from . import config, format, phrases, reply, sessions
+from . import config, format, mode, phrases, reply, sessions
 
 RESUME_COUNT = 3
 TITLE_WORDS = 5
 ANCHOR_BODY_MAX = 3000
 QUERY_MAX = 40  # callback_data caps at 64 bytes; the page arrows carry the active filter
+# A monospace run of non-breaking spaces pins a minimum bubble width, so the message stops
+# resizing as pages of different content go by. Monospace makes the width predictable; NBSP
+# is what survives client-side trimming.
+# To actually pin the width the ruler has to out-measure the longest content line, which is
+# format.PREVIEW_CHARS (64) of proportional text — monospace runs wider per character, so
+# fewer of them are needed. 44 is an eyeball estimate: too low and wide pages still stretch
+# the bubble, too high and every page is padded to the full screen. Tune it live.
+# Set to 0 to remove the ruler entirely.
+RULER_WIDTH = 44
+_NBSP = " "
+_NOOP = "noop:"
 
 
 def _meta(item: dict) -> str:
@@ -40,20 +51,39 @@ def _list_text(items: list[dict], start: int = 1) -> str:
     return "\n\n".join(blocks)
 
 
+def _arrow(glyph: str, target: int, query: str, live: bool) -> InlineKeyboardButton:
+    """Arrows keep their slot at both ends of the range so the row never changes shape —
+    at an end the glyph stays put and the tap simply does nothing."""
+    data = _NOOP
+    if live:
+        data = f"page:{target}:{query}"
+    return InlineKeyboardButton(glyph, callback_data=data)
+
+
 def _keyboard(items: list[dict], offset: int = 0, query: str = "", total: int = 0) -> InlineKeyboardMarkup:
-    """One row: ‹ then the page's absolute numerals then ›. Numbering runs 1 2 3, 4 5 6, …
-    so a numeral always names the same session as the line above it (AD-5)."""
-    row = []
-    if offset > 0:
-        back = offset - RESUME_COUNT
-        row.append(InlineKeyboardButton("‹", callback_data=f"page:{max(0, back)}:{query}"))
+    """Always five slots: ‹ then the page's absolute numerals then ›. Numbering runs 1 2 3,
+    4 5 6, … so a numeral always names the same session as the line above it (AD-5)."""
+    back = offset - RESUME_COUNT
+    if back < 0:
+        back = 0
+    row = [_arrow("‹", back, query, offset > 0)]
     for i, item in enumerate(items, start=offset + 1):
         data = f"resume:{item['session_id']}"
-        row.append(InlineKeyboardButton(str(i), callback_data=data))
+        button = InlineKeyboardButton(str(i), callback_data=data)
+        row.append(button)
     shown = offset + len(items)
-    if shown < total:
-        row.append(InlineKeyboardButton("›", callback_data=f"page:{shown}:{query}"))
+    row.append(_arrow("›", shown, query, shown < total))
     return InlineKeyboardMarkup([row])
+
+
+def _ruler() -> str:
+    """Injected after escaping — `_page` escapes the whole picker text, which would turn
+    these tags into literal <code> on screen."""
+    result = ""
+    if RULER_WIDTH:
+        pad = _NBSP * RULER_WIDTH
+        result = f"\n<code>{pad}</code>"
+    return result
 
 
 def _header(total: int, shown: int, query: str) -> str:
@@ -73,23 +103,19 @@ def _page(query: str, cwd: str, offset: int, count: int) -> tuple[str, InlineKey
         listing = _list_text(items, offset + 1)
         text = f"{header}\n\n{listing}"
         keyboard = _keyboard(items, offset, query, total)
-        result = (format.plain(text), keyboard)
+        escaped = format.plain(text)
+        ruler = _ruler()
+        result = (escaped + ruler, keyboard)
     return result
 
 
-def _parse_arg(arg: str) -> tuple[str, int]:
-    query = arg
-    count = RESUME_COUNT
-    if arg.isdigit():
-        query = ""
-        count = int(arg)
-    return query, count
-
-
 async def cmd_resume(msg, arg: str, cwd: str) -> None:
-    stripped = arg.strip()
-    query, count = _parse_arg(stripped)
-    page = _page(query[:QUERY_MAX], cwd, 0, count)
+    """The page size is fixed. It used to be settable as `/resume N`, but `_turn_page` always
+    paged by RESUME_COUNT, so page 1 showed 1-5 while page 2 showed 4-6 — the same numeral
+    naming two different sessions, which is the one thing AD-5 exists to prevent. A bare
+    number is now just a filter term, so `/resume 2026` searches titles."""
+    query = arg.strip()
+    page = _page(query[:QUERY_MAX], cwd, 0, RESUME_COUNT)
     if page is None:
         await reply.safe_reply(msg, format.plain(phrases.pick(phrases.RESUME_EMPTY_PHRASES)))
         return
@@ -125,7 +151,11 @@ async def _anchor(query, sid: str) -> None:
     body = _clip(answer) if answer else None
     phrase = phrases.pick(phrases.RESUME_ANCHOR_PHRASES)
     block = format.session_block(phrase, sid, title, body=body, backend=backend)
-    sent = await reply.safe_reply(query.message, block)
+    # The anchor is a repliable message like any answer, so it carries the same mode toggle:
+    # without it you re-anchor a session unable to see the mode you're about to run in.
+    current = sessions.mode_for(sid)
+    markup = mode.toggle_markup(sid, current)
+    sent = await reply.safe_reply(query.message, block, reply_markup=markup)
     if sent is not None:
         sessions.remember_reply(sent.message_id, sid)
 
@@ -143,3 +173,5 @@ async def handle_callback(update, context) -> None:
         await _anchor(query, sid)
     elif data.startswith("page:"):
         await _turn_page(query, data)
+    # `noop:` is an arrow parked at the end of the range — answering the callback above already
+    # dismissed the spinner, so there is deliberately nothing left to do here.

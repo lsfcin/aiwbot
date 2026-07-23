@@ -1,6 +1,6 @@
 # test_resume.py — free unit test: /resume picker list/label/pagination assembly.
 import time
-from frontend.resume import _entry_line, _list_text, _header, _parse_arg, _meta, _clip, _keyboard
+from frontend.resume import _entry_line, _list_text, _header, _meta, _clip, _keyboard, _ruler
 
 _NOW = time.time()
 
@@ -66,21 +66,13 @@ def test_header_no_hint_when_all_shown():
     assert _header(3, 3, "") == "Sessões recentes — 3 de 3"
 
 
-def test_parse_arg_digit_is_count():
-    assert _parse_arg("10") == ("", 10)
-
-
-def test_parse_arg_text_is_query():
-    assert _parse_arg("bugfix") == ("bugfix", 3)
-
-
-def test_keyboard_is_single_row_of_numerals():
+def test_keyboard_is_single_row_of_numerals_between_arrows():
     items = [{"session_id": "sid-a", "title": "a", "backend": "claude", "updated_at": _NOW},
               {"session_id": "sid-b", "title": "b", "backend": "opencode", "updated_at": _NOW}]
     markup = _keyboard(items)
     row = markup.inline_keyboard[0]
-    assert [b.text for b in row] == ["1", "2"]
-    assert [b.callback_data for b in row] == ["resume:sid-a", "resume:sid-b"]
+    assert [b.text for b in row] == ["‹", "1", "2", "›"]
+    assert [b.callback_data for b in row[1:-1]] == ["resume:sid-a", "resume:sid-b"]
 
 
 def _items(n, start=0):
@@ -88,14 +80,26 @@ def _items(n, start=0):
             for i in range(start, start + n)]
 
 
-def test_keyboard_first_page_has_next_arrow_only():
+def test_keyboard_row_shape_is_identical_on_every_page():
+    """The bubble stopped resizing because the row never changes width: five slots always,
+    whichever end of the range you are on."""
+    shapes = []
+    for offset in (0, 3, 6):
+        markup = _keyboard(_items(3, offset), offset=offset, query="", total=9)
+        row = markup.inline_keyboard[0]
+        shapes.append(len(row))
+    assert shapes == [5, 5, 5]
+
+
+def test_keyboard_first_page_back_arrow_is_inert():
     markup = _keyboard(_items(3), offset=0, query="", total=9)
     row = markup.inline_keyboard[0]
-    assert [b.text for b in row] == ["1", "2", "3", "›"]
+    assert [b.text for b in row] == ["‹", "1", "2", "3", "›"]
+    assert row[0].callback_data == "noop:"
     assert row[-1].callback_data == "page:3:"
 
 
-def test_keyboard_middle_page_has_both_arrows_and_absolute_numerals():
+def test_keyboard_middle_page_has_both_arrows_live_and_absolute_numerals():
     markup = _keyboard(_items(3), offset=3, query="", total=9)
     row = markup.inline_keyboard[0]
     assert [b.text for b in row] == ["‹", "4", "5", "6", "›"]
@@ -103,16 +107,25 @@ def test_keyboard_middle_page_has_both_arrows_and_absolute_numerals():
     assert row[-1].callback_data == "page:6:"
 
 
-def test_keyboard_last_page_has_back_arrow_only():
+def test_keyboard_last_page_next_arrow_is_inert():
     markup = _keyboard(_items(3), offset=6, query="", total=9)
     row = markup.inline_keyboard[0]
-    assert [b.text for b in row] == ["‹", "7", "8", "9"]
+    assert [b.text for b in row] == ["‹", "7", "8", "9", "›"]
+    assert row[0].callback_data == "page:3:"
+    assert row[-1].callback_data == "noop:"
 
 
 def test_keyboard_arrows_carry_the_active_filter():
     markup = _keyboard(_items(3), offset=0, query="bugfix", total=9)
     row = markup.inline_keyboard[0]
     assert row[-1].callback_data == "page:3:bugfix"
+
+
+def test_ruler_is_monospace_nbsp_of_fixed_width():
+    from frontend.resume import RULER_WIDTH
+    ruler = _ruler()
+    assert ruler.startswith("\n<code>")
+    assert ruler.count(" ") == RULER_WIDTH
 
 
 def test_list_text_numbers_from_page_offset():
