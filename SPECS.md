@@ -61,8 +61,22 @@ Code's native picker by a filter internal to the (closed) extension/CLI — the 
 override it. Making bot sessions natively resumable elsewhere is an open investigation (ROADMAP), not a
 solved feature; may be impossible from outside the extension.
 
-**Resolved 2026-07-22 — listing infeasible, but the sessions are NOT trapped.** Three findings, all
-verified empirically:
+**SOLVED 2026-07-23 — it was an env var all along.** `CLAUDE_CODE_ENTRYPOINT` decides the recorded
+entrypoint; the `-p` flag does not. A bare headless run under systemd inherits nothing → `sdk-cli` →
+hidden. Setting `CLAUDE_CODE_ENTRYPOINT=claude-vscode` on the subprocess makes a bot-created session
+appear in the native VSCode/terminal picker like any other. Verified live: two headless `-p` sessions
+created seconds apart, one with the var (`8c5aabce`, origin `claude-vscode`) and one without
+(`26d440e7`, origin `sdk-cli`) — the first is listed by `claude --resume`, the second is skipped.
+`ClaudeBackend.env()` now returns it (the seam gained `CliBackend.env()` + `run_capture(extra_env=…)`,
+so this stays provider-specific data, not a global). The value `cli` is **rejected** — it silently
+falls back to `sdk-cli`; only `claude-vscode` works.
+
+The filter keys on the session's **originating** entrypoint, not later entries: a session created
+interactively stays listed even after headless `-p` turns append to it, and a session born `sdk-cli`
+stays hidden even once `claude-vscode` entries are appended. So the var matters at session creation
+(`/new`, explicit or via the "bot" prefix); already-created bot sessions stay hidden forever.
+
+Superseded reasoning kept below, since the sub-findings still hold:
 
 1. **The filter is real and `--name` does not beat it.** Captured the terminal picker's actual list and
    diffed it against `~/.claude/projects/-mnt-workspace/*.jsonl` sorted by mtime: every `claude-vscode`
@@ -83,9 +97,21 @@ verified empirically:
    and it is exactly what forced `--fork-session` (AD-3) → one extra session per message. Visibility and
    single-lineage were a direct trade-off; Phase B chose lineage.
 
-Full native visibility is only available through Claude-Code-native transports — **Remote Control**
-(`claude --remote-control`) or the official **Channels** Telegram plugin — both rejected for 100%
-lock-in (see `brain/goals/workspace-os.md`). Revisit only if that trade-off is reconsidered.
+~~Full native visibility is only available through Claude-Code-native transports.~~ Wrong — see the
+env-var fix above. Remote Control / Channels remain rejected for lock-in ([REFS.md](REFS.md)), but they
+are no longer the only path to native visibility.
+
+### AD-9 — Context % is free: it already rides in the result object
+`claude -p --output-format json` returns `modelUsage[model]` carrying **both** the token breakdown
+(`inputTokens` + `cacheReadInputTokens` + `cacheCreationInputTokens` = occupancy) **and**
+`contextWindow`. We already parse that object every turn, so reporting `X%` costs zero extra tokens —
+no `/context` call, no estimation. Plumbed as `AgentEvent.context_used`/`context_window` →
+`TurnResult` → footer.
+
+Transcripts (`.jsonl`) carry the same usage numbers in snake_case on each assistant message but **not**
+the window. So for the `/resume` list the frontend pairs transcript usage with a window *learned* from
+live turns (`sessions.remember_context_window`, keyed by model) instead of hardcoding per-model
+constants. Unknown model → the `%` bit is simply omitted, never guessed.
 
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.

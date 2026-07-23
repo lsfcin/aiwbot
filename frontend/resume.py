@@ -4,21 +4,17 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from . import config, format, phrases, reply, sessions
 
 RESUME_COUNT = 5
-TITLE_WORDS = 6
+TITLE_WORDS = 5
+ANCHOR_BODY_MAX = 3000
 
 
 def _meta(item: dict) -> str:
-    """L3: tempo · modo · provider · model — bits omitted when a session lacks them
-    (VSCode sessions carry no bot mode/model beyond what the transcript records)."""
+    """L3: provider · modelo · modo · X%contexto · quando — bits omitted when absent."""
+    used = item.get("context_used")
+    window = item.get("context_window")
+    bits = format.meta_bits(item["backend"], item.get("model"), item.get("mode"), used, window)
     when = format.relative_time(item["updated_at"])
-    bits = [when]
-    mode = item.get("mode")
-    if mode:
-        bits.append(mode)
-    bits.append(item["backend"])
-    model = format.short_model(item.get("model"))
-    if model:
-        bits.append(model)
+    bits.append(when)
     return " · ".join(bits)
 
 
@@ -83,11 +79,22 @@ async def cmd_resume(msg, arg: str, cwd: str) -> None:
     await reply.safe_reply(msg, format.plain(text), reply_markup=keyboard)
 
 
+def _clip(text: str, limit: int = ANCHOR_BODY_MAX) -> str:
+    """Telegram caps a message at 4096; the anchor's last-response body is the only
+    unbounded part, so clip the raw text before it gets formatted."""
+    result = text
+    if len(text) > limit:
+        result = text[:limit] + "\n[…]"
+    return result
+
+
 async def _anchor(query, sid: str) -> None:
     title = sessions.title_for(sid)
     backend = sessions.backend_for(sid)
+    answer = sessions.last_response(sid, config.WORKSPACE_DIR)
+    body = _clip(answer) if answer else None
     phrase = phrases.pick(phrases.RESUME_ANCHOR_PHRASES)
-    block = format.session_block(phrase, sid, title, backend=backend)
+    block = format.session_block(phrase, sid, title, body=body, backend=backend)
     sent = await reply.safe_reply(query.message, block)
     if sent is not None:
         sessions.remember_reply(sent.message_id, sid)

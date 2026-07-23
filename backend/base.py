@@ -15,6 +15,9 @@ class AgentEvent:
     session_id: str | None = None
     cost_usd: float | None = None
     model: str | None = None
+    # Context-window occupancy after this turn. Providers that don't report it leave both None.
+    context_used: int | None = None
+    context_window: int | None = None
 
 
 @dataclass
@@ -39,6 +42,10 @@ class AgentBackend(Protocol):
         """Resumable sessions for cwd from the provider's own store, newest-first-agnostic.
         Each item: {session_id, title, updated_at}. Lets the frontend picker show sessions
         started anywhere (e.g. VSCode), not just ones the bot created."""
+        ...
+
+    def last_response(self, session_id: str, cwd: str) -> str:
+        """Full text of that session's last agent answer, or "" if the provider can't say."""
         ...
 
 

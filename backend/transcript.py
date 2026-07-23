@@ -67,6 +67,23 @@ def last_response_text(lines: list[str]) -> str:
     return text
 
 
+# Transcript usage is snake_case (the live result object uses camelCase — see claude._context_of).
+_CONTEXT_FIELDS = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+
+
+def last_context_used(lines: list[str]) -> int | None:
+    """Context occupancy of the last assistant turn, from its `usage` breakdown. The window
+    itself is NOT in the transcript — the frontend pairs this with a window learned live."""
+    message = _last_assistant_message(lines)
+    used = None
+    if isinstance(message, dict):
+        usage = message.get("usage") or {}
+        if usage:
+            counts = [usage.get(f) or 0 for f in _CONTEXT_FIELDS]
+            used = sum(counts)
+    return used
+
+
 def last_model(lines: list[str]) -> str | None:
     """Model of the last assistant response (e.g. claude-sonnet-5), if recorded."""
     message = _last_assistant_message(lines)

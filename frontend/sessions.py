@@ -30,6 +30,22 @@ def adopt(session_id: str, backend: str, title: str | None, updated_at: float) -
     config.save_config(sessions=sessions)
 
 
+def remember_context_window(model: str | None, window: int | None) -> None:
+    """Learn a model's context window from a live turn. Transcripts don't record it, so the
+    /resume list reuses what we've observed instead of hardcoding per-model constants."""
+    if model and window:
+        cfg = config.load_config()
+        windows = cfg.get("context_windows", {})
+        windows[model] = window
+        config.save_config(context_windows=windows)
+
+
+def context_window_for(model: str | None) -> int | None:
+    """Observed context window for a model, or None if we've never seen a live turn on it."""
+    windows = config.load_config().get("context_windows", {})
+    return windows.get(model or "")
+
+
 def _title_matches(title: str | None, query: str) -> bool:
     lowered = (title or "").lower()
     return (not query) or (query in lowered)
@@ -63,6 +79,7 @@ def recent(n: int, query: str, cwd: str) -> list[dict]:
         sid = item["session_id"]
         adopt(sid, item["backend"], item.get("title"), item["updated_at"])
         item["mode"] = mode_for(sid)
+        item["context_window"] = context_window_for(item.get("model"))
     return page
 
 
@@ -79,6 +96,16 @@ def backend_for(session_id: str) -> str | None:
     sessions = config.load_config().get("sessions", {})
     entry = sessions.get(session_id, {})
     return entry.get("backend")
+
+
+def last_response(session_id: str, cwd: str) -> str:
+    """Full text of the session's last answer, from whichever backend owns it."""
+    name = backend_for(session_id)
+    text = ""
+    if name:
+        backend = get_backend(name)
+        text = backend.last_response(session_id, cwd)
+    return text
 
 
 def title_for(session_id: str) -> str | None:

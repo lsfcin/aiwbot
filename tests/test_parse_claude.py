@@ -121,3 +121,24 @@ def test_list_sessions_missing_dir_is_empty(tmp_path, monkeypatch):
     import backend.claude as C
     monkeypatch.setattr(C, "_project_dir", lambda cwd: tmp_path / "nope")
     assert ClaudeBackend().list_sessions("/x") == []
+
+
+def test_result_carries_context_used_and_window():
+    # modelUsage already rides in the -p result object, so the % costs no extra tokens.
+    import json
+    from backend.claude import parse_events
+    obj = {"type": "result", "session_id": "s1", "result": "hi", "total_cost_usd": 0.1,
+           "modelUsage": {"claude-opus-4-8": {"inputTokens": 2, "cacheReadInputTokens": 11036,
+                                              "cacheCreationInputTokens": 13092,
+                                              "contextWindow": 1000000}}}
+    events = parse_events(json.dumps(obj))
+    result = [e for e in events if e.kind == "result"][-1]
+    assert result.context_used == 24130
+    assert result.context_window == 1000000
+
+
+def test_env_sets_entrypoint_so_sessions_are_natively_listed():
+    # AD-8 (revised): the native picker hides sessions whose originating entrypoint is
+    # sdk-cli; the value comes from this env var, not from the -p flag.
+    env = ClaudeBackend().env()
+    assert env["CLAUDE_CODE_ENTRYPOINT"] == "claude-vscode"
