@@ -61,14 +61,31 @@ Code's native picker by a filter internal to the (closed) extension/CLI — the 
 override it. Making bot sessions natively resumable elsewhere is an open investigation (ROADMAP), not a
 solved feature; may be impossible from outside the extension.
 
-**Resolved 2026-07-22 — infeasible, dropped.** The discriminating field is `entrypoint`, stamped on
-every user/assistant jsonl line by Claude Code itself: `sdk-cli` (bot `claude -p`) vs `claude-vscode`
-(extension) vs `cli` (interactive REPL). Headless `-p` turns also uniquely carry top-level
-`promptSource:"sdk"` + `permissionMode`; interactive VSCode turns uniquely carry `isMeta:true`. The
-native picker almost certainly excludes `entrypoint:"sdk-cli"`. That value is set by the CLI for any
-`-p`/SDK invocation — the bot has no flag to change it (`--name` already proved insufficient), so bot
-sessions cannot be made visible in Claude Code's own picker from outside the closed extension. The bot's
-own `/resume` (AD-6, sourcing the jsonl store directly) remains the way to resume bot sessions.
+**Resolved 2026-07-22 — listing infeasible, but the sessions are NOT trapped.** Three findings, all
+verified empirically:
+
+1. **The filter is real and `--name` does not beat it.** Captured the terminal picker's actual list and
+   diffed it against `~/.claude/projects/-mnt-workspace/*.jsonl` sorted by mtime: every `claude-vscode`
+   /`cli` session appears in exact mtime order, and **every** `sdk-cli` session is skipped — including
+   `5fbc1770`, which *does* carry a `custom-title` record written by `--name`. So `--name` reaches the
+   store but not the picker. The discriminator is `entrypoint` (`sdk-cli` for any `-p`/SDK invocation,
+   stamped by the CLI itself; headless turns also uniquely carry `promptSource:"sdk"` + `permissionMode`).
+   The bot has no flag to change it → **cannot be listed** in Claude Code's native picker.
+2. **But bot sessions ARE resumable by explicit id.** `claude --resume 5fbc1770-…` from the terminal
+   resumed a bot-created session and answered normally (verified live). They are unlisted, not
+   inaccessible. → Hence the **reattach hint**: the `/resume` anchor message shows a copyable
+   `<code>claude --resume &lt;id&gt;</code>` (`format.reattach_cmd`, provider as data — opencode maps to
+   `opencode -s &lt;id&gt;`). That is the sanctioned escape hatch out of the bot.
+3. **Why bot sessions once DID show up in VSCode** (Lucas's recollection, reconciled): the old `--bg`
+   era started each turn as a **background agent**, which registers in the live roster
+   `~/.claude/sessions/<pid>.json` (`kind`, `entrypoint`, `name`, managed by `claude agents`) and thus
+   surfaced in the extension *while running*. That registration is pid-scoped and dies with the process,
+   and it is exactly what forced `--fork-session` (AD-3) → one extra session per message. Visibility and
+   single-lineage were a direct trade-off; Phase B chose lineage.
+
+Full native visibility is only available through Claude-Code-native transports — **Remote Control**
+(`claude --remote-control`) or the official **Channels** Telegram plugin — both rejected for 100%
+lock-in (see `brain/goals/workspace-os.md`). Revisit only if that trade-off is reconsidered.
 
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.

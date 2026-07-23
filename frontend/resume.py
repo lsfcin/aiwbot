@@ -85,8 +85,9 @@ async def cmd_resume(msg, arg: str, cwd: str) -> None:
 
 async def _anchor(query, sid: str) -> None:
     title = sessions.title_for(sid)
+    backend = sessions.backend_for(sid)
     phrase = phrases.pick(phrases.RESUME_ANCHOR_PHRASES)
-    block = format.session_block(phrase, sid, title)
+    block = format.session_block(phrase, sid, title, backend=backend)
     sent = await reply.safe_reply(query.message, block)
     if sent is not None:
         sessions.remember_reply(sent.message_id, sid)
