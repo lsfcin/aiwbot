@@ -96,11 +96,12 @@ Re-tune it if the picker bubble ever looks padded or still breathes.
 Landed the same day P2 shipped, on Lucas's read of the first cut. Four changes, three of them
 corrections rather than additions:
 
-- [x] **The gear is now a square `+`** on the mode row, and the whole panel is a fixed **5-column
-      grid** — Lucas's design. Telegram splits a row evenly and has no colspan, so squareness and
-      column alignment both require a constant button count per row; empty braille-blank cells are
-      the padding that buys it. `···` expands a picker to 3×3, `−` collapses, `‹ ›` are square by
-      living in the chrome columns. Full geometry + its costs: SPECS AD-13.
+- [x] **The gear became a `+`**, and the panel a positional layout: **at most four buttons per
+      row**, first always `+`/`x`, last always `···`/`−`. Went through two iterations the same
+      day — the first was a fixed 5-column grid padded with invisible cells so everything was
+      square and aligned, which Lucas dropped once he saw the cost: five columns means
+      ~8-character labels and model ids stop being distinguishable. Four (or fewer) per row buys
+      ~12. Rows split evenly, never 4+1. SPECS AD-13.
 - [x] **Harness left the session panel.** Lucas: switching harness mid-session makes no sense
       unless the context moves with it. Checked — it can't, not symmetrically: `opencode` has
       `export`/`import`, `claude` has no counterpart. So a lineage belongs to its harness for life
@@ -114,9 +115,10 @@ corrections rather than additions:
       auto-focus — Lucas's call (SPECS AD-14). `/new <prompt>` and the `bot ` prefix are unchanged
       and inherit the last interaction's knobs, which every turn now records as `defaults`.
 
-Open from this round: **label truncation.** A cell is a fifth of the bubble (~8 chars), so
-`claude-fable-latest` and `claude-haiku-latest` differ only past the cut. `keyboard.COLS = 4` is
-the one-line lever if that ever matters more than squareness.
+Found by rendering the real states rather than by reasoning: with only two visible slots, a
+collapsed picker would show `low medium ···` while `high` was set — the state invisible. The
+selected value is now pinned first whenever the list is truncated, including when it came from
+the drill-down and is not in the shortlist at all.
 
 ### ~~P2 — backend + model + effort selection~~ — **SHIPPED 2026-07-23**
 Plan + measurements: [ROADMAP-p2.md](ROADMAP-p2.md). Design: [SPECS.md](SPECS.md) AD-11 (capability
