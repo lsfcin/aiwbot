@@ -57,8 +57,9 @@ def test_clip_marks_truncation():
     assert len(clipped) == 104
 
 
-def test_header_hints_full_count_command_when_more_exist():
-    assert _header(12, 5, "") == "Sessões recentes — 5 de 12 · /resume 12 pra ver todas"
+def test_header_counts_shown_of_total():
+    # the "/resume N pra ver todas" hint is gone: ‹ / › arrows page through instead
+    assert _header(12, 5, "") == "Sessões recentes — 5 de 12"
 
 
 def test_header_no_hint_when_all_shown():
@@ -70,7 +71,7 @@ def test_parse_arg_digit_is_count():
 
 
 def test_parse_arg_text_is_query():
-    assert _parse_arg("bugfix") == ("bugfix", 5)
+    assert _parse_arg("bugfix") == ("bugfix", 3)
 
 
 def test_keyboard_is_single_row_of_numerals():
@@ -80,3 +81,41 @@ def test_keyboard_is_single_row_of_numerals():
     row = markup.inline_keyboard[0]
     assert [b.text for b in row] == ["1", "2"]
     assert [b.callback_data for b in row] == ["resume:sid-a", "resume:sid-b"]
+
+
+def _items(n, start=0):
+    return [{"session_id": f"sid-{i}", "title": "t", "backend": "claude", "updated_at": _NOW}
+            for i in range(start, start + n)]
+
+
+def test_keyboard_first_page_has_next_arrow_only():
+    markup = _keyboard(_items(3), offset=0, query="", total=9)
+    row = markup.inline_keyboard[0]
+    assert [b.text for b in row] == ["1", "2", "3", "›"]
+    assert row[-1].callback_data == "page:3:"
+
+
+def test_keyboard_middle_page_has_both_arrows_and_absolute_numerals():
+    markup = _keyboard(_items(3), offset=3, query="", total=9)
+    row = markup.inline_keyboard[0]
+    assert [b.text for b in row] == ["‹", "4", "5", "6", "›"]
+    assert row[0].callback_data == "page:0:"
+    assert row[-1].callback_data == "page:6:"
+
+
+def test_keyboard_last_page_has_back_arrow_only():
+    markup = _keyboard(_items(3), offset=6, query="", total=9)
+    row = markup.inline_keyboard[0]
+    assert [b.text for b in row] == ["‹", "7", "8", "9"]
+
+
+def test_keyboard_arrows_carry_the_active_filter():
+    markup = _keyboard(_items(3), offset=0, query="bugfix", total=9)
+    row = markup.inline_keyboard[0]
+    assert row[-1].callback_data == "page:3:bugfix"
+
+
+def test_list_text_numbers_from_page_offset():
+    text = _list_text(_items(2), start=4)
+    assert text.startswith("4. T\n")
+    assert "\n\n5. T\n" in text

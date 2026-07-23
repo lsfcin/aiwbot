@@ -55,10 +55,30 @@ archived in [HISTORY.md](HISTORY.md). Live feedback opened the follow-ups below.
       callback + edit the markup before persisting the mode, so the bracket moves instantly instead of
       after the config write. `frontend/mode.py`. Shipped Phase 1.
 
+#### Shipped 2026-07-23 (live feedback round 2)
+- [x] **`/resume` pagination** — 3 per page, `‹ 1 2 3 ›` → `‹ 4 5 6 ›`; numerals stay absolute so a
+      button always names the line above it. Arrows carry the active filter in `callback_data`.
+- [x] **`/new` usable from the command menu** — tapping it sends `/new` bare, so an empty prompt now
+      answers with a `ForceReply` and starts the session from that reply (`pending_new` map).
+- [x] **context % + meta reorder + 5-word titles + full last response on re-anchor** — see AD-9.
+- [x] **native session visibility** (2a) — `CLAUDE_CODE_ENTRYPOINT`, see AD-8.
+
+#### Known limits (won't chase)
+- **Mode-button latency ~1.5 s** — the optimistic edit already removed our side; what's left is the
+  Telegram round-trip for `edit_message_reply_markup`. Not fixable without a local-echo mechanism
+  Telegram doesn't offer. Lucas: "não é crítico".
+- **VSCode picker needs a window reload** to pick up newly created sessions (the extension caches its
+  list). Terminal `claude --resume` re-reads every time. `Ctrl+Shift+P → Reload Window` is the quick way.
+
 #### Tier 3 remainder
-- [ ] **model + effort selection** — pick the model and the reasoning effort per session/turn (claude:
-      `--effort {low,medium,high,xhigh,max}`; `--model <family>`), tap-not-type UX. Reuses the
-      `TurnOptions` seam (add `model`/`effort` fields; claude maps to flags, opencode maps what it can).
+- [ ] **backend + model + effort selection** (Lucas, 2026-07-23) — three linked pickers, tap-not-type,
+      reusing the `TurnOptions` seam (add `backend`/`model`/`effort`; each backend maps what it can):
+      1. **switch backend** claude ↔ opencode per session (today only `/new --backend X` at creation).
+      2. **switch model** (claude `--model`; opencode has its own catalogue).
+      3. **modes conditioned on the backend/model** — build/plan is a Claude Code notion; opencode
+         models (e.g. GLM-5.2) likely don't share it. Needs a per-backend capability declaration on the
+         seam so the toggle only offers modes the current target actually supports. **Unverified** —
+         confirm opencode's real mode/effort surface before designing.
 - [ ] **output-format translation** — translate the markdown that Claude Code / opencode emit
       (`**bold**`, `##` headings, code fences) into what Telegram actually renders (MarkdownV2 or HTML).
       Today bold sometimes shows, `##` never does — inconsistent. A translation layer sits between agent

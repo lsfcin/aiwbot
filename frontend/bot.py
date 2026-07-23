@@ -1,6 +1,6 @@
 # bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX.
 from __future__ import annotations
-from telegram import BotCommand, Update
+from telegram import BotCommand, ForceReply, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from backend import TurnOptions
 from . import config, dispatch, format, inbox, mode, phrases, reply, resume, sessions
@@ -60,14 +60,24 @@ async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
         sessions.remember_reply(sent.message_id, result.session_id)
 
 
-async def _cmd_new(msg, arg: str) -> None:
-    backend_name, prompt = _parse_new_arg(arg)
-    if not prompt.strip():
-        await reply.safe_reply(msg, format.plain(phrases.pick(phrases.NEW_EMPTY_PROMPT_PHRASES)))
-        return
+async def _start_new(msg, backend_name: str, prompt: str) -> None:
     working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
     title = format.title_from_prompt(prompt)
     await _run_and_deliver(msg, working, prompt, session_id=None, backend_name=backend_name, title=title)
+
+
+async def _cmd_new(msg, arg: str) -> None:
+    """Tapping /new in Telegram's command menu sends it bare — so instead of erroring,
+    ask for the prompt with a ForceReply and start the session from that answer."""
+    backend_name, prompt = _parse_new_arg(arg)
+    if not prompt.strip():
+        ask = format.plain(phrases.pick(phrases.NEW_EMPTY_PROMPT_PHRASES))
+        force = ForceReply(input_field_placeholder="prompt da nova sessão")
+        asked = await reply.safe_reply(msg, ask, reply_markup=force)
+        if asked is not None:
+            sessions.remember_pending_new(asked.message_id, backend_name)
+        return
+    await _start_new(msg, backend_name, prompt)
 
 
 async def _handle_reply_continue(msg, sid: str) -> None:
@@ -98,9 +108,14 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         context.application.create_task(_dispatch_command(msg.text, msg))
         return
     if msg.text and msg.reply_to_message is not None:
-        sid = sessions.session_for_reply(msg.reply_to_message.message_id)
+        replied_to = msg.reply_to_message.message_id
+        sid = sessions.session_for_reply(replied_to)
         if sid:
             context.application.create_task(_handle_reply_continue(msg, sid))
+            return
+        awaiting = sessions.pending_new(replied_to)
+        if awaiting:
+            context.application.create_task(_start_new(msg, awaiting, msg.text))
             return
     if msg.text:
         bot_prompt = _strip_bot_prefix(msg.text)
@@ -135,7 +150,7 @@ async def _post_init(app: Application) -> None:
 def main() -> None:
     app = Application.builder().token(config.bot_token()).post_init(_post_init).build()
     app.add_handler(CallbackQueryHandler(mode.handle_callback, pattern="^mode:"))
-    app.add_handler(CallbackQueryHandler(resume.handle_callback, pattern="^resume:"))
+    app.add_handler(CallbackQueryHandler(resume.handle_callback, pattern="^(resume|page):"))
     app.add_handler(MessageHandler(filters.ALL, _handle_message))
     print("aiwbot: polling...")
     app.run_polling()
