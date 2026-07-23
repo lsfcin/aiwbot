@@ -46,10 +46,11 @@ archived in [HISTORY.md](HISTORY.md). Live feedback opened the follow-ups below.
       The 6…6 preview we agreed on isn't rendering today — wire it in. `frontend/resume.py` `_entry_line`
       + a real preview source (registry `preview` only exists for bot-created turns; VSCode sessions need
       it derived from the jsonl last assistant message). Depends on context-% (below) for L3.
-- [x] **bot sessions invisible to VSCode/terminal pickers** (2a) — **dropped, infeasible.** The picker
-      filters on `entrypoint` (`sdk-cli` for bot `-p` vs `claude-vscode`/`cli`), stamped by the CLI itself;
-      the bot has no flag to change it. Documented in SPECS AD-8 + KNOWN-BUGS won't-fix. Bot `/resume`
-      stays the way to resume bot sessions.
+- [x] **bot sessions invisible to VSCode/terminal pickers** (2a) — **listing infeasible; solved by
+      reattach hint instead.** Picker provably filters `entrypoint:"sdk-cli"` (even with `--name`), but
+      bot sessions DO resume by explicit id (verified live). The `/resume` anchor now shows a copyable
+      `claude --resume <id>` (`format.reattach_cmd`, provider as data). Full native visibility would
+      require Remote Control / Channels = Claude-Code lock-in, still rejected. SPECS AD-8.
 - [x] **instant mode-button feedback** (1) — the segmented toggle now flips optimistically: answer the
       callback + edit the markup before persisting the mode, so the bracket moves instantly instead of
       after the config write. `frontend/mode.py`. Shipped Phase 1.

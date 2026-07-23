@@ -106,13 +106,34 @@ def format_body(text: str) -> str:
     return "".join(out)
 
 
-def session_block(phrase: str, sid: str | None, title: str | None, body: str | None = None, extra: str | None = None) -> str:
+# Provider as data: how each backend re-opens a session by id outside the bot.
+_REATTACH = {"claude": "claude --resume {sid}", "opencode": "opencode -s {sid}"}
+
+
+def reattach_cmd(sid: str, backend: str | None = None) -> str | None:
+    """Copy-paste command to reopen a session in the terminal/VSCode. Bot `-p` sessions are
+    resumable by id but never listed in Claude Code's own picker (SPECS AD-8), so the id is
+    the only way out of the bot. None for a backend we don't know how to reattach."""
+    key = backend or ""
+    template = _REATTACH.get(key)
+    result = None
+    if template:
+        result = template.format(sid=sid)
+    return result
+
+
+def session_block(phrase: str, sid: str | None, title: str | None, body: str | None = None,
+                  extra: str | None = None, backend: str | None = None) -> str:
     lines = [html.escape(phrase)]
     if sid:
         header = f"[{sid[:SESSION_ID_LABEL_LEN].upper()}] {title_words(title)}"
         if extra:
             header += f" · {extra}"
         lines.append(html.escape(header))
+        cmd = reattach_cmd(sid, backend)
+        if cmd:
+            escaped = html.escape(cmd)
+            lines.append(f"<code>{escaped}</code>")
     if body:
         lines.append(format_body(body))
     return "\n".join(lines)

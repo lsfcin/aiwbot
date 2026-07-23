@@ -1,5 +1,5 @@
 # test_format.py — free unit test: markdown/table -> Telegram HTML conversion.
-from frontend.format import format_body, session_block, title_words, title_from_prompt, response_preview, relative_time, short_model, answer_block
+from frontend.format import format_body, session_block, reattach_cmd, title_words, title_from_prompt, response_preview, relative_time, short_model, answer_block
 
 
 def test_plain_markdown_to_html():
@@ -33,6 +33,28 @@ def test_session_block_includes_header_and_body():
     assert "[ABC]" in block
     assert "HELLO WORLD SESSION" in block
     assert "oi" in block
+
+
+def test_reattach_cmd_per_backend():
+    # AD-8: bot sessions are resumable by id but never listed in Claude Code's picker,
+    # so the copyable command is the only way to open one outside the bot.
+    assert reattach_cmd("sid-1", "claude") == "claude --resume sid-1"
+    assert reattach_cmd("sid-1", "opencode") == "opencode -s sid-1"
+
+
+def test_reattach_cmd_unknown_backend_is_none():
+    assert reattach_cmd("sid-1", None) is None
+    assert reattach_cmd("sid-1", "nope") is None
+
+
+def test_session_block_offers_copyable_reattach_command():
+    block = session_block("Pronto.", "abc12345", "t", backend="claude")
+    assert "<code>claude --resume abc12345</code>" in block
+
+
+def test_session_block_omits_reattach_without_backend():
+    block = session_block("Pronto.", "abc12345", "t")
+    assert "<code>" not in block
 
 
 def test_title_from_prompt_takes_leading_words():
