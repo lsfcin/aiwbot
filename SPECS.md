@@ -61,6 +61,15 @@ Code's native picker by a filter internal to the (closed) extension/CLI — the 
 override it. Making bot sessions natively resumable elsewhere is an open investigation (ROADMAP), not a
 solved feature; may be impossible from outside the extension.
 
+**Resolved 2026-07-22 — infeasible, dropped.** The discriminating field is `entrypoint`, stamped on
+every user/assistant jsonl line by Claude Code itself: `sdk-cli` (bot `claude -p`) vs `claude-vscode`
+(extension) vs `cli` (interactive REPL). Headless `-p` turns also uniquely carry top-level
+`promptSource:"sdk"` + `permissionMode`; interactive VSCode turns uniquely carry `isMeta:true`. The
+native picker almost certainly excludes `entrypoint:"sdk-cli"`. That value is set by the CLI for any
+`-p`/SDK invocation — the bot has no flag to change it (`--name` already proved insufficient), so bot
+sessions cannot be made visible in Claude Code's own picker from outside the closed extension. The bot's
+own `/resume` (AD-6, sourcing the jsonl store directly) remains the way to resume bot sessions.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

@@ -36,28 +36,23 @@ plan↔build toggle (sticky, segmented button) + session-parity groundwork shipp
 archived in [HISTORY.md](HISTORY.md). Live feedback opened the follow-ups below.
 
 #### Session-parity polish (live feedback 2026-07-22) — do next, cheap → deep
-- [ ] **claude title = `aiTitle`, not the opening prompt** (2b). `/resume` shows `[A06] ## RESUME —`
-      because `_opening_prompt` reads the first `last-prompt` event. Claude Code's real picker title is
-      the **`aiTitle`** jsonl event (verified: session `a064881a` carries
-      `"aiTitle":"Resume video tool core M4 implementation"`). Fix `backend/claude.py` `_opening_prompt`/
-      `_session_item` to prefer the **latest** `aiTitle` (tail-scan the file; it recurs ~24×), fall back
-      to `lastPrompt`. Cheap: read last ~64 KB, grep last `aiTitle`.
+- [x] **claude title = `aiTitle`, not the opening prompt** (2b) — **shipped Phase 1.** New
+      `backend/transcript.py` tail-scans the last 64 KB for the latest `ai-title` jsonl event (Claude
+      Code's real picker title), `_session_item` prefers it and falls back to `lastPrompt`. Kills
+      `[A06] ## RESUME —` labels. (SPECS AD-7)
 - [ ] **3-line `/resume` entry redesign** (extra) — each session over 3 lines in the message text
       (buttons stay numeral-only, AD-5): L1 `N. TÍTULO` (6-word cap); L2 `<first 6 words> … <last 6
       words>` of the session's **last response**; L3 `tempo · modo · provider · model · custo · %contexto`.
       The 6…6 preview we agreed on isn't rendering today — wire it in. `frontend/resume.py` `_entry_line`
       + a real preview source (registry `preview` only exists for bot-created turns; VSCode sessions need
       it derived from the jsonl last assistant message). Depends on context-% (below) for L3.
-- [ ] **bot sessions invisible to VSCode/terminal pickers** (2a) — `--name` did NOT surface a
-      bot-created session ("JUST A TEST") in VSCode `/resume` **or** terminal `claude --resume`; it shows
-      only in the bot's own `/resume`. So `-p` sessions are systematically hidden from Claude Code's
-      native picker. Investigate the filter (compare a bot `-p` jsonl vs an interactive one for the field
-      the picker keys on — `kind`/`entrypoint`/persistence flag; check `--session-id` + no
-      `--no-session-persistence`). May be unfixable from outside the closed extension — if so, document
-      and drop.
-- [ ] **instant mode-button feedback** (1) — the segmented toggle takes ~2 s to reflect a tap (the
-      `answer()` + `edit_message_reply_markup` round-trip). Answer the callback immediately / make the
-      markup edit optimistic so the bracket flips instantly.
+- [x] **bot sessions invisible to VSCode/terminal pickers** (2a) — **dropped, infeasible.** The picker
+      filters on `entrypoint` (`sdk-cli` for bot `-p` vs `claude-vscode`/`cli`), stamped by the CLI itself;
+      the bot has no flag to change it. Documented in SPECS AD-8 + KNOWN-BUGS won't-fix. Bot `/resume`
+      stays the way to resume bot sessions.
+- [x] **instant mode-button feedback** (1) — the segmented toggle now flips optimistically: answer the
+      callback + edit the markup before persisting the mode, so the bracket moves instantly instead of
+      after the config write. `frontend/mode.py`. Shipped Phase 1.
 
 #### Tier 3 remainder
 - [ ] **model + effort selection** — pick the model and the reasoning effort per session/turn (claude:
