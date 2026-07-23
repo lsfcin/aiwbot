@@ -203,39 +203,36 @@ Because those two need a query per session, the seam gained `session_detail(sess
 `list_sessions` stays the cheap index, and the picker asks for detail only on the page it renders
 — 3 sessions, not the 59 that exist.
 
-### AD-13 — The panel is a fixed 5-column grid, because Telegram has no colspan
-*Lucas's design, 2026-07-23.* A row's width is divided **evenly** between its buttons, and there is
-no way to make one span two cells. So a button is square — and column N of one row sits above column
-N of the next — only if every row holds the same number of buttons. `keyboard.COLS = 5` is that
-number, and it is the whole geometry: change it and every state re-lays-out at once.
+### AD-13 — Panel layout: at most four per row, framed by two controls
+*Lucas's design, 2026-07-23 — second iteration.* The first cut was a fixed 5-column grid padded
+with invisible braille-blank buttons, chosen so every cell was square and column N of one row sat
+above column N of the next. **Abandoned the same day**: Telegram divides a row's width evenly
+between its buttons, so five columns meant ~8-character labels, and model ids truncated past the
+point of telling apart (`claude-fable-latest` vs `claude-haiku-latest`). Lucas: *"desisti do grid,
+tá custoso em termos de usabilidade."*
 
-```
- col 0        col 1..3          col 4
- chrome       content           chrome
-┌────┬──────┬──────┬──────┬────┐
-│ x  │  m1  │  m2  │  m3  │ ···│   ··· expand   (row 0)
-├────┼──────┼──────┼──────┼────┤
-│2/38│  m4  │  m5  │  m6  │    │   page counter (middle-left, otherwise dead)
-├────┼──────┼──────┼──────┼────┤
-│ ‹  │  m7  │  m8  │  m9  │ ›  │   pager        (last row)
-└────┴──────┴──────┴──────┴────┘
-```
+The rule now is positional rather than geometric:
 
-Consequences worth stating because they are not obvious:
-1. **Empty cells are load-bearing.** A short row is padded with braille-blank (`U+2800`) buttons —
-   inert, no ink, but they hold the column alignment. Dropping them would let the client re-space
-   the remaining buttons and the grid would visibly breathe between states.
-2. **Collapsed means exactly one row**, whatever the list length. Everything past the first three
-   values lives behind `···`; `−` collapses back. Both share row 0's right cell so the control
-   never moves under your thumb.
-3. **`‹ ›` are square for free** by living in the chrome columns rather than in a row of their own.
-4. **The cost is label width.** A cell is a fifth of the bubble (~8 characters), so model ids
-   truncate — `claude-fable-latest` and `claude-haiku-latest` differ only past the cut. Provider ids
-   drop their qualifier (`alibaba-coding-plan` → `alibaba`) to claw some back. If truncation ever
-   matters more than squareness, `COLS = 4` is the one-line lever.
-5. **`x` closes to the mode row; there is no per-level back button** — the levels (menu → values →
-   providers → a provider's models) are shallow, and `−` already walks one level up from the deeper
-   two. A wrong turn costs `x` plus two taps.
+- **At most four buttons per row, and rows may hold fewer.** No padding — a shorter row simply has
+  wider buttons. Labels get ~12 characters instead of ~8.
+- **The first button is always `+` / `x`** (open / close the panel).
+- **The last button is always `···` / `−`** (expand / collapse the value list), wherever it lands.
+- So a collapsed picker is one row of `x`, **two** values, `···` — or **three** values when the
+  list fits and there is nothing to expand.
+- Rows split **evenly**, not greedily: five buttons become 3+2, never 4+1. Width is shared inside a
+  row, so a greedy tail would stretch one lone button across the whole bubble.
+- The pager is a row of its own (`‹ N/M › −`), which is what keeps the collapse control last.
+
+Two behaviours this layout forces, both discovered by rendering the real states:
+
+1. **The selected value is pinned first whenever the list is truncated**, including when it was
+   chosen in the drill-down and is not in the shortlist at all. Two visible slots out of five means
+   a picker showing `low medium ···` while `high` is set — invisible state. Selected-first is the
+   one rule that always shows it.
+2. **`x` closes to the mode row; there is no per-level back button.** The levels (menu → values →
+   providers → a provider's models) are shallow, and `−` walks one level up from the deeper two.
+
+The mode row is not a picker and keeps fixed positions: `+ [ BUILD ] PLAN`, only the bracket moves.
 
 ### AD-14 — `/new` gives up ForceReply to carry the panel
 Telegram accepts exactly **one** `reply_markup` per message: `ForceReply` *or* an inline keyboard,

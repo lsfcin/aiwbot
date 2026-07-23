@@ -1,11 +1,14 @@
-# panelmenu.py — the panel's states as 5-column grids: mode row, dimension menu, value pickers.
+# panelmenu.py — the panel's states: mode row, dimension menu, value pickers with an expander.
 from __future__ import annotations
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from backend import backend_names, get_backend
 from . import format, keyboard, registry
 
-# One expanded screen: three rows of three. Collapsed shows the first row only.
-PAGE = keyboard.CONTENT_COLS * 3
+# Collapsed, the open control eats one of the four slots and the expander another, so two values
+# fit; a picker with nothing to expand keeps that slot and shows three.
+SLOTS = keyboard.MAX_PER_ROW - 2
+# Expanded: three rows of four, minus the open control. The pager, when needed, is a fourth row.
+PAGE = keyboard.MAX_PER_ROW * 3 - 1
 _OPEN = "+"
 _CLOSE = "x"
 _MORE = "···"
@@ -20,6 +23,10 @@ _SESSION_DIMS = ("m", "e")
 _NEW_DIMS = ("h", "m", "e")
 
 
+def _opener() -> InlineKeyboardButton:
+    return keyboard.cell(_CLOSE, "p:root")
+
+
 def _cells(values: list[str], current: str | None, dim: str) -> list[InlineKeyboardButton]:
     buttons = []
     for value in values:
@@ -31,8 +38,8 @@ def _cells(values: list[str], current: str | None, dim: str) -> list[InlineKeybo
 
 
 def root_markup(scope: str, current_mode: str) -> InlineKeyboardMarkup:
-    """What every answer and re-anchor carries: mode, plus one square `+` opening the panel.
-    The `+` sits in the left chrome column, so it is the same width as every other cell."""
+    """What every answer and re-anchor carries: `+` to open the panel, then the mode segments.
+    Nothing to expand here, so there is no trailing control."""
     modes = []
     for name in ("build", "plan"):
         selected = name == current_mode
@@ -40,57 +47,73 @@ def root_markup(scope: str, current_mode: str) -> InlineKeyboardMarkup:
         button = InlineKeyboardButton(label, callback_data=f"p:mode:{name}")
         modes.append(button)
     opener = keyboard.cell(_OPEN, "p:menu")
-    rows = keyboard.grid(modes, left={0: opener})
+    rows = keyboard.framed(opener, modes)
     return InlineKeyboardMarkup(rows)
 
 
 def menu_markup(scope: str) -> InlineKeyboardMarkup:
-    """`x` closes back to the mode row; the three content cells are the dimensions."""
+    """`x` closes back to the mode row; the rest of the row is the dimensions."""
     keys = _NEW_DIMS if scope == registry.NEW else _SESSION_DIMS
     buttons = []
     for key in keys:
         button = InlineKeyboardButton(_DIMS[key], callback_data=f"p:d:{key}")
         buttons.append(button)
-    closer = keyboard.cell(_CLOSE, "p:root")
-    rows = keyboard.grid(buttons, left={0: closer})
+    rows = keyboard.framed(_opener(), buttons)
     return InlineKeyboardMarkup(rows)
 
 
-def _pager(prefix: str, page: int, pages: int) -> tuple[dict, dict]:
-    """‹ › live in the chrome columns of the last row, which is what makes them square, with
-    the page counter filling the otherwise dead middle-left cell."""
-    left: dict[int, InlineKeyboardButton] = {}
-    right: dict[int, InlineKeyboardButton] = {}
-    if pages > 1:
-        left[1] = keyboard.cell(f"{page + 1}/{pages}", None)
-        left[2] = keyboard.cell(_PREV, f"{prefix}:{page - 1}" if page > 0 else None)
-        right[2] = keyboard.cell(_NEXT, f"{prefix}:{page + 1}" if page + 1 < pages else None)
-    return left, right
+def _pager(prefix: str, page: int, pages: int) -> list[InlineKeyboardButton]:
+    """‹ N/M › as its own row, so the collapse control can stay the very last button."""
+    back = f"{prefix}:{page - 1}" if page > 0 else None
+    ahead = f"{prefix}:{page + 1}" if page + 1 < pages else None
+    return [keyboard.cell(_PREV, back),
+            keyboard.cell(f"{page + 1}/{pages}", None),
+            keyboard.cell(_NEXT, ahead)]
 
 
-def values_markup(dim: str, values: list[str], current: str | None, *,
-                  expanded: bool = False, page: int = 0, extra: list = ()) -> InlineKeyboardMarkup:
-    """One value picker. Collapsed is exactly one row of three, whatever the list length —
-    everything past that lives behind `···`. Expanded is the same grid grown to three rows,
-    paged past nine, with `extra` (the model picker's `all`) parked on the last page."""
-    if not expanded:
-        shown = values[:keyboard.CONTENT_COLS]
-        buttons = _cells(shown, current, dim)
-        deeper = len(values) > keyboard.CONTENT_COLS or bool(extra)
-        opener = keyboard.cell(_MORE, f"p:x:{dim}:0") if deeper else None
-        right = {0: opener} if opener else {}
-        rows = keyboard.grid(buttons, left={0: keyboard.cell(_CLOSE, "p:root")}, right=right)
-        return InlineKeyboardMarkup(rows)
+def _paged(prefix: str, values: list[str], current: str | None, dim: str,
+           page: int, extra: list) -> list[list]:
     pages = max(1, -(-len(values) // PAGE))
     start = page * PAGE
     shown = values[start:start + PAGE]
     buttons = _cells(shown, current, dim)
     if page + 1 == pages:
         buttons.extend(extra)
-    left, right = _pager(f"p:x:{dim}", page, pages)
-    left[0] = keyboard.cell(_CLOSE, "p:root")
-    right[0] = keyboard.cell(_LESS, f"p:d:{dim}")
-    rows = keyboard.grid(buttons, left=left, right=right)
+    tail = _pager(prefix, page, pages) if pages > 1 else None
+    closer = keyboard.cell(_LESS, f"p:d:{dim}")
+    return keyboard.framed(_opener(), buttons, closer, tail)
+
+
+def _ordered(values: list[str], current: str | None) -> list[str]:
+    """The collapsed row's candidates, selected-first whenever the selection would otherwise be
+    at risk of falling off the cut — including when it came from the drill-down and is not in
+    the shortlist at all. A picker that hides what is currently set is worse than one that
+    reorders; while everything fits, natural order is kept and nothing moves."""
+    if not current:
+        ordered = values
+    elif current not in values:
+        ordered = [current] + values
+    else:
+        rest = [value for value in values if value != current]
+        ordered = [current] + rest
+    return ordered
+
+
+def values_markup(dim: str, values: list[str], current: str | None, *,
+                  expanded: bool = False, page: int = 0, extra: list = ()) -> InlineKeyboardMarkup:
+    """One value picker. Collapsed is a single row: `x`, then two values and `···`, or three
+    values when the list fits and there is nothing to expand. Expanded grows to three rows and
+    pages past that, with `extra` (the model picker's `all`) on the last page."""
+    candidates = _ordered(values, current)
+    if expanded:
+        rows = _paged(f"p:x:{dim}", candidates, current, dim, page, list(extra))
+    else:
+        deeper = len(candidates) > SLOTS + 1 or bool(extra)
+        slots = SLOTS if deeper else SLOTS + 1
+        shown = candidates[:slots]
+        buttons = _cells(shown, current, dim)
+        closer = keyboard.cell(_MORE, f"p:x:{dim}:0") if deeper else None
+        rows = keyboard.framed(_opener(), buttons, closer)
     return InlineKeyboardMarkup(rows)
 
 
@@ -105,8 +128,8 @@ def harness_values(scope: str) -> list[str]:
 
 
 def model_values(scope: str) -> tuple[list[str], bool]:
-    """(shortlist, whether a drill-down exists). claude's three aliases ARE its catalogue, so
-    it gets no `all`; opencode's 478 across 6 providers always do."""
+    """(shortlist, whether a drill-down exists). claude's three aliases ARE its catalogue, so it
+    gets no `all`; opencode's 478 across 6 providers always do."""
     caps = _caps(scope)
     sizes = [len(models) for models in caps.groups.values()]
     total = sum(sizes)
@@ -125,14 +148,13 @@ def effort_values(scope: str) -> list[str]:
 
 
 def all_button() -> InlineKeyboardButton:
-    """Sits in the expanded model grid: the way out of the shortlist into every provider."""
+    """Sits in the expanded model picker: the way out of the shortlist into every provider."""
     return InlineKeyboardButton(_ALL, callback_data="p:g")
 
 
 def _provider_label(name: str) -> str:
-    """A cell is a fifth of the bubble, so a label past ~9 characters is truncated by the
-    client. Provider ids carry a qualifier nobody reads (`alibaba-coding-plan`,
-    `ollama-cloud`), so only the leading word survives — it is already unique across the six."""
+    """Provider ids carry a qualifier nobody reads (`alibaba-coding-plan`, `ollama-cloud`), so
+    only the leading word survives — already unique across the six configured here."""
     return name.split("-", 1)[0]
 
 
@@ -145,23 +167,21 @@ def providers_markup(scope: str) -> InlineKeyboardMarkup:
         label = _provider_label(name)
         button = InlineKeyboardButton(label, callback_data=f"p:p:{name}:0")
         buttons.append(button)
-    left = {0: keyboard.cell(_CLOSE, "p:root")}
-    right = {0: keyboard.cell(_LESS, "p:d:m")}
-    rows = keyboard.grid(buttons, left=left, right=right)
+    closer = keyboard.cell(_LESS, "p:d:m")
+    rows = keyboard.framed(_opener(), buttons, closer)
     return InlineKeyboardMarkup(rows)
 
 
 def provider_markup(scope: str, name: str, page: int) -> InlineKeyboardMarkup:
-    """One page of a provider's models, same 3×3 grid — openrouter alone holds 339."""
+    """One page of a provider's models — openrouter alone holds 339, so this one always pages."""
     caps = _caps(scope)
     models = caps.groups.get(name) or []
+    current = registry.setting_for(scope, "model")
     pages = max(1, -(-len(models) // PAGE))
     start = page * PAGE
     shown = models[start:start + PAGE]
-    current = registry.setting_for(scope, "model")
     buttons = _cells(shown, current, "m")
-    left, right = _pager(f"p:p:{name}", page, pages)
-    left[0] = keyboard.cell(_CLOSE, "p:root")
-    right[0] = keyboard.cell(_LESS, "p:g")
-    rows = keyboard.grid(buttons, left=left, right=right)
+    tail = _pager(f"p:p:{name}", page, pages) if pages > 1 else None
+    closer = keyboard.cell(_LESS, "p:g")
+    rows = keyboard.framed(_opener(), buttons, closer, tail)
     return InlineKeyboardMarkup(rows)
