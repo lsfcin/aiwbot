@@ -1,6 +1,6 @@
 # test_mode.py — free unit test: plan↔build toggle button + sticky per-session mode state.
 import pytest
-from frontend import mode, sessions, config
+from frontend import mode, registry, config
 
 
 def test_toggle_markup_build_selected_brackets_build():
@@ -26,14 +26,14 @@ def mem_config(monkeypatch):
 
 
 def test_mode_for_defaults_build_when_unset(mem_config):
-    assert sessions.mode_for("sid-1") == "build"
+    assert registry.mode_for("sid-1") == "build"
 
 
 def test_set_mode_persists_and_is_read_back(mem_config):
-    sessions.set_mode("sid-1", "plan")
-    assert sessions.mode_for("sid-1") == "plan"
+    registry.set_mode("sid-1", "plan")
+    assert registry.mode_for("sid-1") == "plan"
 
 
 def test_set_mode_ignores_unknown_session(mem_config):
-    sessions.set_mode("ghost", "plan")
+    registry.set_mode("ghost", "plan")
     assert "ghost" not in mem_config["sessions"]

@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import AsyncIterator
 from .base import AgentEvent, TurnOptions
+from .caps import Capabilities
 from .proc import run_capture, events_from_run
 
 
@@ -22,9 +23,23 @@ class CliBackend:
         """Default: provider exposes no transcript. Backends with one override this."""
         return ""
 
+    def session_detail(self, session_id: str, cwd: str) -> dict:
+        """Default: the list already carried everything. Backends whose store needs a
+        per-session query put the expensive fields here instead, so the picker pays for
+        the page it renders rather than for every session it lists."""
+        return {}
+
     def env(self) -> dict | None:
         """Extra environment for the subprocess. Default: none — backends override."""
         return None
+
+    def capabilities(self) -> Capabilities:
+        """Default: nothing selectable, so the panel simply shows no rows for this backend."""
+        return Capabilities()
+
+    def efforts(self, model: str | None = None) -> list[str]:
+        """Default: no effort knob. Backends whose CLI has one override this."""
+        return []
 
     async def send(self, prompt: str, *, session_id: str | None, cwd: str,
                    options: TurnOptions = TurnOptions()) -> AsyncIterator[AgentEvent]:

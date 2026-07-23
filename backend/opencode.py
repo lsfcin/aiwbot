@@ -1,24 +1,21 @@
 # opencode.py — OpencodeBackend: normalizes `opencode run --format json` (JSONL stream).
 from __future__ import annotations
-import pathlib
-import sqlite3
-from .base import AgentEvent, TurnOptions, try_json
+from . import catalog, ocstore
+from .base import AgentEvent, TurnOptions, add_flag, try_json
+from .caps import Capabilities
 from .cli import CliBackend
 
-_DB = ".local/share/opencode/opencode.db"
-_LIST_SQL = ("SELECT id, title, time_updated FROM session "
-             "WHERE directory = ? AND parent_id IS NULL")
-
-
-def _db_path() -> pathlib.Path:
-    return pathlib.Path.home() / _DB
+_MODES = ("build", "plan")
 
 
 def _row_to_item(row: tuple) -> dict:
-    sid = row[0]
-    title = row[1]
+    """Session row -> picker index entry. `agent` and `model` ride in the row itself, so mode
+    and model cost no join; preview and context % need one and arrive via session_detail."""
+    model = ocstore.model_of(row[4])
+    window = catalog.context_window(model) if model else None
     updated = row[2] / 1000.0
-    return {"session_id": sid, "title": title, "updated_at": updated}
+    return {"session_id": row[0], "title": row[1], "updated_at": updated,
+            "mode": row[3], "model": model, "context_window": window}
 
 
 def _line_to_event(obj: dict) -> AgentEvent | None:
@@ -58,27 +55,49 @@ class OpencodeBackend(CliBackend):
 
     def build_args(self, prompt: str, session_id: str | None, options: TurnOptions) -> list[str]:
         """opencode continues the same lineage with -s <id> (no fork flag, unlike claude).
-        options.mode is not wired yet — but opencode DOES have the equivalent: `--agent
-        build|plan` are both primary agents (verified 2026-07-23, correcting an earlier
-        claim here). Mapping it belongs to the backend/model/effort tier; until then the
-        run uses opencode's default agent."""
+        `--agent build|plan` are both primary agents, so mode maps one-for-one with claude's
+        --permission-mode (AD-10 corrected the old "opencode has no plan/build" claim).
+        Effort maps to --variant, whose vocabulary is per-model — see catalog.efforts."""
+        agent = "plan" if options.mode == "plan" else "build"
         args = ["opencode", "run", prompt, "--format", "json"]
+        add_flag(args, "--agent", agent)
+        add_flag(args, "-m", options.model)
+        add_flag(args, "--variant", options.effort)
         if session_id:
-            args.append("-s")
-            args.append(session_id)
+            add_flag(args, "-s", session_id)
+        else:
+            add_flag(args, "--title", options.title)
         return args
 
     def parse(self, stdout: str) -> list[AgentEvent]:
         return parse_events(stdout)
 
+    def capabilities(self) -> Capabilities:
+        """478 configured models: `favourites` is the cheap-first shortlist and `groups` is the
+        provider drill-down behind it — a flat keyboard is not an option here (SPECS AD-11)."""
+        return Capabilities(modes=list(_MODES), favourites=catalog.favourites(),
+                            groups=catalog.groups())
+
+    def efforts(self, model: str | None = None) -> list[str]:
+        """Per-model, from models.json. Empty for the toggle/budget_tokens shapes."""
+        values: list[str] = []
+        if model:
+            values = catalog.efforts(model)
+        return values
+
     def list_sessions(self, cwd: str) -> list[dict]:
-        """Read top-level sessions for cwd from opencode's sqlite store (session.title;
-        time_updated is ms). Mirrors the claude backend so the picker unifies both."""
-        db = _db_path()
-        items: list[dict] = []
-        if db.exists():
-            con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-            rows = con.execute(_LIST_SQL, (cwd,)).fetchall()
-            con.close()
-            items = [_row_to_item(row) for row in rows]
-        return items
+        """Read top-level sessions for cwd from opencode's sqlite store. Mirrors the claude
+        backend so the picker unifies both — same fields, same 3-line entry."""
+        rows = ocstore.session_rows(cwd)
+        return [_row_to_item(row) for row in rows]
+
+    def last_response(self, session_id: str, cwd: str) -> str:
+        """Last assistant answer, for the /resume re-anchor body."""
+        text, _ = ocstore.last_turn(session_id)
+        return text
+
+    def session_detail(self, session_id: str, cwd: str) -> dict:
+        """The bits that cost a query: answer preview + context occupancy. Called for the
+        page being rendered, not for all 59 listed sessions."""
+        text, used = ocstore.last_turn(session_id)
+        return {"preview": text, "context_used": used}

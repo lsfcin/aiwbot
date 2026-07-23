@@ -3,13 +3,20 @@ from __future__ import annotations
 import pathlib
 import shutil
 from . import transcript
-from .base import AgentEvent, TurnOptions, try_json
+from .base import AgentEvent, TurnOptions, add_flag, try_json
+from .caps import Capabilities
 from .cli import CliBackend
 
 _EXT_GLOB = ".vscode/extensions/anthropic.claude-code-*/resources/native-binary/claude"
 _PROJECTS = ".claude/projects"
 # The one entrypoint value the native picker lists. "cli" is rejected (falls back to sdk-cli).
 _ENTRYPOINT = "claude-vscode"
+_MODES = ("build", "plan")
+# `--model` takes an alias for the latest model of a family, or a full id. Aliases age better
+# than ids, so the picker offers those; a full id still works if it is ever set by hand.
+_MODELS = ("opus", "sonnet", "fable")
+# One ladder for every claude model — verified in `claude --help` 2026-07-23.
+_EFFORTS = ("low", "medium", "high", "xhigh", "max")
 
 
 def _project_dir(cwd: str) -> pathlib.Path:
@@ -136,14 +143,24 @@ class ClaudeBackend(CliBackend):
         binary = _claude_bin()
         perm = "plan" if options.mode == "plan" else "bypassPermissions"
         args = [binary, "-p", "--output-format", "json", "--permission-mode", perm]
+        add_flag(args, "--model", options.model)
+        add_flag(args, "--effort", options.effort)
         if session_id:
-            args.append("--resume")
-            args.append(session_id)
-        elif options.title:
-            args.append("--name")
-            args.append(options.title)
+            add_flag(args, "--resume", session_id)
+        else:
+            add_flag(args, "--name", options.title)
         args.append(prompt)
         return args
+
+    def capabilities(self) -> Capabilities:
+        """A handful of aliases — small enough that `favourites` IS the whole catalogue and
+        the drill-down never opens. The opposite of opencode's 478 (SPECS AD-11)."""
+        models = list(_MODELS)
+        return Capabilities(modes=list(_MODES), favourites=models, groups={"claude": models})
+
+    def efforts(self, model: str | None = None) -> list[str]:
+        """Same ladder whatever the model, so the argument is accepted and ignored."""
+        return list(_EFFORTS)
 
     def last_response(self, session_id: str, cwd: str) -> str:
         """Full text of the session's last answer, read from the transcript — lets /resume

@@ -57,7 +57,9 @@ HELP_TEXT = (
     "<code>/resume</code> [busca] — lista sessões recentes pra retomar (filtra por título se você passar um termo)\n"
     "<code>/help</code> — essa mensagem\n\n"
     "Texto, foto, áudio ou documento mandado sem <code>/</code> vai direto pro brain/INBOX.md.\n\n"
-    "Responder a qualquer mensagem de sessão continua aquela sessão — não precisa digitar id."
+    "Responder a qualquer mensagem de sessão continua aquela sessão — não precisa digitar id.\n\n"
+    "O botão ⚙ embaixo de cada resposta abre provedor / modelo / esforço. Trocar de provedor "
+    "abre uma sessão nova (uma sessão não muda de provedor), e zera modelo e esforço."
 )
 
 

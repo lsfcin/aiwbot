@@ -1,6 +1,6 @@
 # test_sessions.py — free unit test: cross-backend /resume aggregation + registry adopt/mode.
 import pytest
-from frontend import sessions, config
+from frontend import registry, sessions, config
 
 
 class _Fake:
@@ -9,6 +9,9 @@ class _Fake:
 
     def list_sessions(self, cwd):
         return list(self._items)
+
+    def session_detail(self, session_id, cwd):
+        return {}
 
 
 @pytest.fixture
@@ -57,6 +60,6 @@ def test_recent_adopts_shown_into_registry(two_backends):
 
 def test_adopt_preserves_existing_mode(two_backends):
     two_backends["sessions"]["c1"] = {"mode": "plan"}
-    sessions.adopt("c1", "claude", "alpha bug", 30)
+    registry.adopt("c1", "claude", "alpha bug", 30)
     assert two_backends["sessions"]["c1"]["mode"] == "plan"
     assert two_backends["sessions"]["c1"]["title"] == "alpha bug"
