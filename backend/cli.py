@@ -18,10 +18,19 @@ class CliBackend:
         """Default: provider exposes no session store. Backends with one override this."""
         return []
 
+    def last_response(self, session_id: str, cwd: str) -> str:
+        """Default: provider exposes no transcript. Backends with one override this."""
+        return ""
+
+    def env(self) -> dict | None:
+        """Extra environment for the subprocess. Default: none — backends override."""
+        return None
+
     async def send(self, prompt: str, *, session_id: str | None, cwd: str,
                    options: TurnOptions = TurnOptions()) -> AsyncIterator[AgentEvent]:
         args = self.build_args(prompt, session_id, options)
-        out, err, code = await run_capture(args, cwd)
+        extra_env = self.env()
+        out, err, code = await run_capture(args, cwd, extra_env)
         events = events_from_run(out, err, code, self.parse)
         for event in events:
             yield event

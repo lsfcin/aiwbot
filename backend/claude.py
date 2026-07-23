@@ -8,6 +8,8 @@ from .cli import CliBackend
 
 _EXT_GLOB = ".vscode/extensions/anthropic.claude-code-*/resources/native-binary/claude"
 _PROJECTS = ".claude/projects"
+# The one entrypoint value the native picker lists. "cli" is rejected (falls back to sdk-cli).
+_ENTRYPOINT = "claude-vscode"
 
 
 def _project_dir(cwd: str) -> pathlib.Path:
@@ -38,9 +40,10 @@ def _session_item(path: pathlib.Path) -> dict:
         title = _opening_prompt(path)
     preview = transcript.last_response_text(lines)
     model = transcript.last_model(lines)
+    used = transcript.last_context_used(lines)
     updated = path.stat().st_mtime
     return {"session_id": sid, "title": title, "updated_at": updated,
-            "preview": preview, "model": model}
+            "preview": preview, "model": model, "context_used": used}
 
 
 def _claude_bin() -> str:
@@ -78,6 +81,22 @@ def _model_of(obj: dict) -> str | None:
     return result
 
 
+_CONTEXT_FIELDS = ("inputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")
+
+
+def _context_of(obj: dict, model: str | None) -> tuple[int | None, int | None]:
+    """Context occupancy after the turn: modelUsage[model] carries both the token
+    breakdown and the window, so the % costs nothing extra to report."""
+    usage = obj.get("modelUsage") or {}
+    entry = usage.get(model or "") or {}
+    window = entry.get("contextWindow")
+    used = None
+    if entry:
+        counts = [entry.get(f) or 0 for f in _CONTEXT_FIELDS]
+        used = sum(counts)
+    return used, window
+
+
 def _object_to_events(obj: dict) -> list[AgentEvent]:
     sid = obj.get("session_id")
     is_error = obj.get("is_error")
@@ -89,8 +108,10 @@ def _object_to_events(obj: dict) -> list[AgentEvent]:
         text = obj.get("result", "")
         cost = obj.get("total_cost_usd")
         model = _model_of(obj)
+        used, window = _context_of(obj, model)
         events.append(AgentEvent(kind="text", text=text, session_id=sid))
-        events.append(AgentEvent(kind="result", session_id=sid, cost_usd=cost, model=model))
+        events.append(AgentEvent(kind="result", session_id=sid, cost_usd=cost, model=model,
+                                 context_used=used, context_window=window))
     return events
 
 
@@ -123,6 +144,24 @@ class ClaudeBackend(CliBackend):
             args.append(options.title)
         args.append(prompt)
         return args
+
+    def last_response(self, session_id: str, cwd: str) -> str:
+        """Full text of the session's last answer, read from the transcript — lets /resume
+        re-anchor a session by showing where it left off, not just its title."""
+        directory = _project_dir(cwd)
+        path = directory / f"{session_id}.jsonl"
+        text = ""
+        if path.is_file():
+            lines = transcript.tail_lines(path)
+            text = transcript.last_response_text(lines)
+        return text
+
+    def env(self) -> dict | None:
+        """AD-8 (revised): Claude Code's native picker hides sessions whose ORIGINATING
+        entrypoint is `sdk-cli`, which is what a bare headless `-p` records. The entrypoint
+        comes from this env var, not from the flags — setting it makes bot-created sessions
+        show up in the VSCode/terminal picker like any other. Verified live 2026-07-23."""
+        return {"CLAUDE_CODE_ENTRYPOINT": _ENTRYPOINT}
 
     def parse(self, stdout: str) -> list[AgentEvent]:
         return parse_events(stdout)

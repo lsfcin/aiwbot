@@ -5,7 +5,7 @@ from telegram.ext import Application, CallbackQueryHandler, ContextTypes, Messag
 from backend import TurnOptions
 from . import config, dispatch, format, inbox, mode, phrases, reply, resume, sessions
 
-WORKSPACE_DIR = "/mnt/workspace"
+WORKSPACE_DIR = config.WORKSPACE_DIR
 DEFAULT_BACKEND = "claude"
 _BUSY_MARKERS = ("no conversation found", "currently running as a background agent")
 
@@ -52,7 +52,8 @@ async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     preview = format.response_preview(result.text)
     sessions.remember(result.session_id, backend_name, title, preview)
     sessions.set_mode(result.session_id, session_mode)
-    block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd, mode=session_mode)
+    sessions.remember_context_window(result.model, result.context_window)
+    block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd, mode=session_mode, context_used=result.context_used, context_window=result.context_window)
     markup = mode.toggle_markup(result.session_id, session_mode)
     sent = await reply.deliver(working, msg, block, reply_markup=markup)
     if sent is not None:

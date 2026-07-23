@@ -1,8 +1,8 @@
 # format.py — pure text formatting: markdown/tables -> Telegram HTML, session headers. No I/O.
 from __future__ import annotations
 import html
-import re
 import time
+from .markdown import format_body
 
 SESSION_ID_LABEL_LEN = 3
 
@@ -54,58 +54,6 @@ def response_preview(text: str, n: int = 6) -> str:
     return result
 
 
-def _is_table_row(line: str) -> bool:
-    s = line.strip()
-    return s.startswith("|") and s.endswith("|") and s.count("|") >= 2
-
-
-def _is_table_sep(line: str) -> bool:
-    s = line.strip()
-    core = s.strip("|").strip()
-    result = False
-    if core:
-        cells = [c.strip() for c in core.split("|")]
-        result = all(c and set(c) <= set("-:") and "-" in c for c in cells)
-    return result
-
-
-def _convert_inline(text: str) -> str:
-    text = html.escape(text, quote=False)
-    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
-    text = re.sub(r"`([^`\n]+?)`", r"<code>\1</code>", text)
-    return text
-
-
-def _format_text_chunk(text: str) -> str:
-    lines = text.split("\n")
-    out = []
-    i = 0
-    while i < len(lines):
-        if _is_table_row(lines[i]) and i + 1 < len(lines) and _is_table_sep(lines[i + 1]):
-            block = [lines[i], lines[i + 1]]
-            j = i + 2
-            while j < len(lines) and _is_table_row(lines[j]):
-                block.append(lines[j])
-                j += 1
-            out.append(f"<pre>{html.escape(chr(10).join(block))}</pre>")
-            i = j
-        else:
-            out.append(_convert_inline(lines[i]))
-            i += 1
-    return "\n".join(out)
-
-
-def format_body(text: str) -> str:
-    # Telegram has no table syntax at all — pipe-tables get boxed as monospace <pre>.
-    out, last = [], 0
-    for m in re.finditer(r"```(?:\w+\n)?(.*?)```", text, flags=re.S):
-        out.append(_format_text_chunk(text[last:m.start()]))
-        out.append(f"<pre>{html.escape(m.group(1))}</pre>")
-        last = m.end()
-    out.append(_format_text_chunk(text[last:]))
-    return "".join(out)
-
-
 # Provider as data: how each backend re-opens a session by id outside the bot.
 _REATTACH = {"claude": "claude --resume {sid}", "opencode": "opencode -s {sid}"}
 
@@ -153,16 +101,38 @@ def short_model(model: str | None) -> str | None:
     return result
 
 
-def _meta_line(provider: str | None, model: str | None, cost_usd: float | None,
-               mode: str | None) -> str:
+def context_pct(used: int | None, window: int | None) -> str | None:
+    """Context occupancy as `32%`. None unless the provider reported both numbers —
+    claude gets them free from the result object's modelUsage (no extra tokens)."""
+    result = None
+    if used and window:
+        ratio = 100 * used / window
+        pct = round(ratio)
+        result = f"{pct}%"
+    return result
+
+
+def meta_bits(provider: str | None, model: str | None, mode: str | None,
+              used: int | None = None, window: int | None = None) -> list[str]:
+    """Shared head of every meta line: provider · modelo · modo · X%. Callers append
+    the tail that differs — `$custo` on answers, `quando` on the /resume list."""
     bits = []
-    if mode:
-        bits.append(mode)
     if provider:
         bits.append(provider)
     short = short_model(model)
     if short:
         bits.append(short)
+    if mode:
+        bits.append(mode)
+    pct = context_pct(used, window)
+    if pct:
+        bits.append(pct)
+    return bits
+
+
+def _meta_line(provider: str | None, model: str | None, cost_usd: float | None,
+               mode: str | None, used: int | None = None, window: int | None = None) -> str:
+    bits = meta_bits(provider, model, mode, used, window)
     if cost_usd:
         bits.append(f"${cost_usd:.3f}")
     return " · ".join(bits)
@@ -170,14 +140,15 @@ def _meta_line(provider: str | None, model: str | None, cost_usd: float | None,
 
 def answer_block(body: str, sid: str | None, title: str | None, provider: str | None = None,
                  model: str | None = None, cost_usd: float | None = None,
-                 mode: str | None = None) -> str:
+                 mode: str | None = None, context_used: int | None = None,
+                 context_window: int | None = None) -> str:
     """The network's answer with the session header as a footer (everything here is a response).
-    mode (build/plan) leads the meta line so the current setting reads alongside the toggle button."""
+    Footer meta reads provider · modelo · modo · X%contexto · $custo."""
     lines = [format_body(body), "· · ·"]
     if sid:
         label = f"[{sid[:SESSION_ID_LABEL_LEN].upper()}] {title_words(title)}"
         lines.append(html.escape(label))
-    meta = _meta_line(provider, model, cost_usd, mode)
+    meta = _meta_line(provider, model, cost_usd, mode, context_used, context_window)
     if meta:
         lines.append(html.escape(meta))
     return "\n".join(lines)
