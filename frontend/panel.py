@@ -1,13 +1,16 @@
 # panel.py — panel routing: which grid a tap opens, and which scope it writes to.
 from __future__ import annotations
-from . import config, format, panelmenu, registry
+from . import choices, config, format, panelmenu, registry
 
 _STALE = "Essa mensagem é antiga demais — retoma a sessão com /resume."
-_NO_EFFORT = "Esse modelo não expõe controle de esforço."
-# Dimension -> (registry key, label). Harness stores as `backend` because that is the key the
-# session registry has always used for "who owns this lineage"; the word on screen is harness.
+# One message per dimension. A single generic "sem controle de esforço" for any empty list is
+# what made an unreachable opencode binary surface as an effort complaint on the model button.
+_EMPTY = {"h": "Nenhum harness disponível.",
+          "m": "Não consegui listar os modelos desse harness.",
+          "e": "Esse modelo não expõe controle de esforço."}
+# Harness stores as `backend` because that is the key the session registry has always used for
+# "who owns this lineage"; the word on screen is harness (choices.LABELS).
 _KEY = {"h": "backend", "m": "model", "e": "effort"}
-_LABEL = {"h": "harness", "m": "model", "e": "effort"}
 
 
 async def _redraw(query, markup) -> None:
@@ -32,25 +35,20 @@ async def _set_mode(query, scope: str, target: str) -> None:
 
 
 def _values_of(scope: str, dim: str) -> tuple[list[str], list]:
-    """(values, extra buttons). Only the model picker carries an `all` escape into the
-    provider drill-down, and only when the catalogue is bigger than the shortlist."""
+    """(values, extra buttons). Only the model picker carries an `all` escape into the provider
+    drill-down, and only when the catalogue is bigger than the shortlist."""
+    values, deep = choices.values_for(scope, dim)
     extra: list = []
-    if dim == "h":
-        values = panelmenu.harness_values(scope)
-    elif dim == "m":
-        values, deep = panelmenu.model_values(scope)
-        if deep:
-            button = panelmenu.all_button()
-            extra = [button]
-    else:
-        values = panelmenu.effort_values(scope)
+    if deep:
+        button = panelmenu.all_button()
+        extra = [button]
     return values, extra
 
 
 async def _dimension(query, scope: str, dim: str, expanded: bool, page: int) -> None:
     values, extra = _values_of(scope, dim)
     if not values:
-        await query.answer(_NO_EFFORT, show_alert=True)
+        await query.answer(_EMPTY[dim], show_alert=True)
         return
     key = _KEY[dim]
     current = registry.setting_for(scope, key)
@@ -65,7 +63,7 @@ def _drop_stale_effort(scope: str) -> None:
     so an effort the new one never declared would build an argv its CLI rejects."""
     current = registry.setting_for(scope, "effort")
     if current:
-        values = panelmenu.effort_values(scope)
+        values = choices.effort_values(scope)
         if current not in values:
             registry.set_setting(scope, "effort", None)
 
@@ -80,7 +78,7 @@ def apply(scope: str, dim: str, value: str) -> str:
     if dim in ("h", "m"):
         _drop_stale_effort(scope)
     shown = format.model_label(value) if dim == "m" else value
-    return f"{_LABEL[dim]}: {shown}"
+    return f"{choices.LABELS[dim]}: {shown}"
 
 
 async def _choose(query, scope: str, dim: str, value: str) -> None:

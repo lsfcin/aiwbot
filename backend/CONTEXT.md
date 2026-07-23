@@ -8,6 +8,7 @@
 |------|-----------|-----|-------------|
 | [`__init__.py`](__init__.py) | — | `get_backend`, `backend_names` | **facade** — __init__.py — facade: seam types + backend registry. Import backends only through here. |
 | [`base.py`](base.py) | — | `AgentEvent`, `TurnOptions`, `add_flag`, `AgentBackend`, `try_json` | base.py — the provider-agnostic seam: AgentEvent + AgentBackend contract + shared primitives. |
+| [`binaries.py`](binaries.py) | — | `resolve`, `find` | binaries.py — resolve a CLI's executable: PATH first, then the places its installer puts it. |
 | [`caps.py`](caps.py) | — | `Capabilities` | caps.py — capability declaration: what modes/models a backend may actually be offered. |
 | [`catalog.py`](catalog.py) | — | `metadata`, `efforts`, `context_window`, `model_ids`, `groups` | catalog.py — opencode's model catalogue: configured ids + per-model effort/context metadata. |
 | [`claude.py`](claude.py) | — | `parse_events`, `ClaudeBackend`, `build_args`, `capabilities`, `efforts` | claude.py — ClaudeBackend: normalizes `claude -p --output-format json` (single result object). |

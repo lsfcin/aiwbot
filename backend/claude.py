@@ -1,13 +1,11 @@
 # claude.py — ClaudeBackend: normalizes `claude -p --output-format json` (single result object).
 from __future__ import annotations
 import pathlib
-import shutil
-from . import transcript
+from . import binaries, transcript
 from .base import AgentEvent, TurnOptions, add_flag, try_json
 from .caps import Capabilities
 from .cli import CliBackend
 
-_EXT_GLOB = ".vscode/extensions/anthropic.claude-code-*/resources/native-binary/claude"
 _PROJECTS = ".claude/projects"
 # The one entrypoint value the native picker lists. "cli" is rejected (falls back to sdk-cli).
 _ENTRYPOINT = "claude-vscode"
@@ -51,20 +49,6 @@ def _session_item(path: pathlib.Path) -> dict:
     updated = path.stat().st_mtime
     return {"session_id": sid, "title": title, "updated_at": updated,
             "preview": preview, "model": model, "context_used": used}
-
-
-def _claude_bin() -> str:
-    """Resolve the claude binary: PATH override first, else the bundled VSCode-extension build."""
-    override = shutil.which("claude")
-    result = override
-    if not override:
-        home = pathlib.Path.home()
-        raw = home.glob(_EXT_GLOB)
-        candidates = sorted(raw)
-        if not candidates:
-            raise RuntimeError("claude binary not found (PATH + VSCode extension dir)")
-        result = str(candidates[-1])
-    return result
 
 
 def _last_json_object(stdout: str) -> dict | None:
@@ -140,7 +124,7 @@ class ClaudeBackend(CliBackend):
         """Plain --resume, no fork: keeps one lineage (same id, same transcript) per AD-3.
         Fork was only needed in the old bot's --bg era, where a live agent locked the id.
         mode=plan -> --permission-mode plan (agent plans, no edits); build -> bypassPermissions."""
-        binary = _claude_bin()
+        binary = binaries.resolve("claude")
         perm = "plan" if options.mode == "plan" else "bypassPermissions"
         args = [binary, "-p", "--output-format", "json", "--permission-mode", perm]
         add_flag(args, "--model", options.model)
