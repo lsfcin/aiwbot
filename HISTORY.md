@@ -1,6 +1,48 @@
 # aiwbot — History
 > Archive of completed work. Open work lives in [ROADMAP.md](ROADMAP.md).
 
+## Completed — 2026-07-23
+
+### Backlog re-ranked by away-from-PC value
+The easiest→hardest tier ladder was retired. Every item re-scored against one question — *does this
+remove a reason Lucas has to go back to the PC?* Two of the open items turned out to be already
+shipped (3-line `/resume` entries, context % in the footer) and the item that most often forces a trip
+to the desk wasn't on the list at all. Lucas then overrode two calls: outbound media dropped to last
+("if the model needs it it can build an artifact anyway") and audio was promoted above live streaming
+with a new ask for audio **output**. Running order settled as P3 → P2 → audio → live streaming →
+ask_user → show-me → Phase D.
+
+**AD-10** recorded the verified CLI surfaces that had been blocking the P2 design: opencode does have
+plan/build (`--agent`, both primary), a `--variant` effort knob, and 478 models; claude has `--effort
+low..max` and `--model`. The earlier "opencode has no plan/build equivalent" claim was wrong, in both
+the roadmap and `opencode.build_args`'s docstring.
+
+### P3 — Telegram output fidelity + `/resume` stability
+Plan: [ROADMAP-p3.md](ROADMAP-p3.md). Live-confirmed by Lucas, 107 free tests green (from 80).
+
+- **Markdown gaps closed.** Headings (`#`/`##` → bold caps, `###`+ → plain bold), bullets with one
+  nest level, numbered lists, blockquote, links, italic, strikethrough, horizontal rule. Inline
+  conversion split into `frontend/inline.py`; it now stashes code spans *before* any other rule runs,
+  so markdown inside backticks reaches Telegram untouched — a latent bug in the old converter. The
+  rule renders as `─────`, deliberately not `· · ·`, which already means "answer ends here" in every
+  footer. Unsafe link schemes stay as plain text.
+- **Long answers stopped vanishing.** `reply._chunks` had been slicing already-formatted HTML every
+  4096 chars blind to tags: a cut inside `<b>` or `<pre>` produced markup Telegram rejects, retried
+  once, then dropped to stderr with nothing reaching the phone. New `frontend/htmlsplit.py` splits on
+  line boundaries carrying an open-tag stack across the seam (hrefs intact), and `safe_reply` gained a
+  last resort — on a parse error, resend once with tags stripped. A degraded message beats a silent
+  drop.
+- **`/resume` stopped resizing.** Two causes, both fixed: the keyboard swung between 4 and 5 buttons
+  at the ends of the range (arrows now hold their slot and go inert there, `noop:`), and the text was
+  budgeted in *words*, which is not the unit width is measured in — a 5-word title runs 15-60 chars.
+  Titles cap at 32 chars, previews at 64, and a monospace NBSP ruler pins a minimum width
+  (`RULER_WIDTH`, eyeball-tuned, 0 disables). Line widths went from up to 140 chars down to a 25-65
+  band.
+- **Two usability bugs fixed alongside**: `/resume N` set a page size `_turn_page` ignored, so page 1
+  showed 1-5 and page 2 showed 4-6 — one numeral naming two sessions, the one thing AD-5 exists to
+  prevent (the numeric form is gone; a bare number is now a filter term). And the `/resume` anchor
+  finally carries the BUILD/PLAN toggle every answer already had.
+
 ## Completed — 2026-07-22
 
 ### Tier 1 — bot-prefix trigger, native title source, operate docs

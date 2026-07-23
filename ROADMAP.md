@@ -84,20 +84,13 @@ beats live streaming, with a **new ask: audio *output* too**, not just input. Fi
 The P-numbers below keep their original names so earlier notes still resolve; read the arrow above for
 the running order.
 
-### P3 — Telegram output fidelity + `/resume` stability ← **IN PROGRESS**
-Ships first: cheap, and it touches every single message. Three problems, one root — what the agent
-writes is not what Telegram renders. Full plan (design decisions, traps, verification):
-**[ROADMAP-p3.md](ROADMAP-p3.md)**.
-- [ ] **markdown gaps** — headings, lists, italic, links, blockquote, strike. `markdown.py` already
-      does bold/code/fences/tables; agent answers are heading-heavy so `##` leaks into most replies.
-- [ ] **HTML-safe delivery** — `reply._chunks` slices already-formatted HTML every 4096 chars blind to
-      tags, so a long answer can be **silently dropped entirely**. Tag-aware split + plain-text
-      fallback. Ships with the markdown work because more tags = more chances to break.
-- [ ] **`/resume` stops jittering** — fixed 5-slot keyboard (inert `‹`/`›` at the ends), character
-      budgets instead of word budgets, width ruler, drop the `/resume N` form that corrupts the
-      numerals, mode toggle on anchor messages.
+### ~~P3 — Telegram output fidelity + `/resume` stability~~ — **SHIPPED 2026-07-23**
+Live-confirmed by Lucas, 107 tests green. Archived in [HISTORY.md](HISTORY.md); the plan that produced
+it stays in [ROADMAP-p3.md](ROADMAP-p3.md). One knob left open on purpose: `resume.RULER_WIDTH = 44`
+is an eyeball estimate of how wide the monospace ruler must be to out-measure a 64-char preview line.
+Re-tune it if the picker bubble ever looks padded or still breathes.
 
-### P2 — backend + model + effort selection (Lucas, 2026-07-23)
+### P2 — backend + model + effort selection (Lucas, 2026-07-23) ← **NEXT**
 Three linked pickers, tap-not-type, on the `TurnOptions` seam (gains `backend`/`model`/`effort`; each
 backend maps what it can). **The design blocker is gone** — the CLI surfaces were verified live
 2026-07-23 and every knob maps on both sides:
@@ -163,14 +156,16 @@ busy, walking, driving) rather than making an existing text exchange prettier.
       bot to INBOX-only capture. Biggest structural rewrite — last on purpose.
 
 ## Usability bugs found in the live bot (audit 2026-07-23)
-Logged here rather than KNOWN-BUGS.md because each is being fixed inside a backlog item above, not
-independently. Anything left unfixed at the end of P3 moves to KNOWN-BUGS.md with a `bN` id.
-- **Long answers can vanish entirely** — `reply._chunks` splits formatted HTML blind to tags; an
-  invalid chunk is rejected by Telegram, retried once, then dropped to stderr. → P3.
-- **`/resume N` corrupts the numerals** — `cmd_resume` honours a count, `_turn_page` hardcodes 3, so
-  one numeral names two different sessions across pages (breaks AD-5's guarantee). → P3.
-- **Anchor messages carry no mode toggle** — every answer shows BUILD/PLAN, the `/resume` anchor you
-  reply to doesn't, so on re-anchor you can't see the mode you're about to run in. → P3.
+All three closed by P3 — see [HISTORY.md](HISTORY.md). Kept as the record of what the audit found:
+long answers could vanish entirely (blind HTML chunking), `/resume N` made one numeral name two
+different sessions across pages, and anchor messages carried no mode toggle. Future audits log here
+first, then move to KNOWN-BUGS.md with a `bN` id if they survive the round they were found in.
+
+## Housekeeping
+- [ ] **`frontend/` is 14 files** and the size hook is nudging to split. Worth doing **with P2**, which
+      adds three pickers — not before, or the split gets redone. Natural seams: the Telegram-primitive
+      layer (`reply`, `htmlsplit`), the text layer (`format`, `markdown`, `inline`, `phrases`), and the
+      interaction layer (`bot`, `resume`, `mode`, `dispatch`, `sessions`, `config`, `inbox`).
 
 ## Verification
 - Free (every change): `make test`. Live milestone (~$0.20): `make smoke`.
