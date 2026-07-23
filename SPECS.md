@@ -113,6 +113,28 @@ the window. So for the `/resume` list the frontend pairs transcript usage with a
 live turns (`sessions.remember_context_window`, keyed by model) instead of hardcoding per-model
 constants. Unknown model → the `%` bit is simply omitted, never guessed.
 
+### AD-10 — Both CLIs expose mode, model AND effort; the seam can carry all three
+Verified live 2026-07-23 (`claude --help`, `opencode run --help`, `opencode agent list`,
+`opencode models`), settling the "unverified" note that was blocking the backend/model/effort design.
+
+| knob | claude | opencode |
+|------|--------|----------|
+| mode | `--permission-mode plan\|bypassPermissions\|acceptEdits\|auto\|manual` | `--agent <name>`; `build` and `plan` are both **primary** agents (also `compaction`, `summary`, `title`; `explore`/`general` are subagents) |
+| model | `--model` — alias (`opus`, `sonnet`, `fable`) or full id | `-m provider/model`; `opencode models` lists **478** across providers (`anthropic/*`, `google/*`, `alibaba-coding-plan/*`, free `opencode/*` tiers…) |
+| effort | `--effort low\|medium\|high\|xhigh\|max` | `--variant` — "provider-specific reasoning effort, e.g. high, max, minimal" |
+| title | `--name` | `--title` |
+| fork | (dropped, AD-3) | `--fork` |
+
+Consequences for the design:
+1. **The earlier claim that opencode has no plan/build equivalent is false** — it was asserted in
+   `opencode.build_args`'s docstring and repeated in the roadmap. `--agent plan` is a one-flag map.
+2. **Capability declaration is still the right shape**, but as a per-backend mapping table, not an open
+   question. What genuinely differs is *cardinality*, not existence: claude's model set is a handful of
+   aliases, opencode's is 478 — so the model picker cannot be one flat keyboard. Provider→model
+   drill-down, or a curated favourites list plus a typed escape hatch.
+3. **Effort values do not share a vocabulary** (`low..max` vs `minimal|high|max`), which is exactly why
+   it belongs behind the seam as provider data — the frontend offers whatever the backend declares.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

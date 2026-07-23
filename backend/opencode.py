@@ -58,8 +58,10 @@ class OpencodeBackend(CliBackend):
 
     def build_args(self, prompt: str, session_id: str | None, options: TurnOptions) -> list[str]:
         """opencode continues the same lineage with -s <id> (no fork flag, unlike claude).
-        options.mode is ignored: opencode's headless run has no plan/build equivalent (maps
-        what it can, per the provider-agnostic seam)."""
+        options.mode is not wired yet — but opencode DOES have the equivalent: `--agent
+        build|plan` are both primary agents (verified 2026-07-23, correcting an earlier
+        claim here). Mapping it belongs to the backend/model/effort tier; until then the
+        run uses opencode's default agent."""
         args = ["opencode", "run", prompt, "--format", "json"]
         if session_id:
             args.append("-s")
