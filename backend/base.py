@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import AsyncIterator, Literal, Protocol, runtime_checkable
+from .caps import Capabilities
 
 EventKind = Literal["text", "thinking", "tool", "result", "error"]
 
@@ -25,9 +26,20 @@ class TurnOptions:
     """Per-turn knobs threaded from the frontend to a backend's build_args.
     Provider-agnostic: each backend maps what it can and ignores the rest.
     mode ∈ {build, plan}. title names a new session (claude --name -> visible in its /resume).
-    Room to grow (model, effort) for the next tier."""
+    model/effort are opaque strings the backend declared itself (see caps.Capabilities and
+    AgentBackend.efforts) — the frontend never invents one, so no value needs translating."""
     mode: str = "build"
     title: str | None = None
+    model: str | None = None
+    effort: str | None = None
+
+
+def add_flag(args: list[str], name: str, value: str | None) -> None:
+    """Append `--name value` when value is set. Every backend builds its argv this way, so
+    the guard lives here once instead of as an if/append/append triple per knob."""
+    if value:
+        args.append(name)
+        args.append(value)
 
 
 @runtime_checkable
@@ -46,6 +58,20 @@ class AgentBackend(Protocol):
 
     def last_response(self, session_id: str, cwd: str) -> str:
         """Full text of that session's last agent answer, or "" if the provider can't say."""
+        ...
+
+    def session_detail(self, session_id: str, cwd: str) -> dict:
+        """Extra picker fields (preview, context_used) that cost a per-session query, so the
+        frontend asks only for the page it renders. {} when list_sessions already had them."""
+        ...
+
+    def capabilities(self) -> Capabilities:
+        """Modes + models this backend can be given. The frontend offers only what lands here."""
+        ...
+
+    def efforts(self, model: str | None = None) -> list[str]:
+        """Effort vocabulary for a model — per-model because opencode's `--variant` values are
+        (claude's `--effort low..max` is one ladder for everything). Empty = no effort knob."""
         ...
 
 

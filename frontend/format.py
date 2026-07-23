@@ -110,13 +110,29 @@ _MODEL_FAMILIES = ("sonnet", "opus", "haiku", "fable")
 
 
 def short_model(model: str | None) -> str | None:
-    """claude-sonnet-5 -> sonnet; unknown families fall back to the raw string."""
+    """claude-sonnet-5 -> sonnet; nvidia/z-ai/glm-5.2 -> glm-5.2. Meta lines want the model to
+    read as one word, and opencode ids are provider-qualified paths."""
     result = model
     if model:
         for family in _MODEL_FAMILIES:
             if family in model:
                 result = family
                 break
+        else:
+            result = model.rsplit("/", 1)[-1]
+    return result
+
+
+def model_label(model: str | None) -> str | None:
+    """Button label inside a model picker. Family folding is right for a meta line but wrong
+    here: a provider list can hold several claude models at once, and folding them all to
+    `opus` would print the same label on buttons that pick different models. So a qualified
+    id keeps its own last segment, and only a bare alias folds."""
+    result = model
+    if model and "/" not in model:
+        result = short_model(model)
+    elif model:
+        result = model.rsplit("/", 1)[-1]
     return result
 
 

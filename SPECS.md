@@ -135,6 +135,60 @@ Consequences for the design:
 3. **Effort values do not share a vocabulary** (`low..max` vs `minimal|high|max`), which is exactly why
    it belongs behind the seam as provider data — the frontend offers whatever the backend declares.
 
+### AD-11 — Capability declaration: the frontend offers only what a backend declares
+Shipped with P2 (plan + measurements: [ROADMAP-p2.md](ROADMAP-p2.md)). AD-10 established that both
+CLIs expose mode, model and effort; AD-11 is how that reaches a keyboard without the frontend
+learning any provider's vocabulary.
+
+**The seam gained two declarations and two knobs.** `TurnOptions` carries `model` + `effort`
+(opaque strings), and `AgentBackend` answers `capabilities() -> Capabilities(modes, favourites,
+groups)` plus `efforts(model) -> list[str]`. The frontend renders exactly what comes back and
+invents nothing, so a value the CLI would reject can't be tapped.
+
+**Effort is asked per model, not per backend, because that is how it varies.** `models.json`
+declares `reasoning_options` per model in four shapes — `effort` with values (1578 models),
+`toggle` (939), `budget_tokens` (502), absent (3311) — and the `effort` value sets themselves
+differ (`low,medium,high` · `high,max` · `minimal,low,medium,high` · `low..max`). claude is the
+easy case: one `--effort low|medium|high|xhigh|max` ladder for everything. The non-effort shapes
+declare `[]`, and the panel says so out loud instead of drawing a row of values `--variant` would
+refuse.
+
+**Cardinality, not existence, is what differs** (AD-10's phrasing) — so the model picker is
+`favourites` + a `groups` drill-down: claude's 3 aliases ARE its whole catalogue and the `mais…`
+button never appears, while opencode's 478 across 6 providers page 6 at a time.
+
+**A backend switch cannot move a lineage, so it opens a new session.** Only the owning provider
+can resume its own id (AD-3), which makes "switch backend inside a session" impossible as
+literally stated. It maps to: arm `next_backend`, and the next turn starts a fresh session on that
+provider, carrying the title and the mode. Model and effort are explicitly *dropped* on the switch
+— they are provider-specific strings (`opus` means nothing to opencode, `openrouter/x/y` means
+nothing to claude) and carrying either across would build an argv the CLI rejects.
+
+**Panel taps spend no callback_data on the session id.** The panel always edits the anchor
+message, and `reply_map` already resolves that message_id → session_id, leaving all 64 bytes for
+values. `p:s:m:openrouter/qwen/qwen3-coder-next` fits with room to spare.
+
+### AD-12 — opencode's store answers the picker, but only per message for context %
+Picker parity with claude (3-line entry: title / preview / meta) reads opencode's sqlite:
+
+| bit | source |
+|-----|--------|
+| mode | `session.agent` |
+| model | `session.model` JSON → `providerID/id`, the same form `opencode models` and models.json use |
+| context window | `models.json` → `limit.context` |
+| preview + context used | last `message` with `role=assistant`: its `type=text` parts, and `data.tokens` |
+
+Two traps, both hit live:
+1. **`session.tokens_*` are lifetime totals, not occupancy.** A real session summed to 350 927
+   against a 200 000 window — 175%. Occupancy is per message (`input + cache.read + cache.write`,
+   the same formula AD-9 uses for claude), so it comes off the last assistant message.
+2. **`part` rows of `type=text` include the user's message and injected system-reminders.**
+   Filtering by the parent message's `role` is what stops the preview quoting Lucas back at himself.
+
+Because those two need a query per session, the seam gained `session_detail(session_id, cwd)`:
+`list_sessions` stays the cheap index, and the picker asks for detail only on the page it renders
+— 3 sessions, not the 59 that exist.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.
