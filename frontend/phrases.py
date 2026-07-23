@@ -17,9 +17,9 @@ WORKING_PHRASES = [
     "⏳ pensando…",
 ]
 NEW_EMPTY_PROMPT_PHRASES = [
-    "Manda o prompt junto: /new <o que você quer que essa sessão faça>",
-    "Faltou o prompt — /new precisa de um texto depois, tipo /new revisa esse arquivo",
-    "/new sem prompt não dispara nada. Escreve o que quer depois do comando.",
+    "Responde essa mensagem com o prompt da nova sessão.",
+    "Beleza — responde aqui dizendo o que essa sessão deve fazer.",
+    "Sessão nova: responde essa mensagem com o que você quer que ela faça.",
 ]
 ERROR_PHRASES = [
     "Deu erro: {e}",

@@ -4,6 +4,7 @@ import json
 import pathlib
 
 _CONFIG_DIR = pathlib.Path.home() / ".config" / "aiwbot"
+WORKSPACE_DIR = "/mnt/workspace"
 
 
 def config_dir() -> pathlib.Path:

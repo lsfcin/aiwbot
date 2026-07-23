@@ -1,37 +1,65 @@
 # test_resume.py — free unit test: /resume picker list/label/pagination assembly.
 import time
-from frontend.resume import _label, _entry_line, _list_text, _header, _parse_arg, _truncate, _keyboard
+from frontend.resume import _entry_line, _list_text, _header, _parse_arg, _meta, _clip, _keyboard
 
 _NOW = time.time()
 
 
-def test_label_single_line():
-    item = {"title": "hello world session", "backend": "claude", "updated_at": _NOW}
-    assert _label(item) == "HELLO WORLD SESSION · agora · claude"
+def test_meta_line_order_is_provider_model_mode_context_when():
+    item = {"backend": "claude", "updated_at": _NOW, "mode": "plan", "model": "claude-sonnet-5",
+            "context_used": 320_000, "context_window": 1_000_000}
+    assert _meta(item) == "claude · sonnet · plan · 32% · agora"
 
 
-def test_entry_line_appends_preview_on_second_line():
-    item = {"title": "hello world session", "preview": "faz isso … resposta pronta",
-            "backend": "claude", "updated_at": _NOW}
+def test_meta_line_omits_missing_mode_model_and_context():
+    item = {"backend": "opencode", "updated_at": _NOW}
+    assert _meta(item) == "opencode · agora"
+
+
+def test_meta_line_omits_context_without_known_window():
+    item = {"backend": "claude", "updated_at": _NOW, "context_used": 320_000, "context_window": None}
+    assert _meta(item) == "claude · agora"
+
+
+def test_entry_line_three_lines_with_preview():
+    item = {"title": "hello world session", "preview": "faz isso e a resposta fica pronta agora",
+            "backend": "claude", "updated_at": _NOW, "mode": "plan", "model": "claude-sonnet-5"}
     line = _entry_line(1, item)
-    assert line == "1. HELLO WORLD SESSION · agora · claude\n   ↳ faz isso … resposta pronta"
+    expected = ("1. HELLO WORLD SESSION\n"
+                "faz isso e a resposta fica pronta agora\n"
+                "claude · sonnet · plan · agora")
+    assert line == expected
 
 
 def test_entry_line_omits_preview_when_absent():
     item = {"title": "hello world session", "preview": None, "backend": "claude", "updated_at": _NOW}
     line = _entry_line(2, item)
-    assert line == "2. HELLO WORLD SESSION · agora · claude"
+    assert line == "2. HELLO WORLD SESSION\nclaude · agora"
 
 
-def test_list_text_numbers_sequentially():
-    items = [{"title": "a", "backend": "claude", "updated_at": _NOW},
-              {"title": "b", "backend": "opencode", "updated_at": _NOW}]
+def test_title_caps_at_five_words():
+    item = {"title": "one two three four five six seven eight", "preview": None,
+            "backend": "claude", "updated_at": _NOW}
+    line = _entry_line(1, item)
+    assert line.startswith("1. ONE TWO THREE FOUR FIVE\n")
+
+
+def test_list_text_blank_line_between_entries():
+    items = [{"title": "a", "preview": None, "backend": "claude", "updated_at": _NOW},
+              {"title": "b", "preview": None, "backend": "opencode", "updated_at": _NOW}]
     text = _list_text(items)
-    assert text.startswith("1. A · agora · claude\n2. B · agora · opencode")
+    assert text == "1. A\nclaude · agora\n\n2. B\nopencode · agora"
 
 
-def test_header_hints_full_count_command_when_more_exist():
-    assert _header(12, 5, "") == "Sessões recentes — 5 de 12 · /resume 12 pra ver todas"
+def test_clip_marks_truncation():
+    clipped = _clip("x" * 5000, 100)
+    assert clipped.endswith("[…]")
+    assert len(clipped) == 104
+
+
+def test_header_counts_shown_of_total():
+    # the "/resume N pra ver todas" hint is gone: ‹ / › arrows page through instead
+    assert _header(12, 5, "") == "Sessões recentes — 5 de 12"
 
 
 def test_header_no_hint_when_all_shown():
@@ -43,15 +71,7 @@ def test_parse_arg_digit_is_count():
 
 
 def test_parse_arg_text_is_query():
-    assert _parse_arg("bugfix") == ("bugfix", 5)
-
-
-def test_truncate_adds_ellipsis_over_limit():
-    assert _truncate("a" * 70, 60) == "a" * 59 + "…"
-
-
-def test_truncate_leaves_short_text_untouched():
-    assert _truncate("short", 60) == "short"
+    assert _parse_arg("bugfix") == ("bugfix", 3)
 
 
 def test_keyboard_is_single_row_of_numerals():
@@ -61,3 +81,41 @@ def test_keyboard_is_single_row_of_numerals():
     row = markup.inline_keyboard[0]
     assert [b.text for b in row] == ["1", "2"]
     assert [b.callback_data for b in row] == ["resume:sid-a", "resume:sid-b"]
+
+
+def _items(n, start=0):
+    return [{"session_id": f"sid-{i}", "title": "t", "backend": "claude", "updated_at": _NOW}
+            for i in range(start, start + n)]
+
+
+def test_keyboard_first_page_has_next_arrow_only():
+    markup = _keyboard(_items(3), offset=0, query="", total=9)
+    row = markup.inline_keyboard[0]
+    assert [b.text for b in row] == ["1", "2", "3", "›"]
+    assert row[-1].callback_data == "page:3:"
+
+
+def test_keyboard_middle_page_has_both_arrows_and_absolute_numerals():
+    markup = _keyboard(_items(3), offset=3, query="", total=9)
+    row = markup.inline_keyboard[0]
+    assert [b.text for b in row] == ["‹", "4", "5", "6", "›"]
+    assert row[0].callback_data == "page:0:"
+    assert row[-1].callback_data == "page:6:"
+
+
+def test_keyboard_last_page_has_back_arrow_only():
+    markup = _keyboard(_items(3), offset=6, query="", total=9)
+    row = markup.inline_keyboard[0]
+    assert [b.text for b in row] == ["‹", "7", "8", "9"]
+
+
+def test_keyboard_arrows_carry_the_active_filter():
+    markup = _keyboard(_items(3), offset=0, query="bugfix", total=9)
+    row = markup.inline_keyboard[0]
+    assert row[-1].callback_data == "page:3:bugfix"
+
+
+def test_list_text_numbers_from_page_offset():
+    text = _list_text(_items(2), start=4)
+    assert text.startswith("4. T\n")
+    assert "\n\n5. T\n" in text

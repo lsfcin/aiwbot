@@ -1,14 +1,20 @@
 # proc.py — subprocess driver + run-result → events handling (shared by all CLI backends).
 from __future__ import annotations
 import asyncio
+import os
 from typing import Callable
 from .base import AgentEvent
 
 
-async def run_capture(args: list[str], cwd: str) -> tuple[str, str, int]:
-    """Run args in cwd, wait, return (stdout, stderr, returncode). communicate() drains pipes safely."""
+async def run_capture(args: list[str], cwd: str, extra_env: dict | None = None) -> tuple[str, str, int]:
+    """Run args in cwd, wait, return (stdout, stderr, returncode). communicate() drains pipes safely.
+    extra_env overlays the daemon's environment (backends use it for provider-specific knobs)."""
     pipe = asyncio.subprocess.PIPE
-    proc = await asyncio.create_subprocess_exec(*args, cwd=cwd, stdout=pipe, stderr=pipe)
+    env = None
+    if extra_env:
+        env = dict(os.environ)
+        env.update(extra_env)
+    proc = await asyncio.create_subprocess_exec(*args, cwd=cwd, stdout=pipe, stderr=pipe, env=env)
     out_bytes, err_bytes = await proc.communicate()
     code = proc.returncode
     out = out_bytes.decode()
