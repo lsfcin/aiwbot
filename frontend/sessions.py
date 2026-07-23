@@ -60,7 +60,9 @@ def recent(n: int, query: str, cwd: str) -> list[dict]:
         items.append(item)
     page = items[:n]
     for item in page:
-        adopt(item["session_id"], item["backend"], item.get("title"), item["updated_at"])
+        sid = item["session_id"]
+        adopt(sid, item["backend"], item.get("title"), item["updated_at"])
+        item["mode"] = mode_for(sid)
     return page
 
 

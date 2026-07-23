@@ -36,8 +36,11 @@ def _session_item(path: pathlib.Path) -> dict:
     title = transcript.latest_ai_title(lines)
     if not title:
         title = _opening_prompt(path)
+    preview = transcript.last_response_text(lines)
+    model = transcript.last_model(lines)
     updated = path.stat().st_mtime
-    return {"session_id": sid, "title": title, "updated_at": updated}
+    return {"session_id": sid, "title": title, "updated_at": updated,
+            "preview": preview, "model": model}
 
 
 def _claude_bin() -> str:

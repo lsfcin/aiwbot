@@ -103,6 +103,20 @@ def test_list_sessions_prefers_ai_title_over_prompt(tmp_path, monkeypatch):
     assert items[0]["title"] == "Nice AI Title"
 
 
+def test_list_sessions_enriches_preview_and_model(tmp_path, monkeypatch):
+    # Phase 3: the picker's 3-line entry needs a last-response preview + model, derived
+    # from the transcript so VSCode sessions (no bot registry) also get them.
+    import backend.claude as C
+    sid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    title = '{"type":"ai-title","aiTitle":"Nice"}\n'
+    asst = '{"type":"assistant","message":{"model":"claude-sonnet-5","content":[{"type":"text","text":"the last answer here"}]}}\n'
+    (tmp_path / f"{sid}.jsonl").write_text(title + asst)
+    monkeypatch.setattr(C, "_project_dir", lambda cwd: tmp_path)
+    items = ClaudeBackend().list_sessions("/mnt/workspace")
+    assert items[0]["preview"] == "the last answer here"
+    assert items[0]["model"] == "claude-sonnet-5"
+
+
 def test_list_sessions_missing_dir_is_empty(tmp_path, monkeypatch):
     import backend.claude as C
     monkeypatch.setattr(C, "_project_dir", lambda cwd: tmp_path / "nope")
