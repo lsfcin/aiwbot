@@ -15,10 +15,10 @@
 | [`htmlsplit.py`](htmlsplit.py) | — | `split_html`, `strip_tags` | htmlsplit.py — split Telegram HTML into sendable chunks without ever breaking a tag. |
 | [`inbox.py`](inbox.py) | [`inbox.pyi`](inbox.pyi) | `append_entry`, `build_entry`, `save_media` | inbox.py — capture plain text/media into brain/INBOX.md ($0, no backend call). |
 | [`inline.py`](inline.py) | — | `convert` | inline.py — markdown inline spans -> Telegram HTML (bold, strike, code, links, italic). |
-| [`keyboard.py`](keyboard.py) | — | `blank`, `cell`, `segment`, `chunk`, `grid` | keyboard.py — the panel's fixed 5-column grid: two chrome columns framing three content cells. |
+| [`keyboard.py`](keyboard.py) | — | `cell`, `segment`, `chunk`, `framed` | keyboard.py — inline-keyboard primitives: rows of at most four, framed by the panel's controls. |
 | [`markdown.py`](markdown.py) | — | `format_body` | markdown.py — agent markdown -> Telegram HTML: block level (fences, tables, headings, lists). |
 | [`panel.py`](panel.py) | — | `apply`, `handle_callback` | panel.py — panel routing: which grid a tap opens, and which scope it writes to. |
-| [`panelmenu.py`](panelmenu.py) | — | `root_markup`, `menu_markup`, `values_markup`, `harness_values`, `model_values` | panelmenu.py — the panel's states as 5-column grids: mode row, dimension menu, value pickers. |
+| [`panelmenu.py`](panelmenu.py) | — | `root_markup`, `menu_markup`, `values_markup`, `harness_values`, `model_values` | panelmenu.py — the panel's states: mode row, dimension menu, value pickers with an expander. |
 | [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |
 | [`registry.py`](registry.py) | — | `remember`, `adopt`, `defaults`, `setting_for`, `set_setting` | registry.py — bot-owned per-session state in config.json: knobs, titles, message maps. |
 | [`reply.py`](reply.py) | — | `safe_reply`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |

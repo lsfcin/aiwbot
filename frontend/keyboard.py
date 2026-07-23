@@ -1,24 +1,18 @@
-# keyboard.py — the panel's fixed 5-column grid: two chrome columns framing three content cells.
+# keyboard.py — inline-keyboard primitives: rows of at most four, framed by the panel's controls.
 from __future__ import annotations
 from telegram import InlineKeyboardButton
 
-# Telegram splits a row's width evenly between its buttons and has no colspan, so a cell is only
-# square if every row holds the same number of them. Five columns is what makes ‹ › + x ··· −
-# read as squares at phone width; the count is the whole geometry, so it lives here alone.
-COLS = 5
-CONTENT_COLS = 3
+# Telegram divides a row's width evenly between its buttons, so fewer buttons means wider labels.
+# Four is the ceiling; rows are allowed to hold fewer and are never padded. The earlier fixed
+# five-column grid bought square cells and column alignment at the price of ~8-character labels,
+# which truncated model ids — Lucas dropped it 2026-07-23 (SPECS AD-13).
+MAX_PER_ROW = 4
 NOOP = "noop:"
-# Braille blank: a label with no ink, so a filler cell renders as an empty button rather than a
-# gap. Filler is not decoration — it is what keeps column N of one row above column N of the next.
-BLANK = "⠀"
-
-
-def blank() -> InlineKeyboardButton:
-    return InlineKeyboardButton(BLANK, callback_data=NOOP)
 
 
 def cell(label: str, data: str | None) -> InlineKeyboardButton:
-    """A chrome cell. `data=None` means the slot exists for alignment but does nothing."""
+    """A control. `data=None` means the button is drawn but inert — a page arrow parked at the
+    end of its range keeps its slot so the row never changes shape."""
     target = data or NOOP
     return InlineKeyboardButton(label, callback_data=target)
 
@@ -31,37 +25,37 @@ def segment(label: str, selected: bool) -> str:
     return result
 
 
-def chunk(buttons: list[InlineKeyboardButton], per_row: int) -> list[list[InlineKeyboardButton]]:
+def chunk(buttons: list[InlineKeyboardButton], per_row: int = MAX_PER_ROW) -> list[list]:
+    """Rows as even as the count allows, never wider than per_row. Filling greedily instead
+    would leave a last row of one — five buttons as 4+1 rather than 3+2 — and since width is
+    shared inside a row, that lone button would stretch to the full bubble."""
+    total = len(buttons)
+    count = max(1, -(-total // per_row))
+    base, spare = divmod(total, count)
     rows = []
-    for start in range(0, len(buttons), per_row):
-        row = buttons[start:start + per_row]
+    start = 0
+    for index in range(count):
+        size = base + 1 if index < spare else base
+        row = buttons[start:start + size]
+        start += size
         rows.append(row)
     return rows
 
 
-def _slot(chrome: dict[int, InlineKeyboardButton], index: int) -> InlineKeyboardButton:
-    found = chrome.get(index)
-    result = found if found is not None else blank()
-    return result
-
-
-def grid(content: list[InlineKeyboardButton],
-         left: dict[int, InlineKeyboardButton] | None = None,
-         right: dict[int, InlineKeyboardButton] | None = None) -> list[list[InlineKeyboardButton]]:
-    """Content wrapped three per row, each row framed by one chrome cell per side and padded to
-    COLS. `left`/`right` are keyed by row index; every unclaimed slot becomes a blank, so the
-    grid never changes shape and the columns stay aligned between rows."""
-    rows = chunk(content, CONTENT_COLS)
-    if not rows:
-        rows = [[]]
-    lefts = left or {}
-    rights = right or {}
-    built = []
-    for index, row in enumerate(rows):
-        framed = [_slot(lefts, index)]
-        framed.extend(row)
-        while len(framed) < COLS - 1:
-            framed.append(blank())
-        framed.append(_slot(rights, index))
-        built.append(framed)
-    return built
+def framed(opener: InlineKeyboardButton, content: list[InlineKeyboardButton],
+           closer: InlineKeyboardButton | None = None,
+           tail: list[InlineKeyboardButton] | None = None) -> list[list]:
+    """The panel's one layout rule: the first button is always the open/close control and the
+    last is always the expand/collapse one, with the content flowing between them. `tail` is a
+    row of its own (the pager), which then carries the closer so it stays last."""
+    buttons = [opener]
+    buttons.extend(content)
+    if closer is not None and not tail:
+        buttons.append(closer)
+    rows = chunk(buttons)
+    if tail:
+        row = list(tail)
+        if closer is not None:
+            row.append(closer)
+        rows.append(row)
+    return rows

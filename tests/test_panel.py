@@ -49,19 +49,36 @@ def _data(markup):
     return flat
 
 
-def test_every_row_is_exactly_five_cells(store):
-    """The whole geometry: Telegram divides a row evenly and has no colspan, so cells are only
-    square — and only aligned between rows — if every row holds the same count."""
-    markups = [panelmenu.root_markup("s1", "build"),
-               panelmenu.menu_markup("s1"),
-               panelmenu.menu_markup(registry.NEW),
-               panelmenu.values_markup("m", _FAVS, None, extra=[panelmenu.all_button()]),
-               panelmenu.values_markup("m", _FAVS, None, expanded=True),
-               panelmenu.providers_markup("s1"),
-               panelmenu.provider_markup("s1", "big", 0)]
-    for markup in markups:
+def _states(scope="s1"):
+    return [panelmenu.root_markup(scope, "build"),
+            panelmenu.menu_markup(scope),
+            panelmenu.menu_markup(registry.NEW),
+            panelmenu.values_markup("m", _FAVS, None, extra=[panelmenu.all_button()]),
+            panelmenu.values_markup("m", _FAVS, None, expanded=True),
+            panelmenu.providers_markup(scope),
+            panelmenu.provider_markup(scope, "big", 0)]
+
+
+def test_no_row_exceeds_four_buttons(store):
+    for markup in _states():
         for row in markup.inline_keyboard:
-            assert len(row) == keyboard.COLS
+            assert 1 <= len(row) <= keyboard.MAX_PER_ROW
+
+
+def test_first_button_opens_or_closes_and_last_expands_or_collapses(store):
+    """The panel's one layout rule, so the two controls are always where the thumb expects."""
+    for markup in _states():
+        flat = _texts(markup)
+        assert flat[0] in ("+", "x")
+    for markup in _states()[3:]:
+        assert _texts(markup)[-1] in ("···", "−")
+
+
+def test_rows_split_evenly_rather_than_greedily(store):
+    """Width is shared inside a row, so a greedy 4+1 would stretch the lone button across the
+    whole bubble."""
+    rows = keyboard.chunk([object()] * 5)
+    assert [len(row) for row in rows] == [3, 2]
 
 
 def test_root_is_plus_then_the_mode_segments(store):
@@ -79,53 +96,54 @@ def test_collapsed_picker_is_always_one_row(store):
     assert _texts(markup)[-1] == "···"
 
 
-def test_collapsed_picker_that_fits_offers_no_expander(store):
+def test_collapsed_picker_that_fits_shows_three_and_no_expander(store):
     markup = panelmenu.values_markup("e", ["low", "high", "max"], "high")
     assert "···" not in _texts(markup)
     assert "[ high ]" in _texts(markup)
+    assert len(markup.inline_keyboard[0]) == keyboard.MAX_PER_ROW
 
 
-def test_expander_and_collapser_share_the_same_cell(store):
-    """`···` and `−` both sit in row 0's right chrome, so the control never moves under your
-    thumb between the two states."""
+def test_the_selected_value_is_never_cut_off(store):
+    """Collapsed shows two of five, so the selection is pinned first — a picker that hides what
+    is currently set is worse than one that reorders."""
+    markup = panelmenu.values_markup("e", ["low", "medium", "high", "xhigh", "max"], "max")
+    assert "[ max ]" in _texts(markup)
+
+
+def test_a_value_chosen_in_the_drill_down_still_shows_in_the_shortlist(store):
+    """openrouter/... is not among the favourites, but it is what is set, so it leads the row."""
+    markup = panelmenu.values_markup("m", _FAVS, "big/m7", extra=[panelmenu.all_button()])
+    assert "[ m7 ]" in _texts(markup)
+
+
+def test_expander_and_collapser_are_both_the_last_button(store):
     collapsed = panelmenu.values_markup("m", _FAVS, None)
     expanded = panelmenu.values_markup("m", _FAVS, None, expanded=True)
-    assert collapsed.inline_keyboard[0][-1].text == "···"
-    assert expanded.inline_keyboard[0][-1].text == "−"
+    assert _texts(collapsed)[-1] == "···"
+    assert _texts(expanded)[-1] == "−"
 
 
 def test_all_escape_rides_the_last_page_only(store):
     extra = [panelmenu.all_button()]
-    first = _texts(panelmenu.values_markup("m", [f"m{i}" for i in range(20)], None,
-                                           expanded=True, page=0, extra=extra))
-    last = _texts(panelmenu.values_markup("m", [f"m{i}" for i in range(20)], None,
-                                          expanded=True, page=2, extra=extra))
+    values = [f"m{i}" for i in range(30)]
+    first = _texts(panelmenu.values_markup("m", values, None, expanded=True, page=0, extra=extra))
+    last = _texts(panelmenu.values_markup("m", values, None, expanded=True, page=2, extra=extra))
     assert "all" not in first
     assert "all" in last
 
 
-def test_pager_arrows_sit_in_the_chrome_columns(store):
+def test_pager_is_its_own_row_so_the_collapser_stays_last(store):
     markup = panelmenu.provider_markup("s1", "big", 1)
-    rows = _labels(markup)
-    assert rows[-1][0] == "‹"
-    assert rows[-1][-1] == "›"
-    assert rows[1][0] == "2/3"
+    last = _labels(markup)[-1]
+    assert last == ["‹", "2/2", "›", "−"]
 
 
 def test_arrows_park_at_the_ends_of_the_range(store):
     first = _data(panelmenu.provider_markup("s1", "big", 0))
-    last = _data(panelmenu.provider_markup("s1", "big", 2))
+    last = _data(panelmenu.provider_markup("s1", "big", 1))
     assert "p:p:big:1" in first
     assert "p:p:big:-1" not in first
-    assert "p:p:big:3" not in last
-
-
-def test_filler_cells_are_inert(store):
-    markup = panelmenu.menu_markup("s1")
-    fillers = [b for row in markup.inline_keyboard for b in row if b.text == keyboard.BLANK]
-    assert fillers
-    for button in fillers:
-        assert button.callback_data == keyboard.NOOP
+    assert "p:p:big:2" not in last
 
 
 def test_session_menu_hides_harness_but_new_offers_it(store):
