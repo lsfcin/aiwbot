@@ -15,13 +15,12 @@
 | [`htmlsplit.py`](htmlsplit.py) | — | `split_html`, `strip_tags` | htmlsplit.py — split Telegram HTML into sendable chunks without ever breaking a tag. |
 | [`inbox.py`](inbox.py) | [`inbox.pyi`](inbox.pyi) | `append_entry`, `build_entry`, `save_media` | inbox.py — capture plain text/media into brain/INBOX.md ($0, no backend call). |
 | [`inline.py`](inline.py) | — | `convert` | inline.py — markdown inline spans -> Telegram HTML (bold, strike, code, links, italic). |
-| [`keyboard.py`](keyboard.py) | — | `segment`, `arrow`, `chunk` | keyboard.py — inline-keyboard primitives shared by every picker: segments, arrows, rows. |
+| [`keyboard.py`](keyboard.py) | — | `blank`, `cell`, `segment`, `chunk`, `grid` | keyboard.py — the panel's fixed 5-column grid: two chrome columns framing three content cells. |
 | [`markdown.py`](markdown.py) | — | `format_body` | markdown.py — agent markdown -> Telegram HTML: block level (fences, tables, headings, lists). |
-| [`mode.py`](mode.py) | — | `toggle_row`, `toggle_markup` | mode.py — plan↔build segmented control: two footer buttons, selected one bracketed. Sticky/session. |
-| [`panel.py`](panel.py) | — | `root_markup`, `handle_callback` | panel.py — anchor keyboard + its callbacks: mode row, gear, and the morphing settings panel. |
-| [`panelmenu.py`](panelmenu.py) | — | `summary`, `menu_markup`, `backend_markup`, `model_markup`, `group_markup` | panelmenu.py — the settings panel's keyboard states: provedor / modelo / esforço, and the drill-down. |
+| [`panel.py`](panel.py) | — | `apply`, `handle_callback` | panel.py — panel routing: which grid a tap opens, and which scope it writes to. |
+| [`panelmenu.py`](panelmenu.py) | — | `root_markup`, `menu_markup`, `values_markup`, `harness_values`, `model_values` | panelmenu.py — the panel's states as 5-column grids: mode row, dimension menu, value pickers. |
 | [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |
-| [`registry.py`](registry.py) | — | `remember`, `adopt`, `setting_for`, `set_setting`, `backend_for` | registry.py — bot-owned per-session state in config.json: knobs, titles, message maps. |
+| [`registry.py`](registry.py) | — | `remember`, `adopt`, `defaults`, `setting_for`, `set_setting` | registry.py — bot-owned per-session state in config.json: knobs, titles, message maps. |
 | [`reply.py`](reply.py) | — | `safe_reply`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |
 | [`resume.py`](resume.py) | — | `cmd_resume`, `handle_callback` | resume.py — /resume picker (Claude-Code-style): list recent sessions, tap to re-anchor + continue. |
 | [`sessions.py`](sessions.py) | — | `recent`, `count`, `last_response` | sessions.py — cross-backend session listing: the /resume picker aggregates each backend's own |

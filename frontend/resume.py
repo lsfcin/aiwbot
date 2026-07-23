@@ -1,7 +1,7 @@
 # resume.py — /resume picker (Claude-Code-style): list recent sessions, tap to re-anchor + continue.
 from __future__ import annotations
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from . import config, format, panel, phrases, registry, reply, sessions
+from . import config, format, panelmenu, phrases, registry, reply, sessions
 
 RESUME_COUNT = 3
 TITLE_WORDS = 5
@@ -154,7 +154,7 @@ async def _anchor(query, sid: str) -> None:
     # The anchor is a repliable message like any answer, so it carries the same mode toggle:
     # without it you re-anchor a session unable to see the mode you're about to run in.
     current = registry.mode_for(sid)
-    markup = panel.root_markup(sid, current)
+    markup = panelmenu.root_markup(sid, current)
     sent = await reply.safe_reply(query.message, block, reply_markup=markup)
     if sent is not None:
         registry.remember_reply(sent.message_id, sid)
