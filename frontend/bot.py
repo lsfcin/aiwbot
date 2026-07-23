@@ -150,7 +150,7 @@ async def _post_init(app: Application) -> None:
 def main() -> None:
     app = Application.builder().token(config.bot_token()).post_init(_post_init).build()
     app.add_handler(CallbackQueryHandler(mode.handle_callback, pattern="^mode:"))
-    app.add_handler(CallbackQueryHandler(resume.handle_callback, pattern="^(resume|page):"))
+    app.add_handler(CallbackQueryHandler(resume.handle_callback, pattern="^(resume|page|noop):"))
     app.add_handler(MessageHandler(filters.ALL, _handle_message))
     print("aiwbot: polling...")
     app.run_polling()

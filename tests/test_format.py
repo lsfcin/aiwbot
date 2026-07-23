@@ -1,5 +1,5 @@
 # test_format.py — free unit test: markdown/table -> Telegram HTML conversion.
-from frontend.format import format_body, session_block, reattach_cmd, title_words, title_from_prompt, response_preview, relative_time, short_model, answer_block
+from frontend.format import format_body, session_block, reattach_cmd, title_words, title_from_prompt, response_preview, relative_time, short_model, answer_block, clip_chars, PREVIEW_CHARS, TITLE_CHARS
 
 
 def test_plain_markdown_to_html():
@@ -63,12 +63,35 @@ def test_title_from_prompt_takes_leading_words():
 
 
 def test_response_preview_head_and_tail():
-    text = "one two three four five six seven eight nine ten eleven twelve thirteen"
-    assert response_preview(text) == "one two three four five six … eight nine ten eleven twelve thirteen"
+    text = "um dois tres quatro cinco seis sete oito nove dez onze doze treze"
+    assert response_preview(text) == "um dois tres quatro cinco seis … oito nove dez onze doze treze"
 
 
 def test_response_preview_short_text_untouched():
     assert response_preview("resposta curta") == "resposta curta"
+
+
+def test_clip_chars_leaves_text_at_the_limit_alone():
+    assert clip_chars("12345", 5) == "12345"
+
+
+def test_clip_chars_ellipsis_replaces_the_overflow():
+    assert clip_chars("123456", 5) == "12345…"
+
+
+def test_title_is_capped_in_chars_too():
+    long_words = "supercalifragilistico expialidoso extraordinario absurdo"
+    title = title_words(long_words, 5)
+    assert len(title) <= TITLE_CHARS + 1
+
+
+def test_response_preview_capped_in_chars_not_only_words():
+    """A 6…6-word preview still runs 25-140 chars depending on word length, which is what
+    made the picker bubble resize between pages. The character cap is the real budget."""
+    text = " ".join(f"palavralonga{i}" for i in range(20))
+    preview = response_preview(text)
+    assert len(preview) <= PREVIEW_CHARS + 1
+    assert preview.endswith("…")
 
 
 def test_relative_time_buckets():

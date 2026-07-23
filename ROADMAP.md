@@ -73,26 +73,29 @@ archived in [HISTORY.md](HISTORY.md). Live feedback opened the follow-ups below.
 
 Ranking lens, chosen deliberately over "easiest first": the bot's job in
 [workspace-os](../../brain/goals/workspace-os.md) is **the away-from-PC front door**. So each item is
-scored by *does it remove a reason Lucas has to go back to the PC?* — not by size. That reorders the
-old tiers: the outbound-media gap jumps ahead of everything, and audio drops below where it sat.
+scored by *does it remove a reason Lucas has to go back to the PC?* — not by size.
 
-### P1 — **show-me: the bot can only talk, never show** (NEW, from INBOX 2026-07-22)
-- [ ] **outbound media + channel awareness** — today every bot reply is text. The agent has no way to
-      *show* Lucas anything from the phone: no image, no PDF, no rendered artifact. Lucas's own working
-      rule ([[feedback_visual_eyeball_gate]]) is that image-producing steps need his visual OK before
-      the work advances — which means **every visual task hard-blocks until he is physically at the
-      PC**. That is the single largest remaining "back to the PC" forcing function, and it is cheap to
-      close (`send_photo`/`send_document` already exist in PTB; artifact URLs are just links).
-      Two halves, ship in order:
-      1. **outbound**: agent emits a file path or artifact URL → the bot ships the actual file/preview
-         into the chat. Needs a convention the agent can rely on (a sentinel line the frontend strips
-         and turns into an attachment) + size/type guards.
-      2. **channel awareness**: the session knows whether this turn arrived from Telegram or from
-         VSCode, so the agent can choose *how* to check with Lucas (send an image vs. say "look at your
-         screen"). Injectable per-turn on the `TurnOptions` seam, same as mode.
-      Lucas's words: *"garantir que o modelo tem como me mostrar NO telegram o que ele precisar, enviar
-      pdfs, links, talvez focar em artifacts seja mais fácil… garantir essa parte de 'checar' sempre
-      que possível de forma que também possa acontecer remotamente"*.
+**Lucas's call on that ranking (same day):** two overrides. The show-me gap drops to **last** — if the
+agent really needs to show something it can publish an artifact, so it never fully blocks. And audio
+beats live streaming, with a **new ask: audio *output* too**, not just input. Final order:
+
+> **P3 → P2 → audio (in + out) → live streaming → ask_user → show-me → Phase D**
+
+The P-numbers below keep their original names so earlier notes still resolve; read the arrow above for
+the running order.
+
+### P3 — Telegram output fidelity + `/resume` stability ← **IN PROGRESS**
+Ships first: cheap, and it touches every single message. Three problems, one root — what the agent
+writes is not what Telegram renders. Full plan (design decisions, traps, verification):
+**[ROADMAP-p3.md](ROADMAP-p3.md)**.
+- [ ] **markdown gaps** — headings, lists, italic, links, blockquote, strike. `markdown.py` already
+      does bold/code/fences/tables; agent answers are heading-heavy so `##` leaks into most replies.
+- [ ] **HTML-safe delivery** — `reply._chunks` slices already-formatted HTML every 4096 chars blind to
+      tags, so a long answer can be **silently dropped entirely**. Tag-aware split + plain-text
+      fallback. Ships with the markdown work because more tags = more chances to break.
+- [ ] **`/resume` stops jittering** — fixed 5-slot keyboard (inert `‹`/`›` at the ends), character
+      budgets instead of word budgets, width ruler, drop the `/resume N` form that corrupts the
+      numerals, mode toggle on anchor messages.
 
 ### P2 — backend + model + effort selection (Lucas, 2026-07-23)
 Three linked pickers, tap-not-type, on the `TurnOptions` seam (gains `backend`/`model`/`effort`; each
@@ -115,21 +118,28 @@ can make with one tap.
       seam (the toggle offers only what the current target supports), but now as a mapping table, not an
       open question. `frontend/mode.py`'s segmented button is the UX mould for all three.
 
-### P3 — small parity + polish (cheap, visible every message)
-- [ ] **output-format translation — headings, lists, links** — *partially shipped*: `frontend/markdown.py`
-      `format_body` already converts `**bold**`, inline `` `code` ``, fenced blocks, and boxes pipe-tables
-      as `<pre>`. Still unhandled and still ugly on screen: `##` headings, `-`/`1.` list markers,
-      `*italic*`, `[text](url)` links. Bounded (~30 LOC in one file). (INBOX 2026-07-22)
-- [ ] **opencode picker parity** — claude sessions show a 3-line entry with last-response preview,
-      model, and context %; opencode sessions show none of it, because `opencode._row_to_item` returns
-      only `{session_id, title, updated_at}` and its transcript store never passes through
-      `backend/transcript.py`. Needs a reader for opencode's sqlite message rows (`opencode export
-      <sessionID>` is the documented escape hatch if the schema is awkward). Do this **with P2** — it
-      only starts mattering once opencode is genuinely in rotation.
-- [x] **context % in footer** — shipped 2026-07-23, free, see AD-9. (Was listed open here in error.)
+- [ ] **opencode picker parity** — moved here **from P3 by Lucas's scope call**: claude sessions show a
+      3-line entry with last-response preview, model, and context %; opencode sessions show none of it,
+      because `opencode._row_to_item` returns only `{session_id, title, updated_at}`. It only starts
+      mattering once opencode is genuinely in rotation, which is what P2 causes. **Proven cheap while
+      exploring 2026-07-23** (no design work left, just do it): opencode's sqlite `message.data` carries
+      `modelID`, `providerID`, `tokens.total` and `mode`/`agent`; `part.data` type=`text` carries the
+      response text; `~/.cache/opencode/models.json` gives `limit.context` per model, which is the
+      window the context % needs. Same read-only sqlite pattern already in `opencode.list_sessions`.
 
-### P4 — Tier 4, architecturally heavy — still last, still on purpose
-Sequenced after P1-P3 so the picker/button work isn't rebuilt once message-delivery mechanics change.
+### Audio — in **and out** (Lucas, 2026-07-23: "audio wins")
+Promoted above live streaming. Beats streaming because it removes a *modality* barrier (hands/eyes
+busy, walking, driving) rather than making an existing text exchange prettier.
+- [ ] **audio in** — transcribe voice notes → dispatch as a turn (today they land in INBOX
+      untranscribed, `bot.py` `_handle_message`). A voice note starting with "bot" auto-starts a new
+      session, mirroring the existing text prefix trigger.
+- [ ] **audio out** (new ask) — the bot answers *as* a voice note, so a turn can be consumed without
+      looking at the screen. Telegram `send_voice` wants OGG/opus, which is what local TTS emits.
+      Both halves need a local model (STT + TTS) — the one item in the backlog carrying a new external
+      dependency. Note the INBOX entry about a light TTS model, and check PT-BR support before
+      choosing: a bot that answers in English-accented Portuguese is worse than text.
+
+### Later — architecturally heavy
 - [ ] **Live feedback** (Phase C, linuz90 mold) — `stream-json`: edit the message as the agent's chat
       text arrives, appending in chunks, keeping "⏳ pensando…" pinned at the END until the turn
       finishes. Builds on the ⏳-morph already shipped. Changes the reply/dispatch mechanics other
@@ -137,15 +147,30 @@ Sequenced after P1-P3 so the picker/button work isn't rebuilt once message-deliv
 - [ ] **Interview / ask_user** (Phase C) — let the bot interview Lucas mid-task (essential for plan
       mode, useful elsewhere): agent questions surface as Telegram prompts/inline buttons, answers flow
       back into the running turn. (linuz90's `ask_user` MCP pattern — see [[reference_linuz90_bot]].)
-      Depends on the live-feedback plumbing above — **and half its value is already delivered by P1**:
-      most "check with me" moments are *show me this*, not *answer my question*.
-- [ ] **Audio support** — transcribe voice notes → dispatch as a turn (today they only land in INBOX
-      untranscribed). If the audio starts with "bot", auto-start a NEW session (`/new`). **Demoted from
-      Tier 4's head**: it buys input convenience only (voice already reaches INBOX today), and it is the
-      one item needing a new external dependency (STT).
+      Depends on the live-feedback plumbing above.
+- [ ] **show-me: outbound media + channel awareness** (from INBOX 2026-07-22) — **demoted to last by
+      Lucas 2026-07-23**: "if the model needs it, it can build an artifact anyway", so the gap degrades
+      instead of blocking. Kept on the list because the degraded path costs a round trip every time.
+      Two halves: (1) **outbound** — the agent emits a file path or artifact URL and the bot ships the
+      actual file/preview into the chat (`send_photo`/`send_document`), needing a sentinel convention
+      the frontend strips plus size/type guards; (2) **channel awareness** — the turn knows whether it
+      arrived from Telegram or VSCode, so the agent picks *how* to check with Lucas (send the image vs.
+      "look at your screen"). Injectable per-turn on `TurnOptions`, same as mode. Lucas's words:
+      *"garantir que o modelo tem como me mostrar NO telegram o que ele precisar, enviar pdfs, links,
+      talvez focar em artifacts seja mais fácil… garantir essa parte de 'checar' … remotamente"*.
 - [ ] **Phase D — persistent mode + more backends**: claude via SDK `ClaudeSDKClient`, opencode via
       `--attach` server (only if per-message cost annoys); copilot backend; retire/thin the workspace
       bot to INBOX-only capture. Biggest structural rewrite — last on purpose.
+
+## Usability bugs found in the live bot (audit 2026-07-23)
+Logged here rather than KNOWN-BUGS.md because each is being fixed inside a backlog item above, not
+independently. Anything left unfixed at the end of P3 moves to KNOWN-BUGS.md with a `bN` id.
+- **Long answers can vanish entirely** — `reply._chunks` splits formatted HTML blind to tags; an
+  invalid chunk is rejected by Telegram, retried once, then dropped to stderr. → P3.
+- **`/resume N` corrupts the numerals** — `cmd_resume` honours a count, `_turn_page` hardcodes 3, so
+  one numeral names two different sessions across pages (breaks AD-5's guarantee). → P3.
+- **Anchor messages carry no mode toggle** — every answer shows BUILD/PLAN, the `/resume` anchor you
+  reply to doesn't, so on re-anchor you can't see the mode you're about to run in. → P3.
 
 ## Verification
 - Free (every change): `make test`. Live milestone (~$0.20): `make smoke`.
