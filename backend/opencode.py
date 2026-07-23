@@ -1,6 +1,6 @@
 # opencode.py — OpencodeBackend: normalizes `opencode run --format json` (JSONL stream).
 from __future__ import annotations
-from . import catalog, ocstore
+from . import binaries, catalog, ocstore
 from .base import AgentEvent, TurnOptions, add_flag, try_json
 from .caps import Capabilities
 from .cli import CliBackend
@@ -59,7 +59,8 @@ class OpencodeBackend(CliBackend):
         --permission-mode (AD-10 corrected the old "opencode has no plan/build" claim).
         Effort maps to --variant, whose vocabulary is per-model — see catalog.efforts."""
         agent = "plan" if options.mode == "plan" else "build"
-        args = ["opencode", "run", prompt, "--format", "json"]
+        binary = binaries.resolve("opencode")
+        args = [binary, "run", prompt, "--format", "json"]
         add_flag(args, "--agent", agent)
         add_flag(args, "-m", options.model)
         add_flag(args, "--variant", options.effort)

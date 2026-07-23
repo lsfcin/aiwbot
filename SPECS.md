@@ -215,7 +215,10 @@ The rule now is positional rather than geometric:
 
 - **At most four buttons per row, and rows may hold fewer.** No padding — a shorter row simply has
   wider buttons. Labels get ~12 characters instead of ~8.
-- **The first button is always `+` / `x`** (open / close the panel).
+- **The first button is always `+` (open) or `‹` (back one level).** It was an `x` that jumped
+  straight to the mode row; Lucas replaced it 2026-07-23 because a single control that always
+  cancels reads wrong inside a tree — `‹` walks menu → values → providers → a provider's models
+  back up one step at a time.
 - **The last button is always `···` / `−`** (expand / collapse the value list), wherever it lands.
 - So a collapsed picker is one row of `x`, **two** values, `···` — or **three** values when the
   list fits and there is nothing to expand.
@@ -229,8 +232,14 @@ Two behaviours this layout forces, both discovered by rendering the real states:
    chosen in the drill-down and is not in the shortlist at all. Two visible slots out of five means
    a picker showing `low medium ···` while `high` is set — invisible state. Selected-first is the
    one rule that always shows it.
-2. **`x` closes to the mode row; there is no per-level back button.** The levels (menu → values →
-   providers → a provider's models) are shallow, and `−` walks one level up from the deeper two.
+2. **`‹` and `«` are different controls.** Back-one-level and previous-page both sit in the
+   leftmost slot of their row, so identical glyphs would stack vertically meaning two different
+   things. Paging uses the double angles `«` `»`.
+3. **A dimension with nothing to offer is not shown at all.** `effort` disappears from the menu
+   when the chosen model declares no effort vocabulary — including opencode before any model is
+   picked, where the vocabulary is simply unknown. This replaced an alert saying "esse modelo não
+   expõe controle de esforço", which was both unreachable-by-intent and, worse, was the generic
+   message for *any* empty list (see AD-15).
 
 The mode row is not a picker and keeps fixed positions: `+ [ BUILD ] PLAN`, only the bracket moves.
 
@@ -241,6 +250,25 @@ the reply); carrying the harness/model/effort grid means giving that up. Lucas c
 bubble with buttons (2026-07-23), so `/new` now answers with a config bubble you adjust and then
 reply to by hand. `/new <prompt>` and the `bot ` prefix are unchanged: they start immediately on the
 inherited defaults.
+
+### AD-15 — systemd's PATH is the login default, so every CLI is resolved explicitly
+Found via a wrong error message, 2026-07-23: tapping **model** with harness=opencode answered
+"esse modelo não expõe controle de esforço". Two faults stacked. The visible one was a single
+generic message used for any empty value list. The real one: `systemd --user` runs with the login
+PATH, which does **not** carry the per-tool bin directories a shell rc adds — `opencode` lives in
+`~/.opencode/bin` and was simply invisible to the service. `opencode models` never ran, the
+catalogue was empty, and the picker had nothing to show.
+
+The same gap would have failed any opencode **turn** outright, since `build_args` emitted a bare
+`"opencode"` for `create_subprocess_exec`. Only claude worked, and only because it resolved its
+binary explicitly already.
+
+`backend/binaries.py` now does that resolution for every backend: PATH first (so a shell override
+still wins), then the known install locations per tool. `resolve()` raises, `find()` returns None
+for callers that degrade. Verified inside a real `systemd-run --user` unit: 458 models listed,
+previously 0. The count differs slightly from a shell's 478 because a couple of providers key off
+environment the service does not inherit — which is correct behaviour, since the picker should
+offer only what the process running the turn can actually reach.
 
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.

@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 import pathlib
 import subprocess
+from . import binaries
 
 # The offline declaration opencode ships: every provider it knows (3311+ models), each model
 # carrying `reasoning_options` and `limit.context`. Free to read, no network, no key.
 _MODELS_JSON = ".cache/opencode/models.json"
 # ...but it lists providers we have no auth for, so the CONFIGURED subset still comes from the
 # CLI (~1.1 s, 478 ids here). Both are memoized for the daemon's life — never per keyboard render.
-_LIST_CMD = ["opencode", "models"]
+_LIST_ARG = "models"
 _LIST_TIMEOUT = 20
 # Cheap-first shortlist: opencode's bundled tier, then the flat-fee coding plan. Derived from
 # the configured catalogue rather than hardcoded ids, so it survives models coming and going.
@@ -71,13 +72,18 @@ def context_window(model_id: str) -> int | None:
 
 
 def _run_list() -> list[str]:
-    """Configured ids from the CLI. A missing/failing opencode degrades to an empty
-    catalogue (the picker then shows nothing) rather than breaking the whole keyboard."""
+    """Configured ids from the CLI. A missing/failing opencode degrades to an empty catalogue
+    rather than breaking the keyboard — the caller reports that as its own state, not as an
+    empty picker (which is how the systemd PATH gap first surfaced, as a wrong error message)."""
     ids: list[str] = []
-    try:
-        proc = subprocess.run(_LIST_CMD, capture_output=True, text=True, timeout=_LIST_TIMEOUT)
-    except (OSError, subprocess.SubprocessError):
-        proc = None
+    binary = binaries.find("opencode")
+    proc = None
+    if binary:
+        try:
+            proc = subprocess.run([binary, _LIST_ARG], capture_output=True, text=True,
+                                  timeout=_LIST_TIMEOUT)
+        except (OSError, subprocess.SubprocessError):
+            proc = None
     if proc is not None and proc.returncode == 0:
         out = proc.stdout
         lines = out.splitlines()

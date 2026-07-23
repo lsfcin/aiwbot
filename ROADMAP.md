@@ -115,6 +115,16 @@ corrections rather than additions:
       auto-focus — Lucas's call (SPECS AD-14). `/new <prompt>` and the `bot ` prefix are unchanged
       and inherit the last interaction's knobs, which every turn now records as `defaults`.
 
+Round 3 (same day, Lucas testing live):
+- [x] **`x` → `‹`, back one level** instead of jumping to the mode row. Paging moved to `«` `»`
+      so the two controls stop sharing a glyph in the same column.
+- [x] **`effort` is hidden when the model declares none** rather than answering with an alert.
+- [x] **The bug behind that alert: systemd could not see `opencode`.** Its PATH is the login
+      default and the binary lives in `~/.opencode/bin`, so the catalogue was empty and the
+      generic empty-list message fired on the *model* button. Every backend now resolves its
+      binary explicitly (`backend/binaries.py`) — which also un-breaks opencode dispatch, which
+      would have failed for the same reason. SPECS AD-15.
+
 Found by rendering the real states rather than by reasoning: with only two visible slots, a
 collapsed picker would show `low medium ···` while `high` was set — the state invisible. The
 selected value is now pinned first whenever the list is truncated, including when it came from
