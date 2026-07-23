@@ -30,10 +30,28 @@ def plain(text: str) -> str:
     return html.escape(text)
 
 
+TITLE_CHARS = 32
+PREVIEW_CHARS = 64
+
+
+def clip_chars(text: str, limit: int) -> str:
+    """Hard character cap with an ellipsis. Word budgets alone let a line run 15 to 60 chars,
+    which is what made the /resume bubble resize on every page turn — width is a character
+    quantity, so it has to be budgeted as one."""
+    result = text
+    if len(text) > limit:
+        head = text[:limit].rstrip()
+        result = f"{head}…"
+    return result
+
+
 def title_words(name: str | None, n: int = 3) -> str:
     result = "(SEM TÍTULO)"
     if name and name.strip():
-        result = " ".join(name.split()[:n]).upper()
+        words = name.split()[:n]
+        joined = " ".join(words)
+        upper = joined.upper()
+        result = clip_chars(upper, TITLE_CHARS)
     return result
 
 
@@ -44,14 +62,15 @@ def title_from_prompt(prompt: str, n: int = 8) -> str:
 
 
 def response_preview(text: str, n: int = 6) -> str:
-    """First n … last n words of a response, for the /resume picker preview line."""
+    """First n … last n words of a response, for the /resume picker preview line, then capped
+    in characters so a page of long-worded sessions doesn't widen the bubble."""
     words = text.split()
     result = " ".join(words)
     if len(words) > 2 * n:
         head = " ".join(words[:n])
         tail = " ".join(words[-n:])
         result = f"{head} … {tail}"
-    return result
+    return clip_chars(result, PREVIEW_CHARS)
 
 
 # Provider as data: how each backend re-opens a session by id outside the bot.
