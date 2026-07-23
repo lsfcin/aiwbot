@@ -64,9 +64,10 @@ def _all(cwd: str) -> list[dict]:
     return items
 
 
-def recent(n: int, query: str, cwd: str) -> list[dict]:
+def recent(n: int, query: str, cwd: str, offset: int = 0) -> list[dict]:
     """Newest-first sessions (optionally title-filtered) for the /resume picker, from the backend
-    stores. Adopts each shown session into the registry so a later tap can resolve backend+title."""
+    stores. Adopts each shown session into the registry so a later tap can resolve backend+title.
+    offset paginates: the picker shows one page at a time behind ‹ / › buttons."""
     q = query.lower()
     items = []
     for item in _all(cwd):
@@ -74,7 +75,7 @@ def recent(n: int, query: str, cwd: str) -> list[dict]:
             continue
         item.setdefault("preview", None)
         items.append(item)
-    page = items[:n]
+    page = items[offset:offset + n]
     for item in page:
         sid = item["session_id"]
         adopt(sid, item["backend"], item.get("title"), item["updated_at"])
@@ -131,17 +132,37 @@ def set_mode(session_id: str, mode: str) -> None:
         config.save_config(sessions=sessions)
 
 
-def remember_reply(message_id: int, session_id: str) -> None:
+def _remember_by_message(map_name: str, message_id: int, value: str) -> None:
+    """Bounded message_id -> value map (oldest ids evicted first). Shared by the
+    reply-to-continue map and the pending-/new map."""
     cfg = config.load_config()
-    reply_map = cfg.get("reply_map", {})
-    reply_map[str(message_id)] = session_id
-    if len(reply_map) > REPLY_MAP_MAX:
-        stale = sorted(reply_map, key=int)[: len(reply_map) - REPLY_MAP_MAX]
+    mapping = cfg.get(map_name, {})
+    mapping[str(message_id)] = value
+    if len(mapping) > REPLY_MAP_MAX:
+        stale = sorted(mapping, key=int)[: len(mapping) - REPLY_MAP_MAX]
         for k in stale:
-            del reply_map[k]
-    config.save_config(reply_map=reply_map)
+            del mapping[k]
+    config.save_config(**{map_name: mapping})
+
+
+def _value_by_message(map_name: str, message_id: int) -> str | None:
+    mapping = config.load_config().get(map_name, {})
+    return mapping.get(str(message_id))
+
+
+def remember_reply(message_id: int, session_id: str) -> None:
+    _remember_by_message("reply_map", message_id, session_id)
 
 
 def session_for_reply(message_id: int) -> str | None:
-    reply_map = config.load_config().get("reply_map", {})
-    return reply_map.get(str(message_id))
+    return _value_by_message("reply_map", message_id)
+
+
+def remember_pending_new(message_id: int, backend: str) -> None:
+    """A /new with no prompt asks for one via ForceReply; the answer to THAT message
+    is the prompt, so remember which backend the pending session should use."""
+    _remember_by_message("pending_new", message_id, backend)
+
+
+def pending_new(message_id: int) -> str | None:
+    return _value_by_message("pending_new", message_id)
