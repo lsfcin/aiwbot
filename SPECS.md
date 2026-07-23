@@ -157,12 +157,26 @@ refuse.
 `favourites` + a `groups` drill-down: claude's 3 aliases ARE its whole catalogue and the `mais…`
 button never appears, while opencode's 478 across 6 providers page 6 at a time.
 
-**A backend switch cannot move a lineage, so it opens a new session.** Only the owning provider
-can resume its own id (AD-3), which makes "switch backend inside a session" impossible as
-literally stated. It maps to: arm `next_backend`, and the next turn starts a fresh session on that
-provider, carrying the title and the mode. Model and effort are explicitly *dropped* on the switch
-— they are provider-specific strings (`opus` means nothing to opencode, `openrouter/x/y` means
-nothing to claude) and carrying either across would build an argv the CLI rejects.
+**Harness is chosen once, at `/new` — it is not a per-session knob.** *Revised 2026-07-23
+(Lucas).* The first cut offered a harness switch on a live session, mapped to "arm it, and the next
+turn opens a fresh session there". That was answering a question nobody asked: switching only means
+something if the context comes along, and it cannot. `opencode` has `export <sessionID>` /
+`import <file>`, `claude` has no counterpart at all — so claude→opencode would mean rewriting a
+transcript into opencode's JSON schema, and the return trip is impossible. A lineage therefore
+belongs to its harness for life (AD-3), and the session panel offers only **model** and **effort**.
+Harness lives in the `/new` scope, alongside the model and effort a fresh session inherits.
+
+**Two scopes, one panel.** Knobs are addressed by *scope*: a session id, or the sentinel
+`registry.NEW` for the session `/new` is about to create. `NEW` reads and writes the `defaults`
+block, which every finished turn overwrites — so a new session starts on the last interaction's
+harness/model/effort. The panel code is scope-agnostic; only `registry` knows there are two stores.
+`/new --backend X` writes the same `NEW` knob the button does, so typing it and tapping it are the
+same act on the same state.
+
+**Vocabulary.** `harness` = the CLI (claude, opencode). `provider` = who supplies the key (nvidia,
+openrouter, google) — the sense opencode itself uses, and the level the model drill-down groups by.
+Calling the harness a "provider" (the first cut did) collides with that. Button labels stay English
+(`harness` · `model` · `effort`), matching `BUILD`/`PLAN`, which were already English.
 
 **Panel taps spend no callback_data on the session id.** The panel always edits the anchor
 message, and `reply_map` already resolves that message_id → session_id, leaving all 64 bytes for
@@ -188,6 +202,48 @@ Two traps, both hit live:
 Because those two need a query per session, the seam gained `session_detail(session_id, cwd)`:
 `list_sessions` stays the cheap index, and the picker asks for detail only on the page it renders
 — 3 sessions, not the 59 that exist.
+
+### AD-13 — The panel is a fixed 5-column grid, because Telegram has no colspan
+*Lucas's design, 2026-07-23.* A row's width is divided **evenly** between its buttons, and there is
+no way to make one span two cells. So a button is square — and column N of one row sits above column
+N of the next — only if every row holds the same number of buttons. `keyboard.COLS = 5` is that
+number, and it is the whole geometry: change it and every state re-lays-out at once.
+
+```
+ col 0        col 1..3          col 4
+ chrome       content           chrome
+┌────┬──────┬──────┬──────┬────┐
+│ x  │  m1  │  m2  │  m3  │ ···│   ··· expand   (row 0)
+├────┼──────┼──────┼──────┼────┤
+│2/38│  m4  │  m5  │  m6  │    │   page counter (middle-left, otherwise dead)
+├────┼──────┼──────┼──────┼────┤
+│ ‹  │  m7  │  m8  │  m9  │ ›  │   pager        (last row)
+└────┴──────┴──────┴──────┴────┘
+```
+
+Consequences worth stating because they are not obvious:
+1. **Empty cells are load-bearing.** A short row is padded with braille-blank (`U+2800`) buttons —
+   inert, no ink, but they hold the column alignment. Dropping them would let the client re-space
+   the remaining buttons and the grid would visibly breathe between states.
+2. **Collapsed means exactly one row**, whatever the list length. Everything past the first three
+   values lives behind `···`; `−` collapses back. Both share row 0's right cell so the control
+   never moves under your thumb.
+3. **`‹ ›` are square for free** by living in the chrome columns rather than in a row of their own.
+4. **The cost is label width.** A cell is a fifth of the bubble (~8 characters), so model ids
+   truncate — `claude-fable-latest` and `claude-haiku-latest` differ only past the cut. Provider ids
+   drop their qualifier (`alibaba-coding-plan` → `alibaba`) to claw some back. If truncation ever
+   matters more than squareness, `COLS = 4` is the one-line lever.
+5. **`x` closes to the mode row; there is no per-level back button** — the levels (menu → values →
+   providers → a provider's models) are shallow, and `−` already walks one level up from the deeper
+   two. A wrong turn costs `x` plus two taps.
+
+### AD-14 — `/new` gives up ForceReply to carry the panel
+Telegram accepts exactly **one** `reply_markup` per message: `ForceReply` *or* an inline keyboard,
+never both. A bare `/new` used to send a `ForceReply` (which focuses the keyboard and pre-anchors
+the reply); carrying the harness/model/effort grid means giving that up. Lucas chose the single
+bubble with buttons (2026-07-23), so `/new` now answers with a config bubble you adjust and then
+reply to by hand. `/new <prompt>` and the `bot ` prefix are unchanged: they start immediately on the
+inherited defaults.
 
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.

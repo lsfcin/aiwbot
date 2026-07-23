@@ -1,9 +1,9 @@
 # bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX.
 from __future__ import annotations
-from telegram import BotCommand, ForceReply, Update
+from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 from backend import TurnOptions
-from . import config, dispatch, format, inbox, panel, phrases, registry, reply, resume
+from . import config, dispatch, format, inbox, panel, panelmenu, phrases, registry, reply, resume
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 DEFAULT_BACKEND = registry.DEFAULT_BACKEND
@@ -27,8 +27,10 @@ def _strip_bot_prefix(text: str) -> str | None:
     return prompt
 
 
-def _parse_new_arg(arg: str) -> tuple[str, str]:
-    backend_name = DEFAULT_BACKEND
+def _parse_new_arg(arg: str) -> tuple[str | None, str]:
+    """`--backend X` still works and now simply writes the NEW scope's harness, so typing it
+    and tapping it are the same act on the same state."""
+    backend_name = None
     prompt = arg
     if arg.startswith("--backend "):
         rest = arg[len("--backend "):]
@@ -38,35 +40,32 @@ def _parse_new_arg(arg: str) -> tuple[str, str]:
     return backend_name, prompt
 
 
-def _options(knobs_from: str | None, title: str | None) -> TurnOptions:
-    """The turn's knobs, read off the session whose panel set them. A new session started by a
-    backend switch reads them from the OLD session — which is why switch_backend clears the
-    provider-specific ones first (registry.switch_backend)."""
-    if knobs_from is None:
-        return TurnOptions(title=title)
-    mode_name = registry.mode_for(knobs_from)
-    model = registry.setting_for(knobs_from, "model")
-    effort = registry.setting_for(knobs_from, "effort")
+def _options(scope: str, title: str | None) -> TurnOptions:
+    """The turn's knobs, read off the scope that owns them: a live session, or NEW for the
+    last-used defaults a fresh session inherits."""
+    mode_name = registry.mode_for(scope)
+    model = registry.setting_for(scope, "model")
+    effort = registry.setting_for(scope, "effort")
     return TurnOptions(mode=mode_name, title=title, model=model, effort=effort)
 
 
 def _persist(session_id: str, backend_name: str, title: str | None, result, options: TurnOptions) -> None:
-    """Carry the knobs onto whatever session id the turn ended up on — the same one on a
-    resume, a brand-new one after a backend switch."""
+    """Carry the knobs onto the session the turn ran on, and onto the defaults, so the next
+    /new starts where the last interaction left off."""
     preview = format.response_preview(result.text)
     registry.remember(session_id, backend_name, title, preview)
     registry.set_mode(session_id, options.mode)
     registry.set_setting(session_id, "model", options.model)
     registry.set_setting(session_id, "effort", options.effort)
+    registry.remember_defaults(backend_name, options.mode, options.model, options.effort)
     registry.remember_context_window(result.model, result.context_window)
 
 
 async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
-                           backend_name: str, title: str | None, knobs_from: str | None = None) -> None:
-    """Shared tail: dispatch one turn with the session's sticky knobs, then deliver the answer
-    with its footer + the anchor keyboard. New sessions default to build, no model, no effort."""
-    source = knobs_from if knobs_from is not None else session_id
-    options = _options(source, title)
+                           backend_name: str, title: str | None, scope: str) -> None:
+    """Shared tail: dispatch one turn with the scope's sticky knobs, then deliver the answer
+    with its footer + the anchor keyboard."""
+    options = _options(scope, title)
     try:
         result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name, cwd=WORKSPACE_DIR, options=options)
     except dispatch.DispatchError as e:
@@ -74,45 +73,47 @@ async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
         return
     _persist(result.session_id, backend_name, title, result, options)
     block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd, mode=options.mode, context_used=result.context_used, context_window=result.context_window)
-    markup = panel.root_markup(result.session_id, options.mode)
+    markup = panelmenu.root_markup(result.session_id, options.mode)
     sent = await reply.deliver(working, msg, block, reply_markup=markup)
     if sent is not None:
         registry.remember_reply(sent.message_id, result.session_id)
 
 
-async def _start_new(msg, backend_name: str, prompt: str) -> None:
+async def _start_new(msg, prompt: str) -> None:
+    """A new session runs on the NEW scope: whatever the last interaction used, minus anything
+    the /new config bubble changed since."""
     working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
     title = format.title_from_prompt(prompt)
-    await _run_and_deliver(msg, working, prompt, session_id=None, backend_name=backend_name, title=title)
+    harness = registry.harness_for(registry.NEW)
+    await _run_and_deliver(msg, working, prompt, session_id=None, backend_name=harness,
+                           title=title, scope=registry.NEW)
 
 
 async def _cmd_new(msg, arg: str) -> None:
-    """Tapping /new in Telegram's command menu sends it bare — so instead of erroring,
-    ask for the prompt with a ForceReply and start the session from that answer."""
+    """Tapping /new in Telegram's command menu sends it bare, so an empty prompt answers with a
+    config bubble instead of an error: adjust harness/model/effort on it, then reply with the
+    prompt. Telegram allows exactly one reply_markup per message, so this bubble carries the
+    keyboard and gives up ForceReply's auto-focus — Lucas's call, 2026-07-23."""
     backend_name, prompt = _parse_new_arg(arg)
+    if backend_name:
+        registry.set_setting(registry.NEW, "backend", backend_name)
     if not prompt.strip():
         ask = format.plain(phrases.pick(phrases.NEW_EMPTY_PROMPT_PHRASES))
-        force = ForceReply(input_field_placeholder="prompt da nova sessão")
-        asked = await reply.safe_reply(msg, ask, reply_markup=force)
+        current = registry.mode_for(registry.NEW)
+        markup = panelmenu.root_markup(registry.NEW, current)
+        asked = await reply.safe_reply(msg, ask, reply_markup=markup)
         if asked is not None:
-            registry.remember_pending_new(asked.message_id, backend_name)
+            registry.remember_pending_new(asked.message_id)
         return
-    await _start_new(msg, backend_name, prompt)
+    await _start_new(msg, prompt)
 
 
 async def _handle_reply_continue(msg, sid: str) -> None:
-    """A pending backend switch can't resume this lineage (AD-3), so it opens a new session on
-    the chosen provider instead, carrying the title and the mode over."""
-    owner = registry.backend_for(sid) or DEFAULT_BACKEND
-    target = registry.target_backend(sid, DEFAULT_BACKEND)
-    switching = target != owner
+    harness = registry.backend_for(sid) or DEFAULT_BACKEND
     working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
     title = registry.title_for(sid)
-    resumed = None if switching else sid
-    if switching:
-        registry.set_setting(sid, "next_backend", None)
-    await _run_and_deliver(msg, working, msg.text, session_id=resumed, backend_name=target,
-                           title=title, knobs_from=sid)
+    await _run_and_deliver(msg, working, msg.text, session_id=sid, backend_name=harness,
+                           title=title, scope=sid)
 
 
 async def _dispatch_command(text: str, msg) -> None:
@@ -143,7 +144,7 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
         awaiting = registry.pending_new(replied_to)
         if awaiting:
-            context.application.create_task(_start_new(msg, awaiting, msg.text))
+            context.application.create_task(_start_new(msg, msg.text))
             return
     if msg.text:
         bot_prompt = _strip_bot_prefix(msg.text)
@@ -177,7 +178,7 @@ async def _post_init(app: Application) -> None:
 
 def main() -> None:
     app = Application.builder().token(config.bot_token()).post_init(_post_init).build()
-    app.add_handler(CallbackQueryHandler(panel.handle_callback, pattern="^(mode|p):"))
+    app.add_handler(CallbackQueryHandler(panel.handle_callback, pattern="^p:"))
     app.add_handler(CallbackQueryHandler(resume.handle_callback, pattern="^(resume|page|noop):"))
     app.add_handler(MessageHandler(filters.ALL, _handle_message))
     print("aiwbot: polling...")

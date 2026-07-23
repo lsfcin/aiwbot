@@ -35,17 +35,28 @@ def adopt(session_id: str, backend: str, title: str | None, updated_at: float) -
     config.save_config(sessions=sessions)
 
 
-def setting_for(session_id: str, key: str, default: str | None = None) -> str | None:
-    """One sticky per-session knob (mode/model/effort). Unset reads as the default, which is
-    how "let the provider decide" stays distinct from a value that was actually picked."""
-    entry = _entries().get(session_id, {})
-    return entry.get(key) or default
+# The panel edits knobs for two things: a live session, or the session /new is about to create.
+# Both are addressed as a "scope" so the panel code stays scope-agnostic — NEW routes to the
+# last-used defaults, any other value is a session id.
+NEW = "*new*"
 
 
-def set_setting(session_id: str, key: str, value: str | None) -> None:
-    """Persist one knob, preserving the rest of the entry. Unknown sessions are ignored on
-    purpose: every message carrying a panel was remembered or adopted first, so a write
-    against an unknown id means a stale keyboard, not a new session."""
+def defaults() -> dict:
+    """Knobs the last turn ran with. A new session inherits them, so the harness/model you
+    chose yesterday is still what /new starts on today."""
+    return config.load_config().get("defaults", {})
+
+
+def _set_default(key: str, value: str | None) -> None:
+    entry = defaults()
+    entry[key] = value
+    config.save_config(defaults=entry)
+
+
+def _set_session(session_id: str, key: str, value: str | None) -> None:
+    """Unknown sessions are ignored on purpose: every message carrying a panel was remembered
+    or adopted first, so a write against an unknown id means a stale keyboard, not a new
+    session."""
     cfg = config.load_config()
     sessions = cfg.get("sessions", {})
     entry = sessions.get(session_id)
@@ -54,39 +65,61 @@ def set_setting(session_id: str, key: str, value: str | None) -> None:
         config.save_config(sessions=sessions)
 
 
+def _scope_entry(scope: str) -> dict:
+    entry = defaults() if scope == NEW else _entries().get(scope, {})
+    return entry
+
+
+def setting_for(scope: str, key: str, default: str | None = None) -> str | None:
+    """One sticky knob (mode/model/effort) for a scope. Unset reads as the default, which is
+    how "let the harness decide" stays distinct from a value that was actually picked."""
+    entry = _scope_entry(scope)
+    return entry.get(key) or default
+
+
+def set_setting(scope: str, key: str, value: str | None) -> None:
+    if scope == NEW:
+        _set_default(key, value)
+    else:
+        _set_session(scope, key, value)
+
+
+def harness_for(scope: str) -> str:
+    """The harness a scope runs on. For a session that is fixed at creation; for NEW it is the
+    one knob /new can still change."""
+    if scope == NEW:
+        chosen = setting_for(NEW, "backend", DEFAULT_BACKEND)
+    else:
+        chosen = backend_for(scope) or DEFAULT_BACKEND
+    return chosen or DEFAULT_BACKEND
+
+
+def remember_defaults(backend: str, mode: str, model: str | None, effort: str | None) -> None:
+    """Called after every turn so /new inherits the last interaction's knobs."""
+    entry = defaults()
+    entry["backend"] = backend
+    entry["mode"] = mode
+    entry["model"] = model
+    entry["effort"] = effort
+    config.save_config(defaults=entry)
+
+
 def backend_for(session_id: str) -> str | None:
-    """The provider that owns this lineage — the one that can actually resume this id."""
+    """The harness that owns this lineage — the only one that can resume this id, and the
+    reason harness is NOT a per-session knob: no CLI can import the other's transcript
+    (opencode has `export`/`import`, claude has no counterpart), so a running session can
+    never change harness. It is chosen once, at /new (SPECS AD-11)."""
     entry = _entries().get(session_id, {})
     return entry.get("backend")
 
 
-def target_backend(session_id: str, default: str = DEFAULT_BACKEND) -> str:
-    """The backend the NEXT turn runs on. A pending switch beats the lineage's own provider:
-    a session cannot move between providers (AD-3), so choosing another backend is a promise
-    about the next turn — which will be a new session — not an edit to this one."""
-    pending = setting_for(session_id, "next_backend")
-    owner = backend_for(session_id)
-    return pending or owner or default
+def mode_for(scope: str, default: str = DEFAULT_MODE) -> str:
+    """Sticky mode ∈ {build, plan}; defaults to build when unset."""
+    return setting_for(scope, "mode", default) or default
 
 
-def switch_backend(session_id: str, name: str) -> None:
-    """Arm (or cancel) a provider switch. Model and effort are cleared with it because they
-    are provider-specific strings: `opus` means nothing to opencode and `openrouter/x/y`
-    means nothing to claude, so carrying either across would build an argv the CLI rejects."""
-    owner = backend_for(session_id)
-    pending = None if name == owner else name
-    set_setting(session_id, "next_backend", pending)
-    set_setting(session_id, "model", None)
-    set_setting(session_id, "effort", None)
-
-
-def mode_for(session_id: str, default: str = DEFAULT_MODE) -> str:
-    """Sticky per-session mode ∈ {build, plan}; defaults to build when unset."""
-    return setting_for(session_id, "mode", default) or default
-
-
-def set_mode(session_id: str, mode: str) -> None:
-    set_setting(session_id, "mode", mode)
+def set_mode(scope: str, mode: str) -> None:
+    set_setting(scope, "mode", mode)
 
 
 def title_for(session_id: str) -> str | None:
@@ -138,11 +171,18 @@ def session_for_reply(message_id: int) -> str | None:
     return _value_by_message("reply_map", message_id)
 
 
-def remember_pending_new(message_id: int, backend: str) -> None:
-    """A /new with no prompt asks for one via ForceReply; the answer to THAT message
-    is the prompt, so remember which backend the pending session should use."""
-    _remember_by_message("pending_new", message_id, backend)
+def remember_pending_new(message_id: int) -> None:
+    """A bare /new sends a config bubble; the reply to THAT message is the prompt. Marking the
+    message is also what routes its panel taps to the NEW scope instead of to a session."""
+    _remember_by_message("pending_new", message_id, NEW)
 
 
 def pending_new(message_id: int) -> str | None:
     return _value_by_message("pending_new", message_id)
+
+
+def scope_for_message(message_id: int) -> str | None:
+    """Which knobs a panel tap edits: an anchored session, or NEW for a /new config bubble.
+    Resolved from the message the keyboard sits on, so callback_data spends no bytes on it."""
+    sid = session_for_reply(message_id)
+    return sid or pending_new(message_id)
