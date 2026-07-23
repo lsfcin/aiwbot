@@ -36,9 +36,9 @@ async def handle_callback(update, context) -> None:
     parts = data.split(":", 2)
     target = parts[1]
     sid = parts[2]
-    current = sessions.mode_for(sid)
     await query.answer(f"modo: {target}")
+    current = sessions.mode_for(sid)
     if target != current:
-        sessions.set_mode(sid, target)
         markup = toggle_markup(sid, target)
         await query.edit_message_reply_markup(reply_markup=markup)
+        sessions.set_mode(sid, target)

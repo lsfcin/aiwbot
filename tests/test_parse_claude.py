@@ -90,6 +90,19 @@ def test_list_sessions_reads_store(tmp_path, monkeypatch):
     assert items[0]["title"] == "olá mundo"
 
 
+def test_list_sessions_prefers_ai_title_over_prompt(tmp_path, monkeypatch):
+    # AD-7: the latest `ai-title` is Claude Code's real picker title; the opening
+    # prompt is only a fallback when no ai-title exists.
+    import backend.claude as C
+    sid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    prompt = '{"type":"last-prompt","lastPrompt":"## RESUME — ugly"}\n'
+    title = '{"type":"ai-title","aiTitle":"Nice AI Title"}\n'
+    (tmp_path / f"{sid}.jsonl").write_text(prompt + title)
+    monkeypatch.setattr(C, "_project_dir", lambda cwd: tmp_path)
+    items = ClaudeBackend().list_sessions("/mnt/workspace")
+    assert items[0]["title"] == "Nice AI Title"
+
+
 def test_list_sessions_missing_dir_is_empty(tmp_path, monkeypatch):
     import backend.claude as C
     monkeypatch.setattr(C, "_project_dir", lambda cwd: tmp_path / "nope")
