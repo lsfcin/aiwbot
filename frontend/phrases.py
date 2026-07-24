@@ -50,6 +50,11 @@ RESUME_ANCHOR_PHRASES = [
     "Pronto, essa é a ativa. Responde essa mensagem pra seguir.",
     "Retomei essa sessão. Manda a próxima como resposta a essa mensagem.",
 ]
+TRANSCRIBE_FAIL_PHRASES = [
+    "Não consegui transcrever o áudio — guardei em brain/INBOX.md.",
+    "Esse áudio não rolou de transcrever, mas já tá salvo no INBOX.md.",
+    "Falhou a transcrição — deixei o áudio guardado no brain/INBOX.md.",
+]
 
 HELP_TEXT = (
     "<b>Comandos</b>\n"
