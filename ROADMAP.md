@@ -58,17 +58,19 @@ Small, all from Lucas testing the panel live. Cheap; ordered by how much each bu
       a plain hourglass over the gradient one) in the ⏳/status phrases. `frontend/phrases.py`.
       Cosmetic, low priority, but batch it with the phrase-style housekeeping item below.
 
-### Audio — in **and out** (Lucas, 2026-07-23: "audio wins") ← **NEXT (feature work)**
-Promoted above live streaming. Beats streaming because it removes a *modality* barrier (hands/eyes
-busy, walking, driving) rather than making an existing text exchange prettier.
-- [ ] **audio in** — transcribe voice notes → dispatch as a turn (today they land in INBOX
-      untranscribed, `bot.py` `_handle_message`). A voice note starting with "bot" auto-starts a new
-      session, mirroring the existing text prefix trigger.
-- [ ] **audio out** (new ask) — the bot answers *as* a voice note, so a turn can be consumed without
-      looking at the screen. Telegram `send_voice` wants OGG/opus, which is what local TTS emits.
-      Both halves need a local model (STT + TTS) — the one item in the backlog carrying a new external
-      dependency. Note the INBOX entry about a light TTS model, and check PT-BR support before
-      choosing: a bot that answers in English-accented Portuguese is worse than text.
+### Audio — in **and out** (Lucas, 2026-07-23: "audio wins") ✔ **SHIPPED 2026-07-24**
+Beats streaming because it removes a *modality* barrier (hands/eyes busy, walking, driving) rather
+than making an existing text exchange prettier. End-to-end: faster-whisper STT (large-v3-turbo,
+PT+hotwords) dispatches voice notes into the session graph; Kokoro-82M TTS (pf_dora voice) replies
+in OGG/Opus. Reply-continue on voice-to-voice works correctly (fixed transcript-vs-msg.text gap).
+- [x] **audio in** — transcribe voice notes → dispatch as a turn (C1, C2, C3); voice note starting 
+      with "bot" auto-starts a new session. Empty/exception transcripts degrade safely to 
+      untranscribed INBOX + notice (C3). hotwords list explicit editable data (C4).
+- [x] **audio out** — bot answers *as* voice note (C5); text-triggered turns unaffected. Both 
+      models lazy-loaded; no model load at import time; `make test` green with fake models (C6).
+- Shipped (commit hash in HISTORY): STT wrapper `frontend/stt.py`, TTS wrapper + OGG encode 
+      `frontend/tts.py`, voice reply `frontend/reply.py`, hotwords data `frontend/hotwords.py`, 
+      wiring in `frontend/bot.py`. Contract locked in `frontend/SPEC.md`.
 
 ### Later — architecturally heavy
 - [ ] **Live feedback** (Phase C, linuz90 mold) — `stream-json`: edit the message as the agent's chat
