@@ -64,6 +64,17 @@ async def _edit_or_send(working_msg, msg, html_text: str, reply_markup=None) -> 
     return sent
 
 
+async def send_voice(msg, ogg_bytes: bytes) -> "telegram.Message | None":
+    """Best-effort voice reply (C5): text has already been delivered, so a rejected voice
+    send degrades to None — mirrors safe_reply's tolerance for Telegram-side errors."""
+    result = None
+    try:
+        result = await msg.reply_voice(ogg_bytes)
+    except TelegramError as e:
+        print(f"send_voice failed: {e}")
+    return result
+
+
 async def deliver(working_msg, msg, html_text: str, reply_markup=None) -> "telegram.Message | None":
     chunks = split_html(html_text, TELEGRAM_MSG_LIMIT)
     first = chunks[0]

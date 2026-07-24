@@ -2,22 +2,10 @@
 from __future__ import annotations
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from backend import TurnOptions
-from . import config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume
+from . import config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, stt, tts, turnhelpers
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 DEFAULT_BACKEND = registry.DEFAULT_BACKEND
-_BUSY_MARKERS = ("no conversation found", "currently running as a background agent")
-
-
-def _friendly_error(e: Exception) -> str:
-    text = str(e).lower()
-    busy = any(marker in text for marker in _BUSY_MARKERS)
-    if busy:
-        result = format.plain(phrases.pick(phrases.SESSION_LIVE_ELSEWHERE_PHRASES))
-    else:
-        result = format.plain(phrases.pick(phrases.ERROR_PHRASES, e=e))
-    return result
 
 
 def _strip_bot_prefix(text: str) -> str | None:
@@ -27,66 +15,47 @@ def _strip_bot_prefix(text: str) -> str | None:
     return prompt
 
 
-def _parse_new_arg(arg: str) -> tuple[str | None, str]:
-    """`--backend X` still works and now simply writes the NEW scope's harness, so typing it
-    and tapping it are the same act on the same state."""
-    backend_name = None
-    prompt = arg
-    if arg.startswith("--backend "):
-        rest = arg[len("--backend "):]
-        parts = rest.split(maxsplit=1)
-        backend_name = parts[0]
-        prompt = parts[1] if len(parts) > 1 else ""
-    return backend_name, prompt
-
-
-def _options(scope: str, title: str | None) -> TurnOptions:
-    """The turn's knobs, read off the scope that owns them: a live session, or NEW for the
-    last-used defaults a fresh session inherits."""
-    mode_name = registry.mode_for(scope)
-    model = registry.setting_for(scope, "model")
-    effort = registry.setting_for(scope, "effort")
-    return TurnOptions(mode=mode_name, title=title, model=model, effort=effort)
-
-
-def _persist(session_id: str, backend_name: str, title: str | None, result, options: TurnOptions) -> None:
-    """Carry the knobs onto the session the turn ran on, and onto the defaults, so the next
-    /new starts where the last interaction left off."""
-    preview = format.response_preview(result.text)
-    registry.remember(session_id, backend_name, title, preview)
-    registry.set_mode(session_id, options.mode)
-    registry.set_setting(session_id, "model", options.model)
-    registry.set_setting(session_id, "effort", options.effort)
-    registry.remember_defaults(backend_name, options.mode, options.model, options.effort)
-    registry.remember_context_window(result.model, result.context_window)
+def _empty_guard(transcript: str) -> bool:
+    """C3: an empty/whitespace-only transcript must not be dispatched."""
+    return not transcript.strip()
 
 
 async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
-                           backend_name: str, title: str | None, scope: str) -> None:
+                           backend_name: str, title: str | None, scope: str,
+                           spoken: bool = False) -> None:
     """Shared tail: dispatch one turn with the scope's sticky knobs, then deliver the answer
-    with its footer + the anchor keyboard."""
-    options = _options(scope, title)
+    with its footer + the anchor keyboard. `spoken` (C5) additionally replies with a voice
+    note synthesized from the same answer — text-triggered turns leave it False and are
+    unaffected."""
+    options = turnhelpers.turn_options(scope, title)
     try:
         result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name, cwd=WORKSPACE_DIR, options=options)
     except dispatch.DispatchError as e:
-        await reply.deliver(working, msg, _friendly_error(e))
+        await reply.deliver(working, msg, turnhelpers.friendly_error(e))
         return
-    _persist(result.session_id, backend_name, title, result, options)
+    turnhelpers.persist_turn(result.session_id, backend_name, title, result, options)
     block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd, mode=options.mode, context_used=result.context_used, context_window=result.context_window)
     markup = panelmenu.root_markup(result.session_id, options.mode)
     sent = await reply.deliver(working, msg, block, reply_markup=markup)
     if sent is not None:
         msgmap.remember_reply(sent.message_id, result.session_id)
+    if spoken:
+        try:
+            speech_text = format.clip_chars(format.plain(result.text), 2000)
+            ogg_bytes = tts.synthesize(speech_text)
+            await reply.send_voice(msg, ogg_bytes)
+        except Exception as e:
+            print(f"voice reply failed: {e}")
 
 
-async def _start_new(msg, prompt: str) -> None:
+async def _start_new(msg, prompt: str, *, spoken: bool = False) -> None:
     """A new session runs on the NEW scope: whatever the last interaction used, minus anything
     the /new config bubble changed since."""
     working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
     title = format.title_from_prompt(prompt)
     harness = registry.harness_for(registry.NEW)
     await _run_and_deliver(msg, working, prompt, session_id=None, backend_name=harness,
-                           title=title, scope=registry.NEW)
+                           title=title, scope=registry.NEW, spoken=spoken)
 
 
 async def _cmd_new(msg, arg: str) -> None:
@@ -94,7 +63,7 @@ async def _cmd_new(msg, arg: str) -> None:
     config bubble instead of an error: adjust harness/model/effort on it, then reply with the
     prompt. Telegram allows exactly one reply_markup per message, so this bubble carries the
     keyboard and gives up ForceReply's auto-focus — Lucas's call, 2026-07-23."""
-    backend_name, prompt = _parse_new_arg(arg)
+    backend_name, prompt = turnhelpers.parse_new_arg(arg)
     if backend_name:
         registry.set_setting(registry.NEW, "backend", backend_name)
     if not prompt.strip():
@@ -108,12 +77,50 @@ async def _cmd_new(msg, arg: str) -> None:
     await _start_new(msg, prompt)
 
 
-async def _handle_reply_continue(msg, sid: str) -> None:
+async def _handle_reply_continue(msg, sid: str, text: str, *, spoken: bool = False) -> None:
+    """`text` is the already-resolved prompt (msg.text for a text turn, the STT transcript for
+    a voice turn) — read from the caller's arg, never re-derived from `msg.text`, since a voice
+    message replying to a prior session anchor has no `.text` at all (only the transcript the
+    caller already computed)."""
     harness = registry.backend_for(sid) or DEFAULT_BACKEND
     working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
     title = registry.title_for(sid)
-    await _run_and_deliver(msg, working, msg.text, session_id=sid, backend_name=harness,
-                           title=title, scope=sid)
+    await _run_and_deliver(msg, working, text, session_id=sid, backend_name=harness,
+                           title=title, scope=sid, spoken=spoken)
+
+
+async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
+    """Shared reply-continue / pending-new / "bot"-prefix / INBOX-fallback routing (steps
+    3-6 of the old `_handle_message`), reused verbatim by text (spoken=False) and voice
+    (spoken=True, C2/C5)."""
+    if msg.reply_to_message is not None:
+        replied_to = msg.reply_to_message.message_id
+        sid = msgmap.session_for_reply(replied_to)
+        if sid:
+            await _handle_reply_continue(msg, sid, text, spoken=spoken)
+            return
+        awaiting = msgmap.pending_new(replied_to)
+        if awaiting:
+            await _start_new(msg, text, spoken=spoken)
+            return
+    bot_prompt = _strip_bot_prefix(text)
+    if bot_prompt is not None:
+        await _start_new(msg, bot_prompt, spoken=spoken)
+        return
+    inbox.append_entry(inbox.build_entry(text, None))
+    await reply.safe_reply(msg, format.plain(phrases.pick(phrases.CAPTURE_ACKS)))
+
+
+async def _handle_voice(msg, context) -> None:
+    """C1/C3: transcribe, then either route through the same text dispatch (spoken=True) or
+    degrade safely to the untranscribed-INBOX fallback."""
+    path = await inbox.save_media(msg.voice.file_id, context, ".ogg")
+    transcript = stt.transcribe(path)
+    if _empty_guard(transcript):
+        inbox.append_entry(inbox.build_entry("voice note (untranscribed)", path))
+        await reply.safe_reply(msg, format.plain(phrases.pick(phrases.TRANSCRIBE_FAIL_PHRASES)))
+        return
+    await _route_text(msg, transcript, context, spoken=True)
 
 
 async def _dispatch_command(text: str, msg) -> None:
@@ -136,33 +143,19 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if msg.text and msg.text.startswith("/"):
         context.application.create_task(_dispatch_command(msg.text, msg))
         return
-    if msg.text and msg.reply_to_message is not None:
-        replied_to = msg.reply_to_message.message_id
-        sid = msgmap.session_for_reply(replied_to)
-        if sid:
-            context.application.create_task(_handle_reply_continue(msg, sid))
-            return
-        awaiting = msgmap.pending_new(replied_to)
-        if awaiting:
-            context.application.create_task(_start_new(msg, msg.text))
-            return
     if msg.text:
-        bot_prompt = _strip_bot_prefix(msg.text)
-        if bot_prompt is not None:
-            context.application.create_task(_cmd_new(msg, bot_prompt))
-            return
+        context.application.create_task(_route_text(msg, msg.text, context, spoken=False))
+        return
     if msg.voice is not None:
-        path = await inbox.save_media(msg.voice.file_id, context, ".ogg")
-        inbox.append_entry(inbox.build_entry("voice note (untranscribed)", path))
-    elif msg.photo:
+        context.application.create_task(_handle_voice(msg, context))
+        return
+    if msg.photo:
         path = await inbox.save_media(msg.photo[-1].file_id, context, ".jpg")
         inbox.append_entry(inbox.build_entry(msg.caption or "(photo)", path))
     elif msg.document is not None:
         suffix = "." + (msg.document.file_name or "file").rsplit(".", 1)[-1]
         path = await inbox.save_media(msg.document.file_id, context, suffix)
         inbox.append_entry(inbox.build_entry(msg.caption or "(document)", path))
-    elif msg.text:
-        inbox.append_entry(inbox.build_entry(msg.text, None))
     else:
         return
     await reply.safe_reply(msg, format.plain(phrases.pick(phrases.CAPTURE_ACKS)))

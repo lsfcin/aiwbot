@@ -1,6 +1,6 @@
 # frontend
 > Telegram frontend on the AgentBackend seam — /new + reply-to-continue + INBOX capture.
-> spec: none
+> spec: SPEC.md
 
 <!-- routing:start -->
 ## Routing
@@ -8,11 +8,13 @@
 | File | Interface | API | Description |
 |------|-----------|-----|-------------|
 | [`__init__.py`](__init__.py) | — | — | **facade** — __init__.py — facade: Telegram frontend on the AgentBackend seam. Import frontend only through here. |
+| [`SPEC.md`](SPEC.md) | — | — | SPEC: frontend — audio-in-out voice pipeline |
 | [`bot.py`](bot.py) | — | `main` | bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX. |
 | [`choices.py`](choices.py) | — | `harness_values`, `model_values`, `groups`, `effort_values`, `preferred` | choices.py — what a scope may be offered: the backends' declarations, asked per dimension. |
 | [`config.py`](config.py) | [`config.pyi`](config.pyi) | `config_dir`, `load_config`, `save_config`, `bot_token`, `allowed_chat_id` | config.py — aiwbot's own Telegram config dir (separate token/storage from the old workspace bot). |
 | [`dispatch.py`](dispatch.py) | [`dispatch.pyi`](dispatch.pyi) | `TurnResult`, `DispatchError`, `events_to_result`, `turn` | dispatch.py — one call site that drains any AgentBackend.send() into a single reply. |
 | [`format.py`](format.py) | [`format.pyi`](format.pyi) | `relative_time`, `plain`, `clip_chars`, `title_words`, `title_from_prompt` | format.py — pure text formatting: markdown/tables -> Telegram HTML, session headers. No I/O. |
+| [`hotwords.py`](hotwords.py) | — | `as_prompt` | hotwords.py — explicit editable data (C4): faster-whisper's `hotwords=` prompt seed. |
 | [`htmlsplit.py`](htmlsplit.py) | — | `split_html`, `strip_tags` | htmlsplit.py — split Telegram HTML into sendable chunks without ever breaking a tag. |
 | [`inbox.py`](inbox.py) | [`inbox.pyi`](inbox.pyi) | `append_entry`, `build_entry`, `save_media` | inbox.py — capture plain text/media into brain/INBOX.md ($0, no backend call). |
 | [`inline.py`](inline.py) | — | `convert` | inline.py — markdown inline spans -> Telegram HTML (bold, strike, code, links, italic). |
@@ -24,7 +26,10 @@
 | [`panelmenu.py`](panelmenu.py) | — | `root_markup`, `menu_markup`, `values_markup`, `all_button`, `providers_markup` | panelmenu.py — the panel's states drawn as keyboards: mode row, dimension menu, value pickers. |
 | [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |
 | [`registry.py`](registry.py) | — | `remember`, `adopt`, `defaults`, `setting_for`, `set_setting` | registry.py — bot-owned per-session state in config.json: knobs, titles, message maps. |
-| [`reply.py`](reply.py) | — | `safe_reply`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |
+| [`reply.py`](reply.py) | — | `safe_reply`, `send_voice`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |
 | [`resume.py`](resume.py) | — | `cmd_resume`, `handle_callback` | resume.py — /resume picker (Claude-Code-style): list recent sessions, tap to re-anchor + continue. |
 | [`sessions.py`](sessions.py) | — | `recent`, `count`, `last_response` | sessions.py — cross-backend session listing: the /resume picker aggregates each backend's own |
+| [`stt.py`](stt.py) | — | `run`, `transcribe` | stt.py — STT wrapper: faster-whisper large-v3-turbo, lazy-loaded; fails safe to "" (C1, C3). |
+| [`tts.py`](tts.py) | — | `encode_ogg`, `synthesize` | tts.py — TTS wrapper: Kokoro-82M pf_dora voice, lazy-loaded; local OGG/Opus encode (C5, C6). |
+| [`turnhelpers.py`](turnhelpers.py) | — | `friendly_error`, `parse_new_arg`, `turn_options`, `persist_turn` | turnhelpers.py — turn plumbing: friendly errors, /new arg parsing, sticky options, persistence. |
 <!-- routing:end -->
