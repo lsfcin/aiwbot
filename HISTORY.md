@@ -120,3 +120,56 @@ Plan: [ROADMAP-p3.md](ROADMAP-p3.md). Live-confirmed by Lucas, 107 free tests gr
   VSCode/terminal pickers (deeper filter); button feedback ~2s; `/resume` needs the 3-line redesign.
 - **resume picker tweak + test sync** — adopted Lucas's hand-tested `resume.py` edits (ellipsis
   `…`→`. . .`, dropped `↳` marker), synced the 2 pinning tests.
+
+## Completed — 2026-07-23 (P2 + P2.1 + panel iterations, all live-tested)
+
+### P2 — backend + model + effort selection (shipped, 139 tests at ship)
+Plan + measurements in [ROADMAP-p2.md](ROADMAP-p2.md). Design: SPECS AD-10 (both CLIs expose
+mode/model/effort), AD-11 (capability declaration — the frontend offers only what a backend
+declares; harness is chosen once at /new and cannot change mid-session; two scopes, one panel),
+AD-12 (opencode /resume parity from sqlite — `tokens_*` are lifetime totals not occupancy, so
+context % comes off the last assistant message per AD-9). Seam gained `TurnOptions.model/effort`,
+`AgentBackend.capabilities()`/`efforts(model)`/`session_detail()`. claude maps `--model`/`--effort`;
+opencode maps `-m`/`--variant`/`--agent build|plan`. claude shows 3 aliases flat; opencode a
+shortlist plus provider→paged drill-down. Money lever: a throwaway phone question routes off a
+metered model in one tap.
+
+### P2.1 + rounds 3-4 — panel redesign under live feedback
+- **Layout**: gear → `+`; positional grid, ≤4 buttons/row, first `+`/`‹`, last `···`/`−`, rows
+  split evenly. A fixed 5-column grid (padded with invisible cells for squareness) was tried and
+  dropped same day — 5 cols meant ~8-char labels and model ids stopped being distinguishable.
+  SPECS AD-13. `/new` carries the panel in one bubble, giving up ForceReply's auto-focus (one
+  reply_markup per message), AD-14.
+- **Harness is /new-only** (AD-11 revised): no CLI imports the other's transcript (opencode has
+  export/import, claude has no counterpart), so a lineage can't change harness. Killed
+  `next_backend` + the switch toast + the new-session-on-switch path.
+- **Vocabulary**: `provedor`→`harness`; `provider` now means who supplies the key (nvidia,
+  openrouter). Buttons English.
+- **Navigation**: `x`→`‹` (back one level, not jump to root); paging on `«` `»` so back and
+  previous-page stop sharing a glyph. A selection redraws the state it was made in (panel-state
+  stored per message, since callback_data has no room). Selected value pinned first when the list
+  truncates — a bug the render exposed (`low medium ···` while `high` was set).
+- **effort hidden when the model declares none** rather than answering with an alert.
+- **The bug behind that alert (AD-15)**: systemd --user runs with the login PATH, so `opencode`
+  (in `~/.opencode/bin`) was invisible → empty catalogue → generic empty-list message on the
+  *model* button. Same gap would have failed any opencode turn. `backend/binaries.py` resolves
+  every CLI explicitly (PATH first, then install dirs). 458 models under systemd, previously 0.
+- **Shortlist from real usage (AD-17)**: 30 days of opencode history ranked by sessions (top three
+  91/42/15) replaced a curated guess that offered once-used models; intersected with the configured
+  catalogue.
+- **Provider-qualified labels (AD-16)**: `nv·glm52` — `glm-5.2` exists under four providers in
+  Lucas's history, so unqualified buttons would collide. `frontend/labels.py` compresses
+  progressively and only on overflow (separators incl. version dot out, noise tokens dropped, alpha
+  tokens contracted keeping version digits, hard cut); `config.json` `model_aliases` overrides by
+  hand. Prefix dropped inside a single provider's page.
+- **effort collapsed shows `medium high`** by name (opencode vocabularies are irregular); expanded
+  keeps the ordinal ladder.
+
+Rejected: scrolling/marquee button text (a label is static; animating = one editMessageReplyMarkup
+per frame at ~1.5 s each → sub-1 fps, flood control). The only richer Telegram component is a Web
+App webview needing an HTTPS page — noted if buttons ever stop being enough.
+
+Refactors forced by the 200-line gate: `sessions.py` → `registry.py` (knobs) + `sessions.py`
+(listing) + `keyboard.py`; `panelmenu.py` → `choices.py` (what a scope may be offered) +
+`panelmenu.py` (drawing); `registry.py` → `registry.py` + `msgmap.py` (message_id→value maps).
+mode.py absorbed into the panel. 166 tests at session end.
