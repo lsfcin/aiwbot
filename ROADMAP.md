@@ -71,6 +71,11 @@ in OGG/Opus. Reply-continue on voice-to-voice works correctly (fixed transcript-
 - Shipped (commit hash in HISTORY): STT wrapper `frontend/stt.py`, TTS wrapper + OGG encode 
       `frontend/tts.py`, voice reply `frontend/reply.py`, hotwords data `frontend/hotwords.py`, 
       wiring in `frontend/bot.py`. Contract locked in `frontend/SPEC.md`.
+- [ ] **echo the transcript under Lucas's own voice message** (Lucas, 2026-07-24, WhatsApp does
+      this) — right now there's no visible confirmation of what STT heard from *his* audio, only
+      the eventual reply. Show the transcript back (e.g. a quoted/quiet reply to his voice message,
+      before the turn's real answer) so he can eyeball whether transcription got it right without
+      needing to guess from the response. Small, deferred by Lucas's own call — not blocking.
 
 ### Later — architecturally heavy
 - [ ] **Live feedback** (Phase C, linuz90 mold) — `stream-json`: edit the message as the agent's chat
