@@ -25,8 +25,8 @@ def test_claude_omits_unset_knobs():
 
 def test_claude_declares_aliases_as_its_whole_catalogue():
     caps = ClaudeBackend().capabilities()
-    assert caps.favourites == ["opus", "sonnet", "fable"]
-    assert caps.groups == {"claude": ["opus", "sonnet", "fable"]}
+    assert caps.favourites == ["sonnet", "opus", "fable"]
+    assert caps.groups == {"claude": ["sonnet", "opus", "fable"]}
     assert caps.modes == ["build", "plan"]
 
 

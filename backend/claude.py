@@ -12,7 +12,7 @@ _ENTRYPOINT = "claude-vscode"
 _MODES = ("build", "plan")
 # `--model` takes an alias for the latest model of a family, or a full id. Aliases age better
 # than ids, so the picker offers those; a full id still works if it is ever set by hand.
-_MODELS = ("opus", "sonnet", "fable")
+_MODELS = ("sonnet", "opus", "fable")
 # One ladder for every claude model — verified in `claude --help` 2026-07-23.
 _EFFORTS = ("low", "medium", "high", "xhigh", "max")
 
