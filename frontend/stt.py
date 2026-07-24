@@ -13,7 +13,7 @@ def _model():
     global _cached_model
     if _cached_model is None:
         from faster_whisper import WhisperModel
-        _cached_model = WhisperModel(_MODEL_NAME)
+        _cached_model = WhisperModel(_MODEL_NAME, device="cpu", compute_type="int8")
     return _cached_model
 
 
