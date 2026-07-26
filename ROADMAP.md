@@ -46,6 +46,8 @@ the running order. **P3, P2, and panel rounds 2-4 all shipped 2026-07-23** — s
 
 ### Live feedback — 2026-07-24 (from INBOX, do before or alongside audio)
 Small, all from Lucas testing the panel live. Cheap; ordered by how much each bugs him.
+- [ ] **button-tap → response feels slow, not instant** (INBOX 2026-07-26). Investigate the
+      Telegram inline-button round trip latency and cut it where possible.
 - [ ] **claude harness model order → `sonnet` `opus` `fable`** (Lucas, explicit). Currently
       `("opus", "sonnet", "fable")` in `claude.py` `_MODELS`; `test_target` pins the order, flip
       both. One-liner, do first.
@@ -57,6 +59,18 @@ Small, all from Lucas testing the panel live. Cheap; ordered by how much each bu
 - [ ] **emoji style: minimalist, not "bregas"** — prefer flat glyphs (red circle 🔴 not 🚦-style,
       a plain hourglass over the gradient one) in the ⏳/status phrases. `frontend/phrases.py`.
       Cosmetic, low priority, but batch it with the phrase-style housekeeping item below.
+- [ ] **"bot" start-word mis-heard as "bote" by STT** (INBOX 2026-07-24) — the voice/text session-start
+      keyword is `bot`, but STT transcribed "bote", so the new-session intent never fired. Two options:
+      (a) if the first token of an audio/text is "bote", normalize it to "bot"; or (b) pick a start word
+      STT won't corrupt. Pick one. `frontend/` start-word detection.
+- [ ] **audio punctuation + cadence quality is poor** (INBOX 2026-07-24) — both the STT transcript and
+      the TTS output need work on punctuation, pauses, and cadence. Refinement on the shipped audio
+      lane (`frontend/stt.py` hotwords/params, `frontend/tts.py`).
+- [ ] **NL harness+model selection from the message, zero extra tokens** (INBOX 2026-07-24) — when a
+      message starts with "bot, …", parse any mention of a harness (claudecode/opencode/kimicode) and a
+      model (opus/sonnet/glm/deepseek/kimi3/kimi2.7) straight from the text to pick backend+model,
+      **without** spending a triage inference call. Complements the shipped P2 button panel with a
+      language path. `frontend/` dispatch.
 
 ### Audio — in **and out** (Lucas, 2026-07-23: "audio wins") ✔ **SHIPPED 2026-07-24**
 Beats streaming because it removes a *modality* barrier (hands/eyes busy, walking, driving) rather
