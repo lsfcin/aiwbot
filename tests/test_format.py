@@ -109,13 +109,13 @@ def test_short_model_extracts_family():
     assert short_model("gpt-4o") == "gpt-4o"
 
 
-def test_answer_block_body_first_footer_last():
+def test_answer_block_anchor_first_body_then_footer():
     block = answer_block("oi tudo bem", "abc12345", "titulo da sessao",
                          provider="claude", model="claude-sonnet-5", cost_usd=0.022)
     lines = block.split("\n")
-    assert lines[0] == "oi tudo bem"
+    assert lines[0] == "continua [ABC] TITULO DA SESSAO"
+    assert lines[1] == "oi tudo bem"
     assert "· · ·" in block
-    assert "[ABC] TITULO DA SESSAO" in block
     assert "claude · sonnet · $0.022" in block
 
 

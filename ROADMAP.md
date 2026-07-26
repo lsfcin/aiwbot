@@ -72,26 +72,30 @@ spec (code/VERIFY.md).
       a failure that quotes the raw tail, so the next unknown shape names itself. Details in
       [KNOWN-BUGS.md](KNOWN-BUGS.md); spec `tests/test_b2_opencode_error.py`.
 
-### F2 — papercut batch (from INBOX 2026-07-24, one branch)
-Small, all from Lucas testing the panel live. Ordered by how much each bugs him.
-- [ ] **the reply affordance is unclear** — "o bot já aparece toda vez com o campo aberto como se
-      minha mensagem fosse um reply, não fica claro sobre o que é o reply". Every anchor is a
-      repliable message (reply-to-continue), and Telegram shows the compose box quoting it. Make
-      what the reply continues legible — e.g. the anchor's title/`[XXX]` in the quoted preview, or
-      a one-line hint. UX, not a bug.
-- [ ] **emoji style: minimalist, not "bregas"** — prefer flat glyphs (red circle 🔴 not 🚦-style,
-      a plain hourglass over the gradient one) in the ⏳/status phrases. `frontend/phrases.py`.
-      Cosmetic, low priority, but batch it with the phrase-style housekeeping item below.
-- [ ] **"bot" start-word mis-heard as "bote" by STT** (INBOX 2026-07-24) — the voice/text session-start
-      keyword is `bot`, but STT transcribed "bote", so the new-session intent never fired. Two options:
-      (a) if the first token of an audio/text is "bote", normalize it to "bot"; or (b) pick a start word
-      STT won't corrupt. Pick one. `frontend/` start-word detection.
-- [ ] **echo the transcript under Lucas's own voice message** (Lucas, 2026-07-24, WhatsApp does
-      this) — right now there's no visible confirmation of what STT heard from *his* audio, only
-      the eventual reply. Show the transcript back (e.g. a quoted/quiet reply to his voice message,
-      before the turn's real answer) so he can eyeball whether transcription got it right without
-      needing to guess from the response. Small — and it is the **instrument** F3b tunes against,
-      so it ships before the cadence work, not after.
+### F2 — papercut batch ✔ **SHIPPED 2026-07-26**
+Small, all from Lucas testing the panel live. Every choice below was made by Lucas against a live
+Telegram prototype rather than decided here — the prototypes were sent through the real render
+pipeline so what he judged is what the bot sends. His calls: phrase tone **B** (lowercase, no
+period), glyphs **B** (flat), affordance **B** *"menos o ícone que ainda parece antigo"* (so the
+`↩` is gone entirely rather than swapped for another glyph), transcript echo **ok**. Specs in
+`tests/test_f2_papercuts.py`, which pins the decisions so a later edit cannot quietly undo them.
+- [x] **the reply affordance is unclear** — "o bot já aparece toda vez com o campo aberto como se
+      minha mensagem fosse um reply, não fica claro sobre o que é o reply". Root cause: Telegram
+      quotes a message **from its start**, and the session label was in the *footer*, so the compose
+      box previewed the answer's opening words — which name no session. `answer_block` now leads
+      with `continua [ABC] TÍTULO` and the footer keeps meta only, so the label is never duplicated.
+- [x] **emoji style: minimalist, not "bregas"** — `⏳` is gone from the status bank in favour of a
+      flat `· trabalhando…`. The tone rule now lives as a comment at the head of `phrases.py` so
+      new banks inherit it instead of re-deciding.
+- [x] **"bot" start-word mis-heard as "bote" by STT** (INBOX 2026-07-24) — took option (a),
+      normalize, over (b), pick a new word: `bot` is already muscle memory and any replacement
+      would collect mishearings of its own. Detection moved out of `bot.py` (which was one edit
+      from the 200-LOC block) into `frontend/startword.py` — also where F3a's natural-language
+      harness/model parsing will land, since it reads the same prefix.
+- [x] **echo the transcript under Lucas's own voice message** (Lucas, 2026-07-24, WhatsApp does
+      this) — the transcript now comes back quoted under his own voice note, before the turn runs.
+      It is also the **instrument** F3b tunes against, which is why it shipped ahead of the
+      cadence work rather than after it.
 
 ### F3 — features
 - [ ] **NL harness+model selection from the message, zero extra tokens** (INBOX 2026-07-24) — when a
