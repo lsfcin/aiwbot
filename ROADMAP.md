@@ -103,10 +103,28 @@ period), glyphs **B** (flat), affordance **B** *"menos o ícone que ainda parece
       model (opus/sonnet/glm/deepseek/kimi3/kimi2.7) straight from the text to pick backend+model,
       **without** spending a triage inference call. Complements the shipped P2 button panel with a
       language path. `frontend/` dispatch.
-- [ ] **audio punctuation + cadence quality is poor** (INBOX 2026-07-24) — both the STT transcript and
-      the TTS output need work on punctuation, pauses, and cadence. Refinement on the shipped audio
-      lane (`frontend/stt.py` hotwords/params, `frontend/tts.py`). **Needs F2's transcript echo first**
-      — without it there is no way to see what STT actually heard, so tuning is blind.
+- [x] **audio punctuation + cadence quality is poor** (INBOX 2026-07-24) ✔ **FIXED 2026-07-26**,
+      token-free as Lucas asked — no API call, no new model. Measured on his own 15 saved voice
+      notes rather than guessed. Three findings:
+      1. **Punctuation was free all along.** Whisper imitates the style of what it is primed with,
+         so a punctuated `initial_prompt` buys punctuation: `bote me diz o que é que tem de e-mail
+         gente` (zero marks) became `Bot, me diz o que que tem de e-mail, gente.` Same ~4 s.
+      2. **`initial_prompt` and `hotwords=` compete for one slot.** Priming for punctuation alone
+         cost the jargon — "bote" came back as "Pode", losing the very start word F2 had just
+         fixed. The fix is one prompt carrying both: punctuated carrier sentences that *contain*
+         the jargon (`hotwords.CARRIER`), opening with "Bot,".
+      3. **Cadence was mostly not the TTS model.** The voice reply was fed `format.plain`, i.e.
+         `html.escape` — a name trap — so Kokoro was handed `&#x27;`, `&amp;`, `##`, `**` and table
+         pipes and tried to pronounce them. New `frontend/speech.py` renders answers as prose.
+      Specs: `tests/test_speech.py`, `tests/test_stt.py`. Contract in `frontend/SPEC.md`.
+- [x] **hallucination guard** (found while doing the above, not previously on the list) — whisper
+      invents words on near-silent audio and **no decoding setting stops it**: the plain prompt
+      emitted `... ... ...`, the jargon-primed one invented `e-mail e-mail e-mail`, and VAD only
+      shortened that to `e-mail.com`. Since a dispatched hallucination costs a real turn, the guard
+      is the model's own confidence: every real transcript scored -0.153..-0.482, that garbage
+      -1.489, so `_MIN_LOGPROB = -0.9` splits them with room either side. A rejected transcript
+      returns `""` and rides the existing C3 fail-safe, which is recoverable. (`no_speech_prob` was
+      0.000 for every file, real or not — VAD strips the silence it would key on. Not usable.)
 - [ ] **button-tap → response feels slow, not instant** (INBOX 2026-07-26). Investigate the Telegram
       inline-button round trip and cut what is ours. **Reopened by Lucas 2026-07-26** — it had been
       filed under "known limits (won't chase)" on the strength of an earlier "não é crítico", but the

@@ -2,7 +2,7 @@
 from __future__ import annotations
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from . import config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, startword, stt, tts, turnhelpers
+from . import config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, speech, startword, stt, tts, turnhelpers
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 DEFAULT_BACKEND = registry.DEFAULT_BACKEND
@@ -37,7 +37,8 @@ async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
         msgmap.remember_reply(sent.message_id, result.session_id)
     if spoken:
         try:
-            speech_text = format.clip_chars(format.plain(result.text), 2000)
+            spoken_text = speech.to_speech(result.text)
+            speech_text = format.clip_chars(spoken_text, 2000)
             ogg_bytes = tts.synthesize(speech_text)
             await reply.send_voice(msg, ogg_bytes)
         except Exception as e:

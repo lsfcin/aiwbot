@@ -14,7 +14,7 @@
 | [`config.py`](config.py) | [`config.pyi`](config.pyi) | `config_dir`, `load_config`, `save_config`, `bot_token`, `allowed_chat_id` | config.py — aiwbot's own Telegram config dir (separate token/storage from the old workspace bot). |
 | [`dispatch.py`](dispatch.py) | [`dispatch.pyi`](dispatch.pyi) | `TurnResult`, `DispatchError`, `events_to_result`, `turn` | dispatch.py — one call site that drains any AgentBackend.send() into a single reply. |
 | [`format.py`](format.py) | [`format.pyi`](format.pyi) | `relative_time`, `plain`, `clip_chars`, `title_words`, `title_from_prompt` | format.py — pure text formatting: markdown/tables -> Telegram HTML, session headers. No I/O. |
-| [`hotwords.py`](hotwords.py) | — | `as_prompt` | hotwords.py — explicit editable data (C4): faster-whisper's `hotwords=` prompt seed. |
+| [`hotwords.py`](hotwords.py) | — | `as_prompt` | hotwords.py — explicit editable data (C4): what the STT is primed with before it listens. |
 | [`htmlsplit.py`](htmlsplit.py) | — | `split_html`, `strip_tags` | htmlsplit.py — split Telegram HTML into sendable chunks without ever breaking a tag. |
 | [`inbox.py`](inbox.py) | [`inbox.pyi`](inbox.pyi) | `append_entry`, `build_entry`, `save_media` | inbox.py — capture plain text/media into brain/INBOX.md ($0, no backend call). |
 | [`inline.py`](inline.py) | — | `convert` | inline.py — markdown inline spans -> Telegram HTML (bold, strike, code, links, italic). |
@@ -29,8 +29,9 @@
 | [`reply.py`](reply.py) | — | `safe_reply`, `send_voice`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |
 | [`resume.py`](resume.py) | — | `cmd_resume`, `handle_callback` | resume.py — /resume picker (Claude-Code-style): list recent sessions, tap to re-anchor + continue. |
 | [`sessions.py`](sessions.py) | — | `recent`, `count`, `last_response` | sessions.py — cross-backend session listing: the /resume picker aggregates each backend's own |
+| [`speech.py`](speech.py) | — | `to_speech` | speech.py — an agent's markdown answer -> prose a TTS voice can actually read aloud. |
 | [`startword.py`](startword.py) | — | `strip_prefix` | startword.py — does a message open with the "bot" session-start word, and what follows it. |
-| [`stt.py`](stt.py) | — | `run`, `transcribe` | stt.py — STT wrapper: faster-whisper large-v3-turbo, lazy-loaded; fails safe to "" (C1, C3). |
+| [`stt.py`](stt.py) | — | `confident`, `run`, `transcribe` | stt.py — STT wrapper: faster-whisper large-v3-turbo, lazy-loaded; fails safe to "" (C1, C3). |
 | [`table.py`](table.py) | — | `is_row`, `is_separator`, `render` | table.py — pipe-tables -> Telegram row blocks: rows become labelled text, never a <pre> box. |
 | [`tts.py`](tts.py) | — | `encode_ogg`, `synthesize` | tts.py — TTS wrapper: Kokoro-82M pf_dora voice, lazy-loaded; local OGG/Opus encode (C5, C6). |
 | [`turnhelpers.py`](turnhelpers.py) | — | `friendly_error`, `parse_new_arg`, `turn_options`, `persist_turn` | turnhelpers.py — turn plumbing: friendly errors, /new arg parsing, sticky options, persistence. |
