@@ -4,20 +4,26 @@ Log as `- [ ] [bN] <symptom> — <where>`; a FIXED flip needs a `tests/**/b<N>-*
 regression test (see code/VERIFY.md).
 
 ## Open
-- [ ] [b2] **opencode backend errors collapse to generic "no text event"** — reported 2026-07-24.
-  Confirmed root cause of that specific report: nvidia free-tier `deepseek-v4-flash` rate limit
-  (`ResourceExhausted: Worker local total request limit reached (48/48)`, visible in opencode's
-  own sqlite `message.data.error`, session `ses_069a2c935ffe57KwNcyj0cEOrF`) — NOT an audio-feature
-  bug; the CLI exited 0 with stdout `proc.py` didn't treat as a hard-fail, so `events_from_run`
-  handed it to `opencode.py`'s `parse_events`, whose `_line_to_event` only recognizes
-  `type=="text"`/`type=="step_finish"` — an error-shaped line falls through silently, producing
-  zero events, hence `check_contract`'s generic `"no text event"` instead of the real reason.
-  Fix needs the actual raw CLI stdout JSON shape for an error turn to parse correctly — two live
-  repro attempts both hung (`opencode run ... -s <sid>` timed out with no output), so the exact
-  shape is still unconfirmed; don't guess-patch `_line_to_event` blind. A FIXED flip needs a
-  `tests/**/b2-*` regression fixture built from a real captured error payload.
+_(none)_
 
 ## Fixed
+- [x] [b2] **opencode backend errors collapse to generic "no text event"** — FIXED 2026-07-26.
+  The previous entry's analysis was right and only the payload shape was missing. Earlier repro
+  attempts hung because they resumed a session (`opencode run … -s <sid>`); forcing the error on a
+  *fresh* run returns instantly:
+  ```
+  opencode run "hi" --format json -m "nvidia/definitely-not-a-real-model"
+  {"type":"error","timestamp":…,"sessionID":"ses_…","error":{"name":"UnknownError",
+   "data":{"message":"Unexpected server error. Check server logs for details.","ref":"err_c1ecc11d"}}}
+  ```
+  Exit code **0**, confirming why `proc.py` never treated it as a hard fail. Two changes:
+  `_line_to_event` now maps `type=="error"` to an error event, preferring `error.data.message`
+  (opencode labels everything `UnknownError`, so the outer name is worthless) and degrading to the
+  name, then the raw object. Separately `events_from_run` treats a parse yielding **zero** events
+  as a failure in its own right and quotes the raw stdout/stderr tail — so the next unrecognized
+  shape names itself instead of repeating this investigation.
+  Regression spec: `tests/test_b2_opencode_error.py` + `tests/fixtures/opencode_error.jsonl`
+  (the captured payload above, verbatim).
 - [x] [b1] **tables and bold don't render** — FIXED 2026-07-26. The hunch in the original entry
   (escaping order / the pipe-table detector) was wrong; escaping was correct throughout. Probing
   4000 real assistant answers from `~/.claude/projects` found **two independent causes**, which is

@@ -34,10 +34,10 @@ away-from-PC capable. **show-me** and **Phase D** stay parked past the line: sho
 artifacts (Lucas 2026-07-23), and Phase D is a structural rewrite that buys cost/latency, not a new
 capability.
 
-> **~~F0 bookkeeping~~ → F1 bugs → F2 papercuts → F3 features → F4 streaming → ask_user** ┃ *line* ┃
-> ~~show-me~~ · ~~Phase D~~
+> **~~F0 bookkeeping~~ → ~~F1 bugs~~ → F2 papercuts → F3 features → F4 streaming → ask_user**
+> ┃ *line* ┃ ~~show-me~~ · ~~Phase D~~
 >
-> Next up: **F1 — [b1] tables/bold rendering**.
+> Next up: **F2 — the papercut batch**.
 
 | Stage | Contents | Why here |
 |-------|----------|----------|
@@ -65,11 +65,12 @@ spec (code/VERIFY.md).
       crossed its tags, making Telegram strip *every* tag in the message. New `frontend/table.py`
       renders rows as labelled blocks; `_BOLD_RE` grew a `(?!\*)` lookahead. Details in
       [KNOWN-BUGS.md](KNOWN-BUGS.md); spec `tests/test_b1_table_bold.py`.
-- [ ] **[b2] opencode errors collapse to generic "no text event"** — blocked on capturing a real
-      error payload, but fixable *without* one: `_line_to_event` silently drops any line that is not
-      `text`/`step_finish`. Surfacing unrecognized lines as an error event makes every *future*
-      opencode failure self-diagnosing instead of a mystery — i.e. the fix unblocks its own
-      regression fixture. Do the defensive half now; the exact-shape parse when a payload exists.
+- [x] **[b2] opencode errors collapse to generic "no text event"** ✔ **FIXED 2026-07-26**. The
+      payload that blocked this was captured after all — earlier repro attempts hung because they
+      *resumed* a session; forcing the error on a fresh run (`-m <bogus model>`) returns instantly.
+      `_line_to_event` now maps `type=="error"`, and `events_from_run` treats a zero-event parse as
+      a failure that quotes the raw tail, so the next unknown shape names itself. Details in
+      [KNOWN-BUGS.md](KNOWN-BUGS.md); spec `tests/test_b2_opencode_error.py`.
 
 ### F2 — papercut batch (from INBOX 2026-07-24, one branch)
 Small, all from Lucas testing the panel live. Ordered by how much each bugs him.
