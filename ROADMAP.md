@@ -59,9 +59,12 @@ audio in+out (2026-07-24) all shipped** — see [HISTORY.md](HISTORY.md) and SPE
 ### F1 — bugs taxing every reply (do first)
 Both tracked in [KNOWN-BUGS.md](KNOWN-BUGS.md); a FIXED flip needs a `tests/**/b<N>-*` regression
 spec (code/VERIFY.md).
-- [ ] **[b1] tables + bold don't render** — every answer passes `markdown.py`/`inline.py`, so broken
-      formatting taxes 100% of output. Best value per hour on the whole list. Verify against a real
-      captured answer, not a hand-written fixture.
+- [x] **[b1] tables + bold don't render** ✔ **FIXED 2026-07-26**. Two independent causes, found by
+      probing 4000 real answers rather than guessing: `<pre>`-boxed tables froze cell markdown into
+      literal `**` (and overflowed — 0 of 412 real tables fit a phone bubble), and `**bold *ital***`
+      crossed its tags, making Telegram strip *every* tag in the message. New `frontend/table.py`
+      renders rows as labelled blocks; `_BOLD_RE` grew a `(?!\*)` lookahead. Details in
+      [KNOWN-BUGS.md](KNOWN-BUGS.md); spec `tests/test_b1_table_bold.py`.
 - [ ] **[b2] opencode errors collapse to generic "no text event"** — blocked on capturing a real
       error payload, but fixable *without* one: `_line_to_event` silently drops any line that is not
       `text`/`step_finish`. Surfacing unrecognized lines as an error event makes every *future*

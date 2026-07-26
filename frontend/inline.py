@@ -7,7 +7,14 @@ import re
 # rewrite their contents. \x00 can't appear in agent output, so the token is unambiguous.
 _CODE_TOKEN = "\x00CODE{}\x00"
 _CODE_RE = re.compile(r"`([^`\n]+?)`")
-_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+# The lookahead is what keeps `**bold *italic***` from crossing its tags. Without it the
+# non-greedy close grabs the FIRST two of the three trailing asterisks, leaving one behind:
+# `<b>bold *italic</b>*`, which the italic rule below then closes across the </b> as
+# `<b>bold <i>italic</b></i>`. Telegram rejects crossed entities outright, so reply.py's
+# fallback strips EVERY tag and the whole message arrives unformatted — one stray construct
+# costing the entire answer its bold, code and links. Refusing a close that has another
+# asterisk after it makes the match extend to the real boundary instead.
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*(?!\*)")
 _STRIKE_RE = re.compile(r"~~(.+?)~~")
 _LINK_RE = re.compile(r"\[([^\]\n]+)\]\((\S+?)\)")
 # Both italic forms demand non-word, non-marker neighbours: `**bold**` must survive the

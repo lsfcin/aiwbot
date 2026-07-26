@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import re
 from .inline import convert
+from . import table
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 _BULLET_RE = re.compile(r"^(\s*)[-*+]\s+(.*)$")
@@ -16,21 +17,6 @@ _CAPS_LEVEL = 2
 _HR = "─────"
 _BULLETS = ("•", "◦")
 _NEST_INDENT = 2
-
-
-def _is_table_row(line: str) -> bool:
-    s = line.strip()
-    return s.startswith("|") and s.endswith("|") and s.count("|") >= 2
-
-
-def _is_table_sep(line: str) -> bool:
-    s = line.strip()
-    core = s.strip("|").strip()
-    result = False
-    if core:
-        cells = [c.strip() for c in core.split("|")]
-        result = all(c and set(c) <= set("-:") and "-" in c for c in cells)
-    return result
 
 
 def _heading(match: re.Match) -> str:
@@ -90,16 +76,11 @@ def _convert_line(line: str) -> str:
     return result
 
 
-def _table_block(lines: list[str], start: int) -> tuple[str, int]:
-    """A header row plus its `---` separator opens a table; it runs until a non-row line."""
-    block = [lines[start], lines[start + 1]]
-    j = start + 2
-    while j < len(lines) and _is_table_row(lines[j]):
-        block.append(lines[j])
-        j += 1
-    body = "\n".join(block)
-    escaped = html.escape(body)
-    return f"<pre>{escaped}</pre>", j
+def _opens_table(lines: list[str], i: int) -> bool:
+    result = False
+    if table.is_row(lines[i]) and i + 1 < len(lines):
+        result = table.is_separator(lines[i + 1])
+    return result
 
 
 def _format_text_chunk(text: str) -> str:
@@ -107,8 +88,8 @@ def _format_text_chunk(text: str) -> str:
     out = []
     i = 0
     while i < len(lines):
-        if _is_table_row(lines[i]) and i + 1 < len(lines) and _is_table_sep(lines[i + 1]):
-            rendered, i = _table_block(lines, i)
+        if _opens_table(lines, i):
+            rendered, i = table.render(lines, i)
             out.append(rendered)
         else:
             converted = _convert_line(lines[i])
@@ -118,7 +99,7 @@ def _format_text_chunk(text: str) -> str:
 
 
 def format_body(text: str) -> str:
-    # Telegram has no table syntax at all — pipe-tables get boxed as monospace <pre>.
+    # Telegram has no table syntax at all — pipe-tables become row blocks (see table.py).
     out, last = [], 0
     for m in re.finditer(r"```(?:\w+\n)?(.*?)```", text, flags=re.S):
         chunk = _format_text_chunk(text[last:m.start()])

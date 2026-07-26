@@ -7,12 +7,12 @@ def test_plain_markdown_to_html():
     assert out == "<b>bold</b> and <code>code</code>"
 
 
-def test_pipe_table_boxed_as_pre():
+def test_pipe_table_becomes_row_blocks_not_a_pre_box():
     text = "| a | b |\n|---|---|\n| 1 | 2 |"
     out = format_body(text)
-    assert out.startswith("<pre>")
-    assert out.endswith("</pre>")
-    assert "| a | b |" in out
+    assert "<pre>" not in out
+    assert out.startswith("<b>a · b</b>")
+    assert "<b>1</b>\n2" in out
 
 
 def test_fenced_code_block_boxed_as_pre():
