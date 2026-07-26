@@ -20,9 +20,14 @@ def append_entry(entry: str) -> None:
     INBOX_FILE.write_text(updated)
 
 
-def build_entry(body: str, attachment_path: pathlib.Path | None) -> str:
+def build_entry(body: str, attachment_path: pathlib.Path | None, *, forwarded: bool = False) -> str:
     date = datetime.now().strftime("%Y-%m-%d")
-    lines = [body]
+    lines = []
+    if forwarded:
+        # Lucas typed it himself in every other case (this bot has one allowed chat_id) —
+        # a forward carries someone else's content, so it's quoted data, never a command.
+        lines.append("[src: telegram-fwd]")
+    lines.append(body)
     if attachment_path is not None:
         lines.append(f"[attachment: {attachment_path.relative_to('/mnt/workspace')}]")
     lines.append(f"— via aiwbot · {date}")

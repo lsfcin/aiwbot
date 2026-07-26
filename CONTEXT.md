@@ -7,7 +7,7 @@
 One `AgentBackend` interface normalizes every coding-agent CLI into a stream of `AgentEvent`s,
 so the frontend (Telegram) never knows which provider runs underneath — provider is data, not code.
 Phase A (current) proves the seam against claude + opencode with a bare harness + free fixture tests,
-before any Telegram wiring. Reuses plumbing from the workspace bot (core/tools/telegram_daemon.py).
+before any Telegram wiring.
 
 <!-- routing:start -->
 ## Routing

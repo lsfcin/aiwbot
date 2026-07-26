@@ -107,7 +107,7 @@ async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
     if bot_prompt is not None:
         await _start_new(msg, bot_prompt, spoken=spoken)
         return
-    inbox.append_entry(inbox.build_entry(text, None))
+    inbox.append_entry(inbox.build_entry(text, None, forwarded=msg.forward_origin is not None))
     await reply.safe_reply(msg, format.plain(phrases.pick(phrases.CAPTURE_ACKS)))
 
 
@@ -117,7 +117,7 @@ async def _handle_voice(msg, context) -> None:
     path = await inbox.save_media(msg.voice.file_id, context, ".ogg")
     transcript = stt.transcribe(path)
     if _empty_guard(transcript):
-        inbox.append_entry(inbox.build_entry("voice note (untranscribed)", path))
+        inbox.append_entry(inbox.build_entry("voice note (untranscribed)", path, forwarded=msg.forward_origin is not None))
         await reply.safe_reply(msg, format.plain(phrases.pick(phrases.TRANSCRIBE_FAIL_PHRASES)))
         return
     await _route_text(msg, transcript, context, spoken=True)
@@ -149,13 +149,14 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if msg.voice is not None:
         context.application.create_task(_handle_voice(msg, context))
         return
+    forwarded = msg.forward_origin is not None
     if msg.photo:
         path = await inbox.save_media(msg.photo[-1].file_id, context, ".jpg")
-        inbox.append_entry(inbox.build_entry(msg.caption or "(photo)", path))
+        inbox.append_entry(inbox.build_entry(msg.caption or "(photo)", path, forwarded=forwarded))
     elif msg.document is not None:
         suffix = "." + (msg.document.file_name or "file").rsplit(".", 1)[-1]
         path = await inbox.save_media(msg.document.file_id, context, suffix)
-        inbox.append_entry(inbox.build_entry(msg.caption or "(document)", path))
+        inbox.append_entry(inbox.build_entry(msg.caption or "(document)", path, forwarded=forwarded))
     else:
         return
     await reply.safe_reply(msg, format.plain(phrases.pick(phrases.CAPTURE_ACKS)))
