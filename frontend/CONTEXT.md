@@ -9,6 +9,7 @@
 |------|-----------|-----|-------------|
 | [`__init__.py`](__init__.py) | — | — | **facade** — __init__.py — facade: Telegram frontend on the AgentBackend seam. Import frontend only through here. |
 | [`SPEC.md`](SPEC.md) | — | — | SPEC: frontend — audio-in-out voice pipeline |
+| [`answer.py`](answer.py) | — | `block` | answer.py — the shape of one answer message: the agent's text, then the footer that names it. |
 | [`bot.py`](bot.py) | — | `main` | bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX. |
 | [`choices.py`](choices.py) | — | `harness_values`, `model_values`, `groups`, `effort_values`, `preferred` | choices.py — what a scope may be offered: the backends' declarations, asked per dimension. |
 | [`config.py`](config.py) | [`config.pyi`](config.pyi) | `config_dir`, `load_config`, `save_config`, `bot_token`, `allowed_chat_id` | config.py — aiwbot's own Telegram config dir (separate token/storage from the old workspace bot). |

@@ -1,6 +1,6 @@
 # test_resume.py — free unit test: /resume picker list/label/pagination assembly.
 import time
-from frontend.resume import _entry_line, _list_text, _header, _meta, _clip, _keyboard, _ruler
+from frontend.resume import _entry_line, _list_text, _header, _meta, _keyboard, _ruler
 
 _NOW = time.time()
 
@@ -51,10 +51,9 @@ def test_list_text_blank_line_between_entries():
     assert text == "1. A\nclaude · agora\n\n2. B\nopencode · agora"
 
 
-def test_clip_marks_truncation():
-    clipped = _clip("x" * 5000, 100)
-    assert clipped.endswith("[…]")
-    assert len(clipped) == 104
+# `_clip` is gone (F5b). The anchor no longer truncates its body at an arbitrary 3000 chars —
+# that clip, not Telegram's 4096 limit, is what produced the mid-word "[…]" Lucas reported. It
+# now goes through reply.deliver like an answer: split on paragraph boundaries, nothing dropped.
 
 
 def test_header_counts_shown_of_total():

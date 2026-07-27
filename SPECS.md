@@ -385,6 +385,33 @@ would fall outside the drawn slots. Claude's handful of aliases all fit on one r
 nothing to rescue and the motion was pure noise. Hoisting is now conditional on the selection
 actually being cut off; a list that already shows its selection keeps its declared order.
 
+### AD-23 — An answer is a conversation, and every bubble of it is repliable (2026-07-27)
+
+Two rules, and the second is what makes the first safe.
+
+**Long answers split at paragraph boundaries on purpose.** Not as a 4096 rescue — as the shape of
+the thing. Lucas: *"talvez fosse até uma estratégia de UX partir a resposta em várias mensagens
+pra parecer mais como uma conversação"*. `split_html` takes a soft size (`reply.SOFT_CHARS = 900`)
+past which the chunk ends at the next blank line, so a bubble never stops mid-thought; Telegram's
+hard cap still wins, and a run of blank lines can never seal an empty chunk. The same path
+delivers the `/resume` anchor, which is why `ANCHOR_BODY_MAX` is gone: that 3000-char mid-word
+clip, not Telegram's limit, produced the `[…]` Lucas reported.
+
+**Every message the bot sends for one turn anchors to that turn's session.** `reply.deliver`
+returns all of them and callers map all of them, because Lucas replies to whichever bubble he
+happens to be reading, not to the last one. Anchoring only the tail meant a reply to an earlier
+bubble missed `session_for_reply` and fell through to INBOX capture — the turn silently did not
+continue. That failure is *created* by splitting, so the two rules ship together and the message
+map is sized for bubbles (`msgmap.MAX = 400`), not for turns.
+
+**Corollary, reversing F2's reply anchor.** F2 led every answer with `continua [ABC] TÍTULO`
+because Telegram quotes a message from its start, so the session name had to be the first line.
+The reasoning was sound and aimed at the wrong reader: the bot's answer is already `do_quote`d
+onto Lucas's own message, so the thread is visible without announcing it. The line is deleted,
+not demoted; the id and title live in the footer (`[ABC] TÍTULO · claude · sonnet · build ·
+$0.031`), which is where he asked for them. `answer.py` now owns the answer message's shape —
+`format.py` stays shared text formatting, and the split is what kept it under the size gate.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.
