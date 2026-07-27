@@ -70,17 +70,32 @@ def _pager(prefix: str, page: int, pages: int) -> list[InlineKeyboardButton]:
             keyboard.cell(_NEXT, ahead)]
 
 
-def _ordered(values: list[str], current: str | None, prefer: tuple = ()) -> list[str]:
-    """The picker's candidates, selected-first whenever the selection would otherwise risk
-    falling off the cut — including when it came from the drill-down and is not in the shortlist
-    at all. A picker that hides what is currently set is worse than one that reorders. With
-    nothing selected, `prefer` decides who gets the visible slots; the rest keep their order."""
+def _cut_off(values: list[str], current: str, visible: int | None) -> bool:
+    """Would the selection fall outside the slots actually drawn?"""
+    result = False
+    if visible is not None:
+        position = values.index(current)
+        result = position >= visible
+    return result
+
+
+def _ordered(values: list[str], current: str | None, prefer: tuple = (),
+             visible: int | None = None) -> list[str]:
+    """The picker's candidates, selected-first whenever the selection would otherwise fall off
+    the cut — including when it came from the drill-down and is not in the shortlist at all. A
+    picker that hides what is currently set is worse than one that reorders. With nothing
+    selected, `prefer` decides who gets the visible slots; the rest keep their order.
+
+    Hoisting is conditional on `visible` because it used to be unconditional, which reshuffled
+    the buttons under Lucas's thumb every single time he picked one — claude's four aliases all
+    fit on the row, so there was nothing to rescue and the motion was pure noise (2026-07-27).
+    A list that already shows its selection keeps its declared order."""
     if current and current not in values:
         ordered = [current] + values
-    elif current:
+    elif current and _cut_off(values, current, visible):
         rest = [value for value in values if value != current]
         ordered = [current] + rest
-    elif prefer:
+    elif not current and prefer:
         head = [value for value in prefer if value in values]
         tail = [value for value in values if value not in head]
         ordered = head + tail
@@ -110,13 +125,16 @@ def values_markup(dim: str, values: list[str], current: str | None, *,
     reorders the collapsed slice — expanded keeps the declared order, which for effort is an
     ordinal ladder and should read as one."""
     if expanded:
-        candidates = _ordered(values, current)
+        candidates = _ordered(values, current, visible=PAGE)
         rows = _paged(f"p:x:{dim}", candidates, current, dim, page, list(extra))
     else:
         prefer = choices.preferred(dim)
-        candidates = _ordered(values, current, prefer)
-        deeper = len(candidates) > SLOTS + 1 or bool(extra)
+        # How many slots the row will have is decided from `values`, before any reordering, so
+        # the reorder can be told what "visible" means without the two defining each other.
+        total = len(values) if (current is None or current in values) else len(values) + 1
+        deeper = total > SLOTS + 1 or bool(extra)
         slots = SLOTS if deeper else SLOTS + 1
+        candidates = _ordered(values, current, prefer, slots)
         shown = candidates[:slots]
         buttons = _cells(shown, current, dim)
         closer = keyboard.cell(_MORE, f"p:x:{dim}:0") if deeper else None

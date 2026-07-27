@@ -99,6 +99,28 @@ does nothing for the latency of a single tap (the complaint), while widening the
 Regression spec: `tests/test_f3c_tap_latency.py` — asserts the *count* of round trips per tap
 (one answer, one redraw, started concurrently), which is the only part we control.
 
+### Voice + picker fixes ✔ **SHIPPED 2026-07-27** — from Lucas's live test right after F3c
+Found by him using the bot, not by a sweep. All four measured against his real chuveiro voice
+note rather than reasoned about; specs in AD-21 / AD-22, regression in
+`tests/test_voice_echo_and_picker.py`.
+
+- **Punctuation was completely dead** (0.0 marks/100 words), and F3b's stated mechanism was
+  wrong: it is not about the prompt's tail, it is that a bare word list *anywhere* suppresses
+  punctuation. Jargon dissolved into sentences → **22.5 marks/100 words**.
+- **`claude sonnet` → `claudsonner`**, because no model name was primed at all — which also meant
+  the F3a spoken directive had been silently dead for anyone saying a model out loud.
+- **Transcript echo** is now `<i>"…"</i>` with no `ouvi:` label and no blockquote, echoing the
+  *normalized* string that routing acts on (new `startword.normalize`), so it answers the only
+  question it exists for: what reached the session.
+- **Picker stopped reshuffling itself** on every pick (AD-22).
+
+Still open from the same test: **[b3] context % over 100%** — see [KNOWN-BUGS.md](KNOWN-BUGS.md).
+And **submenu latency has no remaining fix**: after F3c a tap is one round trip, measured at
+~200 ms Recife→Telegram, and forcing IPv4 was tested and is *slower* than the IPv6 default
+(203 vs 191 ms median). Lucas asked whether it could change fast even if the backend lags — it
+cannot: a Telegram client draws an inline keyboard only from server state, so there is nothing
+local to update optimistically. That round trip is the product's floor, not a bug.
+
 ### F5 — answer-shape papercuts (Lucas, INBOX 2026-07-26; scoped 2026-07-27)
 All three are about what one answer message looks like. Cheap, and worth doing before F4 rewrites
 delivery.
@@ -175,7 +197,8 @@ first, then move to KNOWN-BUGS.md with a `bN` id if they survive the round they 
       layout, not relief — and each package costs a facade plus a CONTEXT.md — so it is churn with
       no behaviour change. Worth doing when the audio work or a third picker makes the flat
       directory genuinely hard to read, not before.
-- [ ] **`bot.py` is at 195 LOC** (200 is the hard gate) after F3c added the startup warm. F4 puts
+- [ ] **`bot.py` is at 197 LOC** (200 is the hard gate) after F3c's startup warm and the voice
+      echo change — two lines of headroom left, so the next touch pays for the split. F4 puts
       streaming into exactly this file, so it *will* breach. Split when F4 starts, not now — the
       seam F4 introduces is what should decide where the cut goes.
 

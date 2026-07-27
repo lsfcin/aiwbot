@@ -23,6 +23,20 @@ def _marker(lowered: str) -> str | None:
     return found
 
 
+def normalize(text: str) -> str:
+    """The transcript as the bot understood it: a misheard `bote` opener rewritten to `bot`.
+    The echo shows this rather than the raw transcript, so what Lucas reads back is what routing
+    actually acted on — echoing `bote` while treating it as `bot` reported a problem that had
+    already been handled (Lucas, 2026-07-27)."""
+    lowered = text.lower()
+    marker = _marker(lowered)
+    result = text
+    if marker and lowered.startswith("bote"):
+        tail = text[len("bote"):]
+        result = "bot" + tail
+    return result
+
+
 def strip_prefix(text: str) -> str | None:
     """The prompt after the start word, or None when the text does not open with one."""
     lowered = text.lower()

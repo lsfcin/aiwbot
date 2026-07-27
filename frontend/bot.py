@@ -116,7 +116,7 @@ async def _echo_transcript(msg, transcript: str) -> None:
     and it is the instrument the audio punctuation/cadence work tunes against."""
     quoted = format.plain(transcript)
     line = phrases.TRANSCRIPT_ECHO.format(text=quoted)
-    await reply.safe_reply(msg, f"<blockquote>{line}</blockquote>")
+    await reply.safe_reply(msg, line)
 
 
 async def _handle_voice(msg, context) -> None:
@@ -128,8 +128,11 @@ async def _handle_voice(msg, context) -> None:
         inbox.append_entry(inbox.build_entry("voice note (untranscribed)", path, forwarded=msg.forward_origin is not None))
         await reply.safe_reply(msg, format.plain(phrases.pick(phrases.TRANSCRIBE_FAIL_PHRASES)))
         return
-    await _echo_transcript(msg, transcript)
-    await _route_text(msg, transcript, context, spoken=True)
+    # Echo and route the SAME string: the echo exists to show what reached the session, so
+    # routing's cleanup has to be visible in it (Lucas, 2026-07-27).
+    heard = startword.normalize(transcript)
+    await _echo_transcript(msg, heard)
+    await _route_text(msg, heard, context, spoken=True)
 
 
 async def _dispatch_command(text: str, msg) -> None:
