@@ -327,6 +327,64 @@ fail-safe. `no_speech_prob` is 0.000 for every file once VAD strips the silence 
 signal. Corollary convention: **`format.plain` is `html.escape`, never speech** — TTS input goes
 through `speech.to_speech`, not `plain`. Contract in `frontend/SPEC.md`.
 
+### AD-20 — A panel tap costs exactly one Telegram round trip (2026-07-27)
+
+Measured, not reasoned about: bot-side work on every warm callback path is **under 1 ms**, while
+one call to `api.telegram.org` is **222 ms** median from Lucas's machine. Anything that felt slow
+about a button was therefore a count of round trips, never our compute — and the count was wrong
+in three places (two sequential calls per tap, three on a value choice, plus an 839 ms
+`opencode models` shell on the first tap after each restart).
+
+The rule that follows: **one tap issues one `answerCallbackQuery` and at most one
+`editMessageReplyMarkup`, concurrently.** `panel._redraw` is the single place both are sent, via
+`asyncio.gather`; `_route` threads a choice's toast through as an argument so no branch is tempted
+to answer a second time. Anything a backend computes to draw a keyboard is warmed at startup
+(`choices.warm`, through the seam) rather than lazily on the button.
+
+This is a floor, not a target: a Telegram client renders an inline keyboard purely from server
+state, so no local echo or optimistic client update exists to beat one round trip. The button's
+built-in spinner is the only instant feedback there is, and clearing it is already what
+`answerCallbackQuery` does. `concurrent_updates(True)` is deliberately **not** enabled — it
+overlaps separate taps but does nothing for a single tap's latency, while widening the race on
+`config.json`'s non-atomic read-modify-write. Regression spec: `tests/test_f3c_tap_latency.py`
+asserts the round-trip *count*, since the duration is not ours to hold.
+
+### AD-21 — The STT conditioning prompt is prose, end to end (2026-07-27, corrects AD-19)
+
+AD-19 shipped `initial_prompt` as punctuated carrier sentences **followed by the bare `HOTWORDS`
+list**, reasoning that the two only had to share one conditioning slot. Measured against Lucas's
+chuveiro voice note, that shape scores **0.0 punctuation marks per 100 words** — the priming
+failed outright, and he reported it as "punctuation didn't work".
+
+Three prompt shapes, same audio, same model:
+
+| prompt shape | punctuation | `claude sonnet` |
+|---|---|---|
+| sentences, then bare word list (AD-19, shipped) | **0.0**/100w | ✗ `claudsonner` |
+| bare word list, then sentences (tail punctuated) | **1.1**/100w | ✓ |
+| jargon dissolved *into* the sentences | **22.5**/100w | ✓ |
+
+The middle row is what kills the obvious theory: the carrier sat at the tail, where whisper
+weights hardest, and punctuation still died. **A bare word list anywhere in the prompt suppresses
+punctuation.** So the rule is: the conditioning prompt is prose from end to end, and the way to
+teach the STT a new word is to put it in a sentence someone could have said. `HOTWORDS` survives
+as the *checklist* — the existing coverage test now doubles as the guard that every listed word
+really appears in a sentence.
+
+Second, independent cause of the same complaint: **no model name was in the vocabulary at all** —
+no `claude`, no `sonnet`, no `opus`. `claude sonnet` had nothing to anchor to, came back as
+`claudsonner`, and so the F3a spoken directive silently never fired. Naming a model out loud is a
+first-class way to steer a turn, so the models belong in the primed vocabulary like any jargon.
+
+### AD-22 — A picker reorders only to rescue a hidden selection (2026-07-27)
+
+`_ordered` hoisted the current value to the front unconditionally, so every model pick reshuffled
+the buttons under Lucas's thumb. The behaviour exists for a real reason — a picker that hides
+what is set is worse than one that reorders — but that reason only applies when the selection
+would fall outside the drawn slots. Claude's handful of aliases all fit on one row, so there was
+nothing to rescue and the motion was pure noise. Hoisting is now conditional on the selection
+actually being cut off; a list that already shows its selection keeps its declared order.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

@@ -61,9 +61,12 @@ TRANSCRIBE_FAIL_PHRASES = [
     "falhou a transcrição — deixei o áudio guardado no brain/INBOX.md",
 ]
 # What the bot heard, echoed under Lucas's own voice note so a misheard word is visible before
-# the answer arrives rather than inferred from a strange one (F2). No glyph: the quote block
-# already marks it as reported speech.
-TRANSCRIPT_ECHO = "ouvi: {text}"
+# the answer arrives rather than inferred from a strange one (F2). Italic inside quotation marks
+# and nothing else — the `ouvi:` label and the <blockquote> were both dropped on Lucas's call
+# (2026-07-27): quoted italics already read as reported speech, and the label was a word he had
+# to skip past every time. What it echoes is the NORMALIZED transcript, so the message answers
+# the only question it exists to answer — what exactly reached the session.
+TRANSCRIPT_ECHO = '<i>"{text}"</i>'
 
 HELP_TEXT = (
     "<b>Comandos</b>\n"
