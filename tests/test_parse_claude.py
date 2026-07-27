@@ -123,8 +123,11 @@ def test_list_sessions_missing_dir_is_empty(tmp_path, monkeypatch):
     assert ClaudeBackend().list_sessions("/x") == []
 
 
-def test_result_carries_context_used_and_window():
-    # modelUsage already rides in the -p result object, so the % costs no extra tokens.
+def test_the_result_object_gives_the_window_but_never_the_occupancy():
+    """b3: summing modelUsage's token fields measures SPEND. It aggregates every API request
+    the invocation made, and a tool-using turn re-reads the whole context on each one — real
+    transcripts sum to 6190% and 32533% of the window that way. The window is static metadata
+    and stays; occupancy comes from the transcript via ClaudeBackend.occupancy."""
     import json
     from backend.claude import parse_events
     obj = {"type": "result", "session_id": "s1", "result": "hi", "total_cost_usd": 0.1,
@@ -133,7 +136,7 @@ def test_result_carries_context_used_and_window():
                                               "contextWindow": 1000000}}}
     events = parse_events(json.dumps(obj))
     result = [e for e in events if e.kind == "result"][-1]
-    assert result.context_used == 24130
+    assert result.context_used is None
     assert result.context_window == 1000000
 
 
