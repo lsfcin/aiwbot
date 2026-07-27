@@ -3,7 +3,7 @@
 # (2026-07-26), so these tests pin decisions, not guesses.
 from frontend import phrases
 from frontend.startword import strip_prefix
-from frontend.format import answer_block, CONTINUES
+from frontend import answer
 
 _BANKS = [phrases.CAPTURE_ACKS, phrases.WORKING_PHRASES, phrases.NEW_EMPTY_PROMPT_PHRASES,
           phrases.ERROR_PHRASES, phrases.UNKNOWN_CMD_PHRASES,
@@ -36,24 +36,25 @@ def test_status_phrases_carry_no_gradient_emoji():
         assert phrase.startswith("· ")
 
 
-# --- the reply anchor leads, so Telegram's quote preview names the session (Lucas: "B") ---
+# --- the reply anchor: REVERSED by Lucas 2026-07-27, see F5c and answer.block's docstring.
+# F2's leading `continua [ABC] …` line is gone; the session is named in the footer instead.
+# These stay as the record of what was tried and what replaced it.
 
-def test_the_first_line_names_the_session_a_reply_continues():
-    block = answer_block("corpo da resposta", "abc12345", "titulo da sessao")
-    first = block.split("\n")[0]
-    assert first.startswith(CONTINUES)
-    assert "[ABC]" in first
-    assert "TITULO DA SESSAO" in first
+def test_the_answer_opens_with_the_answer():
+    block = answer.block("corpo da resposta", "abc12345", "titulo da sessao")
+    assert block.split("\n")[0] == "corpo da resposta"
+    assert "continua" not in block
 
 
-def test_the_session_is_named_once_not_twice():
-    block = answer_block("corpo", "abc12345", "titulo", provider="claude")
+def test_the_session_is_named_once_in_the_footer():
+    block = answer.block("corpo", "abc12345", "titulo", provider="claude")
     assert block.count("[ABC]") == 1
+    assert "[ABC]" in block.split("\n")[-1]
 
 
-def test_an_answer_without_a_session_has_no_anchor_line():
-    block = answer_block("corpo", None, None, provider="claude")
-    assert CONTINUES not in block
+def test_an_answer_without_a_session_names_none():
+    block = answer.block("corpo", None, None, provider="claude")
+    assert "[" not in block
     assert block.split("\n")[0] == "corpo"
 
 

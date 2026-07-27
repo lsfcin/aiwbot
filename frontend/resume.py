@@ -5,7 +5,6 @@ from . import config, format, msgmap, panelmenu, phrases, registry, reply, sessi
 
 RESUME_COUNT = 3
 TITLE_WORDS = 5
-ANCHOR_BODY_MAX = 3000
 QUERY_MAX = 40  # callback_data caps at 64 bytes; the page arrows carry the active filter
 # A monospace run of non-breaking spaces pins a minimum bubble width, so the message stops
 # resizing as pages of different content go by. Monospace makes the width predictable; NBSP
@@ -135,29 +134,23 @@ async def _turn_page(query, data: str) -> None:
     await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
-def _clip(text: str, limit: int = ANCHOR_BODY_MAX) -> str:
-    """Telegram caps a message at 4096; the anchor's last-response body is the only
-    unbounded part, so clip the raw text before it gets formatted."""
-    result = text
-    if len(text) > limit:
-        result = text[:limit] + "\n[…]"
-    return result
-
-
 async def _anchor(query, sid: str) -> None:
     title = registry.title_for(sid)
     backend = registry.backend_for(sid)
-    answer = sessions.last_response(sid, config.WORKSPACE_DIR)
-    body = _clip(answer) if answer else None
+    last = sessions.last_response(sid, config.WORKSPACE_DIR)
+    body = last or None
     phrase = phrases.pick(phrases.RESUME_ANCHOR_PHRASES)
     block = format.session_block(phrase, sid, title, body=body, backend=backend)
     # The anchor is a repliable message like any answer, so it carries the same mode toggle:
     # without it you re-anchor a session unable to see the mode you're about to run in.
     current = registry.mode_for(sid)
     markup = panelmenu.root_markup(sid, current)
-    sent = await reply.safe_reply(query.message, block, reply_markup=markup)
-    if sent is not None:
-        msgmap.remember_reply(sent.message_id, sid)
+    # Delivered exactly like an answer — split on paragraph boundaries, every bubble anchored.
+    # It used to be one `safe_reply` over a body hard-clipped at 3000 chars, which is where the
+    # `[…]` Lucas hit came from: not Telegram's 4096 limit, ours, and mid-word (F5b).
+    sent = await reply.deliver(None, query.message, block, reply_markup=markup)
+    for message in sent:
+        msgmap.remember_reply(message.message_id, sid)
 
 
 async def handle_callback(update, context) -> None:

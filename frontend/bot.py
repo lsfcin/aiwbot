@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from . import choices, config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, speech, startword, stt, tts, turnhelpers
+from . import answer, choices, config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, speech, startword, stt, tts, turnhelpers
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 DEFAULT_BACKEND = registry.DEFAULT_BACKEND
@@ -31,11 +31,11 @@ async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
         await reply.deliver(working, msg, turnhelpers.friendly_error(e))
         return
     turnhelpers.persist_turn(result.session_id, backend_name, title, result, options)
-    block = format.answer_block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd, mode=options.mode, context_used=result.context_used, context_window=result.context_window)
+    block = answer.block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd, mode=options.mode, context_used=result.context_used, context_window=result.context_window)
     markup = panelmenu.root_markup(result.session_id, options.mode)
     sent = await reply.deliver(working, msg, block, reply_markup=markup)
-    if sent is not None:
-        msgmap.remember_reply(sent.message_id, result.session_id)
+    for message in sent:
+        msgmap.remember_reply(message.message_id, result.session_id)
     if spoken:
         try:
             spoken_text = speech.to_speech(result.text)

@@ -66,9 +66,31 @@ def _sealed(prefix: str, body: list[str], stack: list[tuple[str, str]]) -> str:
     return prefix + joined + suffix
 
 
-def split_html(text: str, limit: int) -> list[str]:
+def _has_text(lines: list[str]) -> bool:
+    """Any actual content, ignoring blank lines and the tags carried across a seam. Telegram
+    rejects an empty message, so a run of blank lines must never seal a chunk of its own."""
+    joined = "".join(lines)
+    stripped = _TAG_RE.sub("", joined)
+    return bool(stripped.strip())
+
+
+def _wants_break(grown: str, line: str, soft: int | None, body: list[str]) -> bool:
+    """Has this chunk grown past its comfortable size AND reached a paragraph break? Only a
+    blank line qualifies, so a chunk never ends mid-thought — the split is meant to read like
+    someone sending several messages, not like a message cut in half (F5b)."""
+    result = False
+    if soft is not None and len(grown) >= soft and not line.strip():
+        result = _has_text(body)
+    return result
+
+
+def split_html(text: str, limit: int, soft: int | None = None) -> list[str]:
     """Chunk formatted HTML on line boundaries, carrying open tags across the seam: whatever
-    is still open is closed at the end of a chunk and reopened at the start of the next."""
+    is still open is closed at the end of a chunk and reopened at the start of the next.
+
+    `limit` is Telegram's hard cap and is never exceeded. `soft`, when given, is the size past
+    which a chunk ends at the next paragraph break — that is what turns one wall of text into a
+    conversation instead of a single bubble."""
     queue = text.split("\n")
     chunks: list[str] = []
     stack: list[tuple[str, str]] = []
@@ -83,6 +105,11 @@ def split_html(text: str, limit: int) -> list[str]:
         if len(grown) <= limit:
             body = candidate
             stack = after
+            if _wants_break(grown, line, soft, body):
+                sealed = _sealed(prefix, body, stack)
+                chunks.append(sealed)
+                prefix = _reopen(stack)
+                body = []
             continue
         if body:
             sealed = _sealed(prefix, body, stack)

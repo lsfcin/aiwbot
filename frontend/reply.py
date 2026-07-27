@@ -4,6 +4,11 @@ from telegram.error import TelegramError
 from .htmlsplit import split_html, strip_tags
 
 TELEGRAM_MSG_LIMIT = 4096
+# Lucas, 2026-07-27: a long answer should arrive as several bubbles even when one would fit —
+# "partir a resposta em várias mensagens pra parecer mais como uma conversação". This is the
+# size a chunk wants to reach before it looks for a paragraph break to end on; the hard limit
+# above still governs. Eyeball value, tune it by reading real answers in the chat.
+SOFT_CHARS = 900
 # Telegram's wording when it rejects our markup rather than the request itself. Retrying the
 # same HTML after one of these is pointless — the content is what it objects to.
 _PARSE_MARKERS = ("parse entities", "start tag", "end tag", "entity")
@@ -75,14 +80,23 @@ async def send_voice(msg, ogg_bytes: bytes) -> "telegram.Message | None":
     return result
 
 
-async def deliver(working_msg, msg, html_text: str, reply_markup=None) -> "telegram.Message | None":
-    chunks = split_html(html_text, TELEGRAM_MSG_LIMIT)
+async def deliver(working_msg, msg, html_text: str, reply_markup=None) -> list:
+    """Returns EVERY message sent, not just the last. A long answer arrives as several bubbles
+    and Lucas replies to whichever one he happens to be reading — so the caller has to be able
+    to anchor all of them to the session. Anchoring only the tail is what made a reply to an
+    earlier bubble fall through to INBOX capture instead of continuing the turn (F5a)."""
+    chunks = split_html(html_text, TELEGRAM_MSG_LIMIT, SOFT_CHARS)
     first = chunks[0]
     single = len(chunks) == 1
     markup = reply_markup if single else None
-    last = await _edit_or_send(working_msg, msg, first, markup)
+    sent = []
+    opener = await _edit_or_send(working_msg, msg, first, markup)
+    if opener is not None:
+        sent.append(opener)
     for i, chunk in enumerate(chunks[1:]):
         is_last = i == len(chunks) - 2
         tail_markup = reply_markup if is_last else None
-        last = await safe_reply(msg, chunk, reply_markup=tail_markup)
-    return last
+        nxt = await safe_reply(msg, chunk, reply_markup=tail_markup)
+        if nxt is not None:
+            sent.append(nxt)
+    return sent

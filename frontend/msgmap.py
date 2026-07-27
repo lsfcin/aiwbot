@@ -4,7 +4,10 @@
 from __future__ import annotations
 from . import config
 
-MAX = 50
+# One answer now costs as many entries as it has bubbles (F5a/F5b anchor every chunk, not just
+# the tail), so a 50-entry map would only remember a handful of turns and older answers would
+# quietly stop being repliable. The map is a few hundred integers in config.json — cheap.
+MAX = 400
 NEW = "*new*"
 DEFAULT_PANEL = "p:menu"
 

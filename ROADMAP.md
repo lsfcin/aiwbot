@@ -34,13 +34,11 @@ away-from-PC capable. **show-me** and **Phase D** stay parked past the line: sho
 artifacts (Lucas 2026-07-23), and Phase D is a structural rewrite that buys cost/latency, not a new
 capability.
 
-> **~~F0 bookkeeping~~ → ~~F1 bugs~~ → ~~F2 papercuts~~ → ~~F3 features~~ → F5 papercuts 2 → F4 streaming → ask_user**
+> **~~F0~~ → ~~F1~~ → ~~F2~~ → ~~F3~~ → ~~F5 answer shape~~ → F4 streaming → ask_user**
 > ┃ *line* ┃ ~~show-me~~ · ~~Phase D~~
 >
-> Next up: **F5** (Lucas's 2026-07-26 capture — three answer-shape papercuts), then **F4**.
-> F5 lands before F4 on purpose: it changes what an answer message *looks like*, and F4 rewrites
-> how an answer is *delivered*. Doing the cheap shape change on the stable delivery path costs
-> less than redoing it on top of streaming.
+> Next up: **[b3] context % over 100%** (small, and wrong on every answer), then **F4** — the
+> finish line itself. Everything before F4 is shipped.
 
 | Stage | Contents | Why here |
 |-------|----------|----------|
@@ -121,36 +119,28 @@ And **submenu latency has no remaining fix**: after F3c a tap is one round trip,
 cannot: a Telegram client draws an inline keyboard only from server state, so there is nothing
 local to update optimistically. That round trip is the product's floor, not a bug.
 
-### F5 — answer-shape papercuts (Lucas, INBOX 2026-07-26; scoped 2026-07-27)
-All three are about what one answer message looks like. Cheap, and worth doing before F4 rewrites
-delivery.
+### F5 ✔ **SHIPPED 2026-07-27** — answer-shape papercuts (Lucas, INBOX 2026-07-26)
 
-- [ ] **a. Every chunk of a long answer must continue the session.** `reply.deliver` already
-      splits at Telegram's 4096 (`split_html`), but `bot._run_and_deliver` maps only the LAST
-      chunk's `message_id` to the session — so replying to any earlier bubble misses
-      `session_for_reply` and silently falls through to INBOX capture instead of continuing the
-      turn. Lucas's own condition on the split UX: *"desde que me permitisse, como usuário,
-      respondendo qualquer uma delas, continuar na mesma sessão"*. Fix: `remember_reply` for
-      every sent chunk, not just the tail.
-- [ ] **b. Split long answers into several messages on purpose.** Lucas, asked directly
-      (2026-07-27), chose **always split at paragraph boundaries**, not only when 4096 forces it:
-      *"talvez fosse até uma estratégia de UX partir a resposta em várias mensagens pra parecer
-      mais como uma conversação"*. Needs a target size (start ~800–1200 chars, tune by eye) and a
-      paragraph-boundary rule in `htmlsplit` alongside the existing hard limit. Depends on (a) —
-      shipping (b) without it multiplies the dead-reply bug by the number of bubbles.
-- [ ] **c. Drop the `continua [5FE] TÍTULO` anchor line; move the title to the footer.**
-      *"acho que pode desaparecer, quando o bot responde a mim, como já mostra que é uma resposta"*
-      and *"o título pode ficar no rodapé, fica melhor"*. This **reverses the F2 reply anchor**
-      shipped 2026-07-26 — F2's reasoning (Telegram quotes a message from its start, so the
-      session name had to lead) is sound but was solving for the wrong reader: the bot's answer
-      is already `do_quote`d onto Lucas's own message, so the thread is visible without it.
-      Touches `format.answer_block` / `_anchor_line` and `tests/test_f2_papercuts.py`. Delete the
-      anchor line outright rather than demoting it, and record the reversal in SPECS.
+- **a. Every bubble of a long answer continues the session.** `reply.deliver` now returns *every*
+      message it sent instead of just the last, and both callers anchor all of them. Anchoring
+      only the tail meant replying to an earlier bubble missed `session_for_reply` and silently
+      fell through to INBOX capture — exactly the condition Lucas put on the split UX:
+      *"desde que me permitisse, respondendo qualquer uma delas, continuar na mesma sessão"*.
+      `msgmap.MAX` went 50 → 400, since one answer now costs as many entries as it has bubbles.
+- **b. Long answers split at paragraph boundaries on purpose**, not only when 4096 forces it —
+      Lucas's call, asked directly. `split_html` takes an optional soft size
+      (`reply.SOFT_CHARS = 900`): past it, the chunk ends at the next blank line, so a bubble
+      never stops mid-thought. The hard limit still wins, and a run of blank lines can no longer
+      seal an empty chunk. Same path now delivers the `/resume` anchor, which **removes
+      `ANCHOR_BODY_MAX`** — that 3000-char mid-word clip, not Telegram's limit, is where the
+      `[…]` Lucas reported came from.
+- **c. The `continua [5FE] TÍTULO` anchor line is deleted**; the id and title moved to the
+      footer (`[ABC] TÍTULO · claude · sonnet · build · $0.031`). This **reverses F2's reply
+      anchor** from 2026-07-26 — see AD-23 for why F2's reasoning was sound but aimed at the
+      wrong reader. `answer_block` moved out of `format.py` into its own `answer.py` on the way,
+      because the change would have pushed `format.py` past the 200-line gate.
 
-Also found while measuring F3c, not from the INBOX — the `[…]` Lucas saw was **not** Telegram's
-limit, it was ours: `resume.ANCHOR_BODY_MAX = 3000` hard-clips the `/resume` anchor's
-last-response body mid-word. Fold into (b): the anchor should split like an answer does instead
-of carrying its own arbitrary cap.
+Regression: `tests/test_f5_answer_shape.py`.
 
 ### F4 — heavy, strict order; the finish line sits at `ask_user`
 - [ ] **Live feedback** (Phase C, linuz90 mold) — `stream-json`: edit the message as the agent's chat
