@@ -109,7 +109,8 @@ def test_run_and_deliver_spoken_sends_voice_in_addition_to_text(store, monkeypat
 
     async def fake_deliver(working, msg, block, reply_markup=None):
         sent["text"] = block
-        return None
+        # deliver returns EVERY bubble it sent (F5a), so the caller can anchor them all.
+        return []
 
     async def fake_send_voice(msg, ogg_bytes):
         sent["voice"] = ogg_bytes
@@ -140,7 +141,7 @@ def test_run_and_deliver_not_spoken_never_sends_voice(store, monkeypatch):
         return FakeResult()
 
     async def fake_deliver(working, msg, block, reply_markup=None):
-        return None
+        return []
 
     async def fake_send_voice(msg, ogg_bytes):
         sent["voice_called"] = True

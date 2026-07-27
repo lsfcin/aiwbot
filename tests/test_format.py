@@ -1,5 +1,6 @@
 # test_format.py — free unit test: markdown/table -> Telegram HTML conversion.
-from frontend.format import format_body, session_block, reattach_cmd, title_words, title_from_prompt, response_preview, relative_time, short_model, answer_block, clip_chars, PREVIEW_CHARS, TITLE_CHARS
+from frontend import answer
+from frontend.format import format_body, session_block, reattach_cmd, title_words, title_from_prompt, response_preview, relative_time, short_model, clip_chars, PREVIEW_CHARS, TITLE_CHARS
 
 
 def test_plain_markdown_to_html():
@@ -109,17 +110,16 @@ def test_short_model_extracts_family():
     assert short_model("gpt-4o") == "gpt-4o"
 
 
-def test_answer_block_anchor_first_body_then_footer():
-    block = answer_block("oi tudo bem", "abc12345", "titulo da sessao",
+def test_answer_body_first_then_the_footer_that_names_it():
+    block = answer.block("oi tudo bem", "abc12345", "titulo da sessao",
                          provider="claude", model="claude-sonnet-5", cost_usd=0.022)
     lines = block.split("\n")
-    assert lines[0] == "continua [ABC] TITULO DA SESSAO"
-    assert lines[1] == "oi tudo bem"
+    assert lines[0] == "oi tudo bem"
     assert "· · ·" in block
-    assert "claude · sonnet · $0.022" in block
+    assert lines[-1] == "[ABC] TITULO DA SESSAO · claude · sonnet · $0.022"
 
 
-def test_answer_block_omits_missing_meta():
-    block = answer_block("resposta", "abc12345", None, provider="opencode", model=None, cost_usd=None)
+def test_answer_footer_omits_missing_meta():
+    block = answer.block("resposta", "abc12345", None, provider="opencode", model=None, cost_usd=None)
     lines = block.split("\n")
-    assert lines[-1] == "opencode"
+    assert lines[-1] == "[ABC] (SEM TÍTULO) · opencode"
