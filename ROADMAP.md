@@ -34,10 +34,10 @@ away-from-PC capable. **show-me** and **Phase D** stay parked past the line: sho
 artifacts (Lucas 2026-07-23), and Phase D is a structural rewrite that buys cost/latency, not a new
 capability.
 
-> **~~F0 bookkeeping~~ → ~~F1 bugs~~ → F2 papercuts → F3 features → F4 streaming → ask_user**
+> **~~F0 bookkeeping~~ → ~~F1 bugs~~ → ~~F2 papercuts~~ → F3 features → F4 streaming → ask_user**
 > ┃ *line* ┃ ~~show-me~~ · ~~Phase D~~
 >
-> Next up: **F2 — the papercut batch**.
+> Next up: **F3c — button-tap latency** (last F3 item), then **F4**.
 
 | Stage | Contents | Why here |
 |-------|----------|----------|
@@ -98,11 +98,22 @@ period), glyphs **B** (flat), affordance **B** *"menos o ícone que ainda parece
       cadence work rather than after it.
 
 ### F3 — features
-- [ ] **NL harness+model selection from the message, zero extra tokens** (INBOX 2026-07-24) — when a
-      message starts with "bot, …", parse any mention of a harness (claudecode/opencode/kimicode) and a
-      model (opus/sonnet/glm/deepseek/kimi3/kimi2.7) straight from the text to pick backend+model,
-      **without** spending a triage inference call. Complements the shipped P2 button panel with a
-      language path. `frontend/` dispatch.
+- [x] **NL harness+model selection from the message, zero extra tokens** (INBOX 2026-07-24) ✔
+      **SHIPPED 2026-07-26**. A `bot, …` message reads its own harness/model off the *leading* words
+      (`bot, opencode glm resume o pdf`, `bot sonnet explica isso`) — pure matching against what the
+      backends already declare, never a triage inference call. New `frontend/directives.py` resolves
+      words to `(harness, model_id)`: harness by a data alias table (`claudecode`→claude, `cc`, `oc`,
+      plus each backend's own name), model by normalized match against each backend's declared ids
+      (`glm`→`nvidia/z-ai/glm-5.2`), exact aliases winning over substrings, and a model can imply its
+      harness. Two safety rules: it reads only the leading run and stops at the first non-directive
+      word, so `bot, escreve sobre opus dei` stays whole; and if *every* word was a directive (no task
+      left) nothing is applied. Application lives in `turnhelpers.apply_directives`, which reuses
+      `panel.apply` so an inline harness change clears a stale model exactly as a tapped one does —
+      the invalidation rule stays in one place. (Correction to the F2 note: parsing landed in its own
+      `directives.py`, not `startword.py` — `startword` is pure string logic with zero deps and this
+      needs the backend vocabulary, so folding them would have muddied the small module.) Voice turns
+      get it for free, since they route through the same bot-prefix branch. Spec
+      `tests/test_directives.py`; help text updated.
 - [x] **audio punctuation + cadence quality is poor** (INBOX 2026-07-24) ✔ **FIXED 2026-07-26**,
       token-free as Lucas asked — no API call, no new model. Measured on his own 15 saved voice
       notes rather than guessed. Three findings:

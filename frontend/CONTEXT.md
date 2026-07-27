@@ -12,6 +12,7 @@
 | [`bot.py`](bot.py) | — | `main` | bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX. |
 | [`choices.py`](choices.py) | — | `harness_values`, `model_values`, `groups`, `effort_values`, `preferred` | choices.py — what a scope may be offered: the backends' declarations, asked per dimension. |
 | [`config.py`](config.py) | [`config.pyi`](config.pyi) | `config_dir`, `load_config`, `save_config`, `bot_token`, `allowed_chat_id` | config.py — aiwbot's own Telegram config dir (separate token/storage from the old workspace bot). |
+| [`directives.py`](directives.py) | — | `resolve` | directives.py — read leading harness/model words off a bot-prefixed message, no inference. |
 | [`dispatch.py`](dispatch.py) | [`dispatch.pyi`](dispatch.pyi) | `TurnResult`, `DispatchError`, `events_to_result`, `turn` | dispatch.py — one call site that drains any AgentBackend.send() into a single reply. |
 | [`format.py`](format.py) | [`format.pyi`](format.pyi) | `relative_time`, `plain`, `clip_chars`, `title_words`, `title_from_prompt` | format.py — pure text formatting: markdown/tables -> Telegram HTML, session headers. No I/O. |
 | [`hotwords.py`](hotwords.py) | — | `as_prompt` | hotwords.py — explicit editable data (C4): what the STT is primed with before it listens. |
@@ -34,5 +35,5 @@
 | [`stt.py`](stt.py) | — | `confident`, `run`, `transcribe` | stt.py — STT wrapper: faster-whisper large-v3-turbo, lazy-loaded; fails safe to "" (C1, C3). |
 | [`table.py`](table.py) | — | `is_row`, `is_separator`, `render` | table.py — pipe-tables -> Telegram row blocks: rows become labelled text, never a <pre> box. |
 | [`tts.py`](tts.py) | — | `encode_ogg`, `synthesize` | tts.py — TTS wrapper: Kokoro-82M pf_dora voice, lazy-loaded; local OGG/Opus encode (C5, C6). |
-| [`turnhelpers.py`](turnhelpers.py) | — | `friendly_error`, `parse_new_arg`, `turn_options`, `persist_turn` | turnhelpers.py — turn plumbing: friendly errors, /new arg parsing, sticky options, persistence. |
+| [`turnhelpers.py`](turnhelpers.py) | — | `friendly_error`, `parse_new_arg`, `apply_directives`, `turn_options`, `persist_turn` | turnhelpers.py — turn plumbing: friendly errors, /new arg parsing, sticky options, persistence. |
 <!-- routing:end -->

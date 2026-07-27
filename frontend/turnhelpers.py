@@ -2,7 +2,7 @@
 # Extracted out of bot.py (size gate) — pure helpers with no test-visible monkeypatch seam.
 from __future__ import annotations
 from backend import TurnOptions
-from . import format, phrases, registry
+from . import directives, format, panel, phrases, registry
 
 _BUSY_MARKERS = ("no conversation found", "currently running as a background agent")
 
@@ -28,6 +28,19 @@ def parse_new_arg(arg: str) -> tuple[str | None, str]:
         backend_name = parts[0]
         prompt = parts[1] if len(parts) > 1 else ""
     return backend_name, prompt
+
+
+def apply_directives(bot_prompt: str) -> str:
+    """A `bot, …` message can name its own harness/model inline ("bot, opencode glm resume o
+    pdf"); write those onto the NEW scope so the turn inherits them, and return the prompt with
+    the directive words removed. Reuses `panel.apply` so an inline harness change clears a stale
+    model exactly as a tapped one does — the invalidation rule stays in one place."""
+    harness, model, rest = directives.resolve(bot_prompt)
+    if harness:
+        panel.apply(registry.NEW, "h", harness)
+    if model:
+        panel.apply(registry.NEW, "m", model)
+    return rest
 
 
 def turn_options(scope: str, title: str | None) -> TurnOptions:

@@ -102,7 +102,8 @@ async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
             return
     bot_prompt = _strip_bot_prefix(text)
     if bot_prompt is not None:
-        await _start_new(msg, bot_prompt, spoken=spoken)
+        prompt = turnhelpers.apply_directives(bot_prompt)
+        await _start_new(msg, prompt, spoken=spoken)
         return
     inbox.append_entry(inbox.build_entry(text, None, forwarded=msg.forward_origin is not None))
     await reply.safe_reply(msg, format.plain(phrases.pick(phrases.CAPTURE_ACKS)))
