@@ -13,9 +13,9 @@ Phase B (Telegram frontend + single-lineage fix + ⏳-morph UX) — done, live-c
 Archived in [HISTORY.md](HISTORY.md).
 
 ## Shipped — archived in [HISTORY.md](HISTORY.md)
-Phases A/B, Tiers 1-3, P3, **P2 + P2.1 + panel rounds 3-4** all shipped and live-tested. Design
-lives in [SPECS.md](SPECS.md) (AD-1…AD-17); plans in [ROADMAP-p2.md](ROADMAP-p2.md) /
-[ROADMAP-p3.md](ROADMAP-p3.md). Details moved out of this file on 2026-07-23.
+Phases A/B, Tiers 1-3, P3, **P2 + P2.1 + panel rounds 3-4**, **audio in+out**, and the finish
+plan's **F0–F2 + F3a + F3b** all shipped and live-tested. Design lives in [SPECS.md](SPECS.md)
+(AD-1…AD-17); plans in [ROADMAP-p2.md](ROADMAP-p2.md) / [ROADMAP-p3.md](ROADMAP-p3.md).
 
 ### Known limits (won't chase)
 - **VSCode picker needs a window reload** to pick up newly created sessions (the extension caches its
@@ -50,92 +50,14 @@ capability.
 Earlier P-numbers keep their names so old notes resolve. **P3, P2, panel rounds 2-4 (2026-07-23) and
 audio in+out (2026-07-24) all shipped** — see [HISTORY.md](HISTORY.md) and SPECS AD-10…AD-17.
 
-### F0 — bookkeeping ✔ **done 2026-07-26**
-- [x] **claude model order `sonnet` `opus` `fable`** — was listed open, but already shipped
-      (`claude.py` `_MODELS`, merged `feature/model-order-sonnet-first`). Checkbox was stale.
-- [x] **button-latency contradiction resolved** — the same item sat in *both* "known limits (won't
-      chase)" and the backlog. Lucas reopened it; the won't-chase entry is gone, the live item is F3.
+### F0–F2, F3a, F3b ✔ **SHIPPED 2026-07-26** — archived in [HISTORY.md](HISTORY.md)
+Bookkeeping, both F1 bugs (b1 tables/bold, b2 opencode errors), the F2 papercut batch (phrase
+tone, flat glyphs, reply anchor, transcript echo, `bote`→`bot`), F3a inline harness/model
+selection, and F3b token-free punctuation/cadence + hallucination guard. 6 commits, 239 tests
+green, all live-confirmed after the daemon restart. Method throughout: decide on measured data
+(4000 answers, 412 tables, Lucas's 15 voice notes, live prototypes), not hunches.
 
-### F1 — bugs taxing every reply (do first)
-Both tracked in [KNOWN-BUGS.md](KNOWN-BUGS.md); a FIXED flip needs a `tests/**/b<N>-*` regression
-spec (code/VERIFY.md).
-- [x] **[b1] tables + bold don't render** ✔ **FIXED 2026-07-26**. Two independent causes, found by
-      probing 4000 real answers rather than guessing: `<pre>`-boxed tables froze cell markdown into
-      literal `**` (and overflowed — 0 of 412 real tables fit a phone bubble), and `**bold *ital***`
-      crossed its tags, making Telegram strip *every* tag in the message. New `frontend/table.py`
-      renders rows as labelled blocks; `_BOLD_RE` grew a `(?!\*)` lookahead. Details in
-      [KNOWN-BUGS.md](KNOWN-BUGS.md); spec `tests/test_b1_table_bold.py`.
-- [x] **[b2] opencode errors collapse to generic "no text event"** ✔ **FIXED 2026-07-26**. The
-      payload that blocked this was captured after all — earlier repro attempts hung because they
-      *resumed* a session; forcing the error on a fresh run (`-m <bogus model>`) returns instantly.
-      `_line_to_event` now maps `type=="error"`, and `events_from_run` treats a zero-event parse as
-      a failure that quotes the raw tail, so the next unknown shape names itself. Details in
-      [KNOWN-BUGS.md](KNOWN-BUGS.md); spec `tests/test_b2_opencode_error.py`.
-
-### F2 — papercut batch ✔ **SHIPPED 2026-07-26**
-Small, all from Lucas testing the panel live. Every choice below was made by Lucas against a live
-Telegram prototype rather than decided here — the prototypes were sent through the real render
-pipeline so what he judged is what the bot sends. His calls: phrase tone **B** (lowercase, no
-period), glyphs **B** (flat), affordance **B** *"menos o ícone que ainda parece antigo"* (so the
-`↩` is gone entirely rather than swapped for another glyph), transcript echo **ok**. Specs in
-`tests/test_f2_papercuts.py`, which pins the decisions so a later edit cannot quietly undo them.
-- [x] **the reply affordance is unclear** — "o bot já aparece toda vez com o campo aberto como se
-      minha mensagem fosse um reply, não fica claro sobre o que é o reply". Root cause: Telegram
-      quotes a message **from its start**, and the session label was in the *footer*, so the compose
-      box previewed the answer's opening words — which name no session. `answer_block` now leads
-      with `continua [ABC] TÍTULO` and the footer keeps meta only, so the label is never duplicated.
-- [x] **emoji style: minimalist, not "bregas"** — `⏳` is gone from the status bank in favour of a
-      flat `· trabalhando…`. The tone rule now lives as a comment at the head of `phrases.py` so
-      new banks inherit it instead of re-deciding.
-- [x] **"bot" start-word mis-heard as "bote" by STT** (INBOX 2026-07-24) — took option (a),
-      normalize, over (b), pick a new word: `bot` is already muscle memory and any replacement
-      would collect mishearings of its own. Detection moved out of `bot.py` (which was one edit
-      from the 200-LOC block) into `frontend/startword.py` — also where F3a's natural-language
-      harness/model parsing will land, since it reads the same prefix.
-- [x] **echo the transcript under Lucas's own voice message** (Lucas, 2026-07-24, WhatsApp does
-      this) — the transcript now comes back quoted under his own voice note, before the turn runs.
-      It is also the **instrument** F3b tunes against, which is why it shipped ahead of the
-      cadence work rather than after it.
-
-### F3 — features
-- [x] **NL harness+model selection from the message, zero extra tokens** (INBOX 2026-07-24) ✔
-      **SHIPPED 2026-07-26**. A `bot, …` message reads its own harness/model off the *leading* words
-      (`bot, opencode glm resume o pdf`, `bot sonnet explica isso`) — pure matching against what the
-      backends already declare, never a triage inference call. New `frontend/directives.py` resolves
-      words to `(harness, model_id)`: harness by a data alias table (`claudecode`→claude, `cc`, `oc`,
-      plus each backend's own name), model by normalized match against each backend's declared ids
-      (`glm`→`nvidia/z-ai/glm-5.2`), exact aliases winning over substrings, and a model can imply its
-      harness. Two safety rules: it reads only the leading run and stops at the first non-directive
-      word, so `bot, escreve sobre opus dei` stays whole; and if *every* word was a directive (no task
-      left) nothing is applied. Application lives in `turnhelpers.apply_directives`, which reuses
-      `panel.apply` so an inline harness change clears a stale model exactly as a tapped one does —
-      the invalidation rule stays in one place. (Correction to the F2 note: parsing landed in its own
-      `directives.py`, not `startword.py` — `startword` is pure string logic with zero deps and this
-      needs the backend vocabulary, so folding them would have muddied the small module.) Voice turns
-      get it for free, since they route through the same bot-prefix branch. Spec
-      `tests/test_directives.py`; help text updated.
-- [x] **audio punctuation + cadence quality is poor** (INBOX 2026-07-24) ✔ **FIXED 2026-07-26**,
-      token-free as Lucas asked — no API call, no new model. Measured on his own 15 saved voice
-      notes rather than guessed. Three findings:
-      1. **Punctuation was free all along.** Whisper imitates the style of what it is primed with,
-         so a punctuated `initial_prompt` buys punctuation: `bote me diz o que é que tem de e-mail
-         gente` (zero marks) became `Bot, me diz o que que tem de e-mail, gente.` Same ~4 s.
-      2. **`initial_prompt` and `hotwords=` compete for one slot.** Priming for punctuation alone
-         cost the jargon — "bote" came back as "Pode", losing the very start word F2 had just
-         fixed. The fix is one prompt carrying both: punctuated carrier sentences that *contain*
-         the jargon (`hotwords.CARRIER`), opening with "Bot,".
-      3. **Cadence was mostly not the TTS model.** The voice reply was fed `format.plain`, i.e.
-         `html.escape` — a name trap — so Kokoro was handed `&#x27;`, `&amp;`, `##`, `**` and table
-         pipes and tried to pronounce them. New `frontend/speech.py` renders answers as prose.
-      Specs: `tests/test_speech.py`, `tests/test_stt.py`. Contract in `frontend/SPEC.md`.
-- [x] **hallucination guard** (found while doing the above, not previously on the list) — whisper
-      invents words on near-silent audio and **no decoding setting stops it**: the plain prompt
-      emitted `... ... ...`, the jargon-primed one invented `e-mail e-mail e-mail`, and VAD only
-      shortened that to `e-mail.com`. Since a dispatched hallucination costs a real turn, the guard
-      is the model's own confidence: every real transcript scored -0.153..-0.482, that garbage
-      -1.489, so `_MIN_LOGPROB = -0.9` splits them with room either side. A rejected transcript
-      returns `""` and rides the existing C3 fail-safe, which is recoverable. (`no_speech_prob` was
-      0.000 for every file, real or not — VAD strips the silence it would key on. Not usable.)
+### F3 — remaining
 - [ ] **button-tap → response feels slow, not instant** (INBOX 2026-07-26). Investigate the Telegram
       inline-button round trip and cut what is ours. **Reopened by Lucas 2026-07-26** — it had been
       filed under "known limits (won't chase)" on the strength of an earlier "não é crítico", but the
@@ -143,21 +65,6 @@ period), glyphs **B** (flat), affordance **B** *"menos o ícone que ainda parece
       contradict this line. Prior finding stands as the starting point: the optimistic edit already
       removed our latency, leaving `edit_message_reply_markup`'s round trip — so the investigation is
       about whether a local-echo trick exists, not about re-measuring our own path.
-
-### Audio — in **and out** (Lucas, 2026-07-23: "audio wins") ✔ **SHIPPED 2026-07-24**
-Beats streaming because it removes a *modality* barrier (hands/eyes busy, walking, driving) rather
-than making an existing text exchange prettier. End-to-end: faster-whisper STT (large-v3-turbo,
-PT+hotwords) dispatches voice notes into the session graph; Kokoro-82M TTS (pf_dora voice) replies
-in OGG/Opus. Reply-continue on voice-to-voice works correctly (fixed transcript-vs-msg.text gap).
-- [x] **audio in** — transcribe voice notes → dispatch as a turn (C1, C2, C3); voice note starting 
-      with "bot" auto-starts a new session. Empty/exception transcripts degrade safely to 
-      untranscribed INBOX + notice (C3). hotwords list explicit editable data (C4).
-- [x] **audio out** — bot answers *as* voice note (C5); text-triggered turns unaffected. Both 
-      models lazy-loaded; no model load at import time; `make test` green with fake models (C6).
-- Shipped (commit hash in HISTORY): STT wrapper `frontend/stt.py`, TTS wrapper + OGG encode 
-      `frontend/tts.py`, voice reply `frontend/reply.py`, hotwords data `frontend/hotwords.py`, 
-      wiring in `frontend/bot.py`. Contract locked in `frontend/SPEC.md`.
-- Follow-ups moved out of this section: transcript echo → **F2**, punctuation/cadence → **F3**.
 
 ### F4 — heavy, strict order; the finish line sits at `ask_user`
 - [ ] **Live feedback** (Phase C, linuz90 mold) — `stream-json`: edit the message as the agent's chat
@@ -193,13 +100,6 @@ different sessions across pages, and anchor messages carried no mode toggle. Fut
 first, then move to KNOWN-BUGS.md with a `bN` id if they survive the round they were found in.
 
 ## Housekeeping
-- [ ] **PT-BR phrase style: lowercase, no trailing period.** `frontend/phrases.py` was copied from
-      the old workspace bot and kept its sentence-case banks ("Guardado em brain/INBOX.md."). A
-      parallel session had rewritten exactly these banks in the old daemon to lowercase and
-      period-free ("guardado em brain/INBOX.md") — a deliberate tone choice for chat, where
-      sentence-case acks read stiff. That edit died with the daemon's retirement 2026-07-23; the
-      preference is recorded here so it lands in aiwbot instead. Applies to every bank in
-      `phrases.py`, not just the capture acks.
 - [~] **`frontend/` file count** — partly addressed by P2, but along a seam this note didn't name.
       What actually hit the 200-line block was `sessions.py`, so the cut was by responsibility
       rather than by layer: `registry.py` (bot-owned per-session state — knobs, titles, message
