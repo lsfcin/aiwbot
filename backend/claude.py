@@ -72,20 +72,23 @@ def _model_of(obj: dict) -> str | None:
     return result
 
 
-_CONTEXT_FIELDS = ("inputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")
-
-
 def _context_of(obj: dict, model: str | None) -> tuple[int | None, int | None]:
-    """Context occupancy after the turn: modelUsage[model] carries both the token
-    breakdown and the window, so the % costs nothing extra to report."""
+    """Only the WINDOW comes from the result object; occupancy does not (b3).
+
+    `modelUsage[model]` aggregates every API request the invocation made, and a turn that used
+    tools re-read the whole context from cache on each one — so summing its token fields
+    measures SPEND, not how full the window is. Measured over real transcripts, those sums reach
+    6190% and 32533% of the window, and even a modest 4-8 request turn lands at the 100-200%
+    Lucas reported. `ocstore.py` already carried this exact warning for opencode's `tokens_*`
+    columns; the claude path walked into it anyway.
+
+    Occupancy is a property of the LAST request alone, and the transcript records it per
+    message — so it is read there, via `ClaudeBackend.occupancy`. The window is static metadata
+    and stays safe to take from here."""
     usage = obj.get("modelUsage") or {}
     entry = usage.get(model or "") or {}
     window = entry.get("contextWindow")
-    used = None
-    if entry:
-        counts = [entry.get(f) or 0 for f in _CONTEXT_FIELDS]
-        used = sum(counts)
-    return used, window
+    return None, window
 
 
 def _object_to_events(obj: dict) -> list[AgentEvent]:
@@ -156,6 +159,18 @@ class ClaudeBackend(CliBackend):
             lines = transcript.tail_lines(path)
             text = transcript.last_response_text(lines)
         return text
+
+    def occupancy(self, session_id: str, cwd: str) -> int | None:
+        """How full the window is after the turn, from the transcript's LAST assistant message.
+        One message is one API request, so its `usage` is occupancy; the run summary's
+        `modelUsage` is a sum over requests and is spend (b3, see `_context_of`)."""
+        directory = _project_dir(cwd)
+        path = directory / f"{session_id}.jsonl"
+        used = None
+        if path.is_file():
+            lines = transcript.tail_lines(path)
+            used = transcript.last_context_used(lines)
+        return used
 
     def env(self) -> dict | None:
         """AD-8 (revised): Claude Code's native picker hides sessions whose ORIGINATING

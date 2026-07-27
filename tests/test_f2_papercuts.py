@@ -49,7 +49,7 @@ def test_the_answer_opens_with_the_answer():
 def test_the_session_is_named_once_in_the_footer():
     block = answer.block("corpo", "abc12345", "titulo", provider="claude")
     assert block.count("[ABC]") == 1
-    assert "[ABC]" in block.split("\n")[-1]
+    assert block.split("\n")[-2] == "[ABC] TITULO"
 
 
 def test_an_answer_without_a_session_names_none():

@@ -29,6 +29,11 @@ class CliBackend:
         the page it renders rather than for every session it lists."""
         return {}
 
+    def occupancy(self, session_id: str, cwd: str) -> int | None:
+        """Context-window occupancy after the turn, read from the provider's own store.
+        Default: unknown. Backends that record per-message token usage override this."""
+        return None
+
     def env(self) -> dict | None:
         """Extra environment for the subprocess. Default: none — backends override."""
         return None
@@ -47,5 +52,18 @@ class CliBackend:
         extra_env = self.env()
         out, err, code = await run_capture(args, cwd, extra_env)
         events = events_from_run(out, err, code, self.parse)
+        self._attach_occupancy(events, cwd)
         for event in events:
             yield event
+
+    def _attach_occupancy(self, events: list[AgentEvent], cwd: str) -> None:
+        """Occupancy is a property of the turn's LAST request, never of its total spend — a
+        turn that used tools made several requests and each re-read the whole context, so any
+        sum over them measures money, not how full the window is (b3). Every CLI's own store
+        records the per-message breakdown, so it is read from there rather than from whatever
+        the run's summary object happened to aggregate."""
+        for event in events:
+            if event.kind == "result" and event.session_id:
+                measured = self.occupancy(event.session_id, cwd)
+                if measured is not None:
+                    event.context_used = measured
