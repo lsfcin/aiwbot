@@ -327,6 +327,28 @@ fail-safe. `no_speech_prob` is 0.000 for every file once VAD strips the silence 
 signal. Corollary convention: **`format.plain` is `html.escape`, never speech** — TTS input goes
 through `speech.to_speech`, not `plain`. Contract in `frontend/SPEC.md`.
 
+### AD-20 — A panel tap costs exactly one Telegram round trip (2026-07-27)
+
+Measured, not reasoned about: bot-side work on every warm callback path is **under 1 ms**, while
+one call to `api.telegram.org` is **222 ms** median from Lucas's machine. Anything that felt slow
+about a button was therefore a count of round trips, never our compute — and the count was wrong
+in three places (two sequential calls per tap, three on a value choice, plus an 839 ms
+`opencode models` shell on the first tap after each restart).
+
+The rule that follows: **one tap issues one `answerCallbackQuery` and at most one
+`editMessageReplyMarkup`, concurrently.** `panel._redraw` is the single place both are sent, via
+`asyncio.gather`; `_route` threads a choice's toast through as an argument so no branch is tempted
+to answer a second time. Anything a backend computes to draw a keyboard is warmed at startup
+(`choices.warm`, through the seam) rather than lazily on the button.
+
+This is a floor, not a target: a Telegram client renders an inline keyboard purely from server
+state, so no local echo or optimistic client update exists to beat one round trip. The button's
+built-in spinner is the only instant feedback there is, and clearing it is already what
+`answerCallbackQuery` does. `concurrent_updates(True)` is deliberately **not** enabled — it
+overlaps separate taps but does nothing for a single tap's latency, while widening the race on
+`config.json`'s non-atomic read-modify-write. Regression spec: `tests/test_f3c_tap_latency.py`
+asserts the round-trip *count*, since the duration is not ours to hold.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

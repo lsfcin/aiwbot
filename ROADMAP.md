@@ -34,10 +34,13 @@ away-from-PC capable. **show-me** and **Phase D** stay parked past the line: sho
 artifacts (Lucas 2026-07-23), and Phase D is a structural rewrite that buys cost/latency, not a new
 capability.
 
-> **~~F0 bookkeeping~~ → ~~F1 bugs~~ → ~~F2 papercuts~~ → F3 features → F4 streaming → ask_user**
+> **~~F0 bookkeeping~~ → ~~F1 bugs~~ → ~~F2 papercuts~~ → ~~F3 features~~ → F5 papercuts 2 → F4 streaming → ask_user**
 > ┃ *line* ┃ ~~show-me~~ · ~~Phase D~~
 >
-> Next up: **F3c — button-tap latency** (last F3 item), then **F4**.
+> Next up: **F5** (Lucas's 2026-07-26 capture — three answer-shape papercuts), then **F4**.
+> F5 lands before F4 on purpose: it changes what an answer message *looks like*, and F4 rewrites
+> how an answer is *delivered*. Doing the cheap shape change on the stable delivery path costs
+> less than redoing it on top of streaming.
 
 | Stage | Contents | Why here |
 |-------|----------|----------|
@@ -57,14 +60,75 @@ selection, and F3b token-free punctuation/cadence + hallucination guard. 6 commi
 green, all live-confirmed after the daemon restart. Method throughout: decide on measured data
 (4000 answers, 412 tables, Lucas's 15 voice notes, live prototypes), not hunches.
 
-### F3 — remaining
-- [ ] **button-tap → response feels slow, not instant** (INBOX 2026-07-26). Investigate the Telegram
-      inline-button round trip and cut what is ours. **Reopened by Lucas 2026-07-26** — it had been
-      filed under "known limits (won't chase)" on the strength of an earlier "não é crítico", but the
-      newer capture says it still bugs him, so the won't-chase entry was deleted rather than left to
-      contradict this line. Prior finding stands as the starting point: the optimistic edit already
-      removed our latency, leaving `edit_message_reply_markup`'s round trip — so the investigation is
-      about whether a local-echo trick exists, not about re-measuring our own path.
+### F3c ✔ **SHIPPED 2026-07-27** — button-tap latency, measured then cut
+
+The prior finding ("the optimistic edit already removed our latency") was **half right, and the
+half it got wrong was the whole complaint**. Measured rather than reasoned about — benchmark of
+every callback path against a copy of the live config, plus RTT to `api.telegram.org` from
+Lucas's machine:
+
+| | measured |
+|---|---|
+| bot-side work, warm, worst path (`menu_dims` on opencode) | **0.8 ms** |
+| `api.telegram.org` RTT, pooled connection | **222 ms** median (175 min / 287 max) |
+| `catalog.model_ids()` — `opencode models` subprocess | **839 ms**, once per process |
+
+So our compute never mattered — it is ~0.3% of one round trip. Three real costs, all fixed:
+
+1. **Two sequential round trips per tap.** `answerCallbackQuery` (clears the button spinner) and
+   `editMessageReplyMarkup` (moves the bracket) were awaited one after the other: ~445 ms. They
+   are independent calls on different objects, so `panel._redraw` now `asyncio.gather`s them —
+   **~445 ms → ~222 ms**.
+2. **Three round trips on the commonest tap.** Picking a model/effort value answered *twice* —
+   once in `_choose`, then again in the `_open` it routed into (~667 ms). `_route` now takes the
+   toast as an argument so every branch ends in exactly one `_redraw`. **~667 ms → ~222 ms.**
+3. **A ~865 ms stall on the first tap after every daemon restart.** `opencode models` (839 ms) +
+   the 3 MB `models.json` parse (26 ms) are memoized for the process's life, but the first
+   model/menu tap paid them *before* answering. New `choices.warm()`, awaited in `_post_init`
+   off the event loop, moves that to startup. Asked through the backend seam, so a third backend
+   is warmed by existing.
+
+**The floor is one round trip (~222 ms) and no trick beats it.** That answers the question this
+item was actually posed as: a Telegram client renders an inline keyboard purely from server
+state — there is no client-side optimistic update, no local echo. The only instant feedback that
+exists is the button's built-in spinner, which is already what `answerCallbackQuery` clears.
+`concurrent_updates(True)` was **considered and rejected**: it lets back-to-back taps overlap but
+does nothing for the latency of a single tap (the complaint), while widening the race window on
+`config.json`'s non-atomic read-modify-write.
+
+Regression spec: `tests/test_f3c_tap_latency.py` — asserts the *count* of round trips per tap
+(one answer, one redraw, started concurrently), which is the only part we control.
+
+### F5 — answer-shape papercuts (Lucas, INBOX 2026-07-26; scoped 2026-07-27)
+All three are about what one answer message looks like. Cheap, and worth doing before F4 rewrites
+delivery.
+
+- [ ] **a. Every chunk of a long answer must continue the session.** `reply.deliver` already
+      splits at Telegram's 4096 (`split_html`), but `bot._run_and_deliver` maps only the LAST
+      chunk's `message_id` to the session — so replying to any earlier bubble misses
+      `session_for_reply` and silently falls through to INBOX capture instead of continuing the
+      turn. Lucas's own condition on the split UX: *"desde que me permitisse, como usuário,
+      respondendo qualquer uma delas, continuar na mesma sessão"*. Fix: `remember_reply` for
+      every sent chunk, not just the tail.
+- [ ] **b. Split long answers into several messages on purpose.** Lucas, asked directly
+      (2026-07-27), chose **always split at paragraph boundaries**, not only when 4096 forces it:
+      *"talvez fosse até uma estratégia de UX partir a resposta em várias mensagens pra parecer
+      mais como uma conversação"*. Needs a target size (start ~800–1200 chars, tune by eye) and a
+      paragraph-boundary rule in `htmlsplit` alongside the existing hard limit. Depends on (a) —
+      shipping (b) without it multiplies the dead-reply bug by the number of bubbles.
+- [ ] **c. Drop the `continua [5FE] TÍTULO` anchor line; move the title to the footer.**
+      *"acho que pode desaparecer, quando o bot responde a mim, como já mostra que é uma resposta"*
+      and *"o título pode ficar no rodapé, fica melhor"*. This **reverses the F2 reply anchor**
+      shipped 2026-07-26 — F2's reasoning (Telegram quotes a message from its start, so the
+      session name had to lead) is sound but was solving for the wrong reader: the bot's answer
+      is already `do_quote`d onto Lucas's own message, so the thread is visible without it.
+      Touches `format.answer_block` / `_anchor_line` and `tests/test_f2_papercuts.py`. Delete the
+      anchor line outright rather than demoting it, and record the reversal in SPECS.
+
+Also found while measuring F3c, not from the INBOX — the `[…]` Lucas saw was **not** Telegram's
+limit, it was ours: `resume.ANCHOR_BODY_MAX = 3000` hard-clips the `/resume` anchor's
+last-response body mid-word. Fold into (b): the anchor should split like an answer does instead
+of carrying its own arbitrary cap.
 
 ### F4 — heavy, strict order; the finish line sits at `ask_user`
 - [ ] **Live feedback** (Phase C, linuz90 mold) — `stream-json`: edit the message as the agent's chat
@@ -111,6 +175,9 @@ first, then move to KNOWN-BUGS.md with a `bN` id if they survive the round they 
       layout, not relief — and each package costs a facade plus a CONTEXT.md — so it is churn with
       no behaviour change. Worth doing when the audio work or a third picker makes the flat
       directory genuinely hard to read, not before.
+- [ ] **`bot.py` is at 195 LOC** (200 is the hard gate) after F3c added the startup warm. F4 puts
+      streaming into exactly this file, so it *will* breach. Split when F4 starts, not now — the
+      seam F4 introduces is what should decide where the cut goes.
 
 ## Verification
 - Free (every change): `make test`. Live milestone (~$0.20): `make smoke`.

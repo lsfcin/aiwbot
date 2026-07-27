@@ -1,8 +1,9 @@
 # bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX.
 from __future__ import annotations
+import asyncio
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from . import config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, speech, startword, stt, tts, turnhelpers
+from . import choices, config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, speech, startword, stt, tts, turnhelpers
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 DEFAULT_BACKEND = registry.DEFAULT_BACKEND
@@ -176,6 +177,9 @@ async def _post_init(app: Application) -> None:
         BotCommand("resume", "Retoma uma sessão recente"),
         BotCommand("help", "Lista os comandos"),
     ])
+    # Off the event loop (it shells a CLI), and awaited before polling starts so no tap can
+    # race the warm and pay for it (F3c).
+    await asyncio.to_thread(choices.warm)
 
 
 def main() -> None:
