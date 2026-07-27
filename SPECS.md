@@ -306,6 +306,27 @@ sessions. A machine with no history falls back to the cheap tiers.
 
 The source is one query over `session.model` + `time_updated`, which opencode indexes anyway.
 
+### AD-18 — Pipe-tables render as row blocks, never a `<pre>` box (2026-07-26)
+Telegram has no table syntax at all. Boxing a table in `<pre>` (the original b1 rendering) fails
+on both axes a table has: `<pre>` escapes its contents, so cell markdown freezes into literal
+`**`; and it does not wrap, so it overflows. Measured over 412 tables from real agent answers,
+**95% carried inline markdown** and **0 of 412** fit a phone-width monospace bubble (median widest
+row 151 chars) — so there is no narrow case worth a second code path. `frontend/table.py` renders
+each row as a labelled block (`<b>name</b>` then `header: value` lines), labelling values only when
+a row has siblings to tell apart. See KNOWN-BUGS b1 (archived in HISTORY 2026-07-26).
+
+### AD-19 — STT: one punctuated carrier prompt, plus a confidence hallucination guard (2026-07-26)
+Whisper imitates the style of what it is primed with, so punctuation is bought by a punctuated
+`initial_prompt`, not by any decode flag. But `initial_prompt` and faster-whisper's `hotwords=`
+share one conditioning slot, so the jargon rides *inside* a punctuated carrier (`hotwords.CARRIER`)
+rather than in a competing arg — priming for punctuation alone had turned "bote" into "Pode".
+Separately, Whisper hallucinates words on near-silent audio and no decode setting stops it (VAD
+only shortened the garbage), so the guard is the model's own `avg_logprob`: real transcripts scored
+-0.15..-0.48, garbage -1.49, threshold `_MIN_LOGPROB = -0.9`; a rejected transcript rides the C3
+fail-safe. `no_speech_prob` is 0.000 for every file once VAD strips the silence — not a usable
+signal. Corollary convention: **`format.plain` is `html.escape`, never speech** — TTS input goes
+through `speech.to_speech`, not `plain`. Contract in `frontend/SPEC.md`.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

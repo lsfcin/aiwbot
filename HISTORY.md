@@ -1,6 +1,84 @@
 # aiwbot — History
 > Archive of completed work. Open work lives in [ROADMAP.md](ROADMAP.md).
 
+## Completed — 2026-07-26 (finish plan F0–F3, all live-confirmed)
+
+The open backlog was sequenced as a **finish line** (F0 bookkeeping → F1 bugs → F2 papercuts →
+F3 features → F4 streaming → `ask_user`); F0 through F3 shipped this session, 6 commits on
+`feature/finish-plan`, 239 tests green (from 186). show-me and Phase D parked past the line.
+A method ran through all of it: **decide on measured data, not hunches** — 4000 real answers for
+F1, 412 real tables for the table rewrite, Lucas's own 15 voice notes for F3b, live Telegram
+prototypes for every F2 UX call.
+
+**F0 — bookkeeping.** Two roadmap lies removed: the claude model order (`sonnet, opus, fable`)
+was listed open but had already shipped; button latency sat in *both* "won't chase" and the
+backlog, so on Lucas reopening it the won't-chase entry was deleted and it moved to F3.
+
+**F1 — bugs taxing every reply** (both in Resolved Bugs below). b1 tables/bold and b2 opencode
+error surfacing, each closed with a `tests/**/b<N>-*` regression spec built from a real payload.
+
+**F2 — papercut batch** (`tests/test_f2_papercuts.py`). Every choice made by Lucas against a
+live prototype sent through the real pipeline: phrase banks → lowercase, period-free, tone rule
+now a comment at the head of `phrases.py`; `⏳` → flat `·`; the reply anchor (`answer_block`) now
+*leads* with `continua [ABC] TÍTULO` because Telegram quotes a message from its start, so the
+footer label was invisible in the compose preview; `bote`→`bot` STT mishearing normalized, with
+start-word detection extracted to `frontend/startword.py`; STT transcript echoed back quoted
+under Lucas's own voice note (also the instrument F3b tuned against).
+
+**F3a — inline harness/model selection, zero tokens** (`frontend/directives.py`,
+`tests/test_directives.py`). `bot, opencode glm resume o pdf` reads its harness/model off the
+leading words by matching what the backends already declare — no triage inference. Harness via a
+data alias table, model by normalized match (`glm`→`nvidia/z-ai/glm-5.2`), a model implying its
+harness. Reads only the leading run so mid-prose mentions are safe; a task-less message is left
+untouched. Applied via `turnhelpers.apply_directives`, reusing `panel.apply` so the
+harness-clears-model rule stays in one place. Voice turns get it free (same bot-prefix branch).
+
+**F3b — punctuation + cadence, token-free** (`frontend/speech.py`, `tests/test_speech.py`,
+`tests/test_stt.py`; contract in `frontend/SPEC.md`). Three findings on Lucas's own voice notes:
+(1) Whisper punctuates when its `initial_prompt` is punctuated — free; (2) `initial_prompt` and
+`hotwords=` share one conditioning slot, so the jargon now rides *inside* a punctuated carrier
+(`hotwords.CARRIER`) rather than losing to it (which had turned "bote" into "Pode"); (3) most bad
+cadence was not the TTS model — the voice reply was fed `format.plain` (= `html.escape`), so
+Kokoro was pronouncing `&#x27;`, `##`, `**` and table pipes; `speech.to_speech` renders prose
+instead. Plus a **hallucination guard** found along the way: Whisper invents words on near-silent
+audio and no decoding setting stops it (VAD only shortened `e-mail e-mail` to `e-mail.com`), so
+the guard is the model's own confidence — real transcripts scored -0.15..-0.48, garbage -1.49, so
+`_MIN_LOGPROB = -0.9` splits them and a rejected transcript rides the C3 fail-safe.
+
+### Audio — in **and out** (shipped 2026-07-24, archived here)
+End-to-end voice: faster-whisper STT (large-v3-turbo, PT) dispatches voice notes into the session
+graph; a voice note opening with "bot" starts a new session; Kokoro-82M TTS (pf_dora) replies in
+OGG/Opus; empty/exception transcripts degrade to untranscribed INBOX + notice (C3); models
+lazy-loaded so `make test` stays import-safe with the deps absent (C6). Wrappers `frontend/stt.py`
+/ `frontend/tts.py`, voice reply `frontend/reply.py`, hotwords data `frontend/hotwords.py`.
+Contract in `frontend/SPEC.md`. (F3b later reworked the STT conditioning and TTS input feeding.)
+
+### Housekeeping done
+- **PT-BR phrase style** (lowercase, period-free) — carried over from the retired daemon's
+  preference and applied to every bank in `phrases.py` as part of F2.
+
+## Resolved Bugs — 2026-07-26
+
+- **[b1] tables and bold don't render** — the original hunch (escaping order / pipe-table
+  detector) was wrong; escaping was correct throughout. Probing 4000 real assistant answers found
+  **two independent causes**: (1) `<pre>`-boxed tables escaped their own contents, freezing cell
+  markdown into literal `**` — and 0 of 412 real tables fit a phone-width bubble anyway (median
+  widest row 151 chars), so `<pre>` boxing is gone, replaced by `frontend/table.py` rendering rows
+  as labelled blocks; (2) `_BOLD_RE`'s non-greedy close took 2 of 3 trailing asterisks in
+  `**bold *italic***`, emitting `<b>x <i>y</b></i>` — Telegram rejects crossed entities and
+  `reply._send_plain` then strips *every* tag, so one run cost a whole message its formatting;
+  fixed with a `(?!\*)` lookahead. Spec `tests/test_b1_table_bold.py`; the 4000-answer probe now
+  reports 0 rejections.
+- **[b2] opencode errors collapse to generic "no text event"** — the prior analysis was right,
+  only the payload shape was missing. Earlier repros hung because they *resumed* a session;
+  forcing the error on a *fresh* run (`-m <bogus model>`) returns instantly with
+  `{"type":"error",…,"error":{"name":"UnknownError","data":{"message":…}}}` and **exit code 0**,
+  which is why `proc.py` never treated it as a hard fail. `_line_to_event` now maps `type=="error"`
+  (preferring `error.data.message` — opencode labels everything `UnknownError`), and
+  `events_from_run` treats a zero-event parse as a failure that quotes the raw tail, so the next
+  unrecognized shape names itself. Spec `tests/test_b2_opencode_error.py` +
+  `tests/fixtures/opencode_error.jsonl`.
+
 ## Completed — 2026-07-23
 
 ### Backlog re-ranked by away-from-PC value

@@ -11,13 +11,15 @@ verify: none
 
 ## Inputs
 - A Telegram voice note: `voice.file_id: str` reaching `bot._handle_message`.
-- `hotwords.HOTWORDS: list[str]` — explicit editable literal (workspace jargon + EN loanwords), no inline strings (C4).
+- `hotwords.HOTWORDS: list[str]` — explicit editable literal (workspace jargon + EN loanwords), no inline strings (C4). Joined by `hotwords.CARRIER`, punctuated carrier sentences in Lucas's register (F3b, 2026-07-26): whisper imitates the style it is primed with, so punctuation has to be *in* the prompt, and the jargon has to ride inside that same prompt because `initial_prompt` and faster-whisper's separate `hotwords=` arg compete for one conditioning slot.
 - On voice-out: the delivered turn text `result.text: str` (plain-stripped via `format.plain`, clipped to a sane cap).
 - `stt.run` accepts an injectable `model` (the C1/C3 test seam); `tts.encode_ogg` accepts a synthetic numpy waveform + `sample_rate: int` (the C5 test seam).
 
 ## Outputs
-- `hotwords.as_prompt() -> str` — HOTWORDS joined by spaces for faster-whisper's `hotwords=` arg.
-- `stt.run(path: Path, model) -> str` and `stt.transcribe(path: Path) -> str` — transcript text; `""` on empty/exception (C1/C3).
+- `hotwords.as_prompt() -> str` — CARRIER sentences then HOTWORDS, fed to faster-whisper's `initial_prompt=` (was `hotwords=` before F3b; signature unchanged, mechanism changed).
+- `stt.run(path: Path, model) -> str` and `stt.transcribe(path: Path) -> str` — transcript text; `""` on empty/exception (C1/C3) **or on a transcript the model itself doubts** (F3b).
+- `stt.confident(segments) -> bool` — mean `avg_logprob` over the segments vs `_MIN_LOGPROB`.
+- `speech.to_speech(markdown: str) -> str` — an agent's markdown answer as prose a voice can read.
 - `tts.encode_ogg(samples, sample_rate: int) -> bytes` — OGG/Opus bytes (Opus magic header present); `tts.synthesize(text: str) -> bytes` (C5).
 - `reply.send_voice(msg, ogg_bytes: bytes) -> Message | None` — best-effort voice reply; `None` on failure (text already delivered).
 - Voice-in path yields either a routed turn (`_route_text(..., spoken=True)`) or a transcribed INBOX entry — never an untranscribed dump when text is present (C1).
@@ -27,7 +29,9 @@ verify: none
 - `stt.run` wraps transcription in try/except and returns `""` on ANY failure; empty and exception both collapse to `""` (C3).
 - An empty transcript is NEVER dispatched: the voice branch guards on `t.strip()` and on empty falls back to transcribed→untranscribed INBOX + a `TRANSCRIBE_FAIL_PHRASES` notice (C3).
 - The `spoken: bool` flag is kw-only with default `False`; text-triggered turns are byte-for-byte unaffected (C5). Voice reply is additive — its failure never blocks the already-delivered text.
-- Voice transcripts route through the SAME `_route_text` as typed text (symmetry); the `"bot"` prefix is parsed by the existing `_strip_bot_prefix`, no new prefix logic (C2).
+- Voice transcripts route through the SAME `_route_text` as typed text (symmetry); the `"bot"` prefix is parsed by the existing `_strip_bot_prefix` (now `startword.strip_prefix`), no new prefix logic (C2).
+- The voice reply is fed `speech.to_speech(result.text)`, NEVER `format.plain` — that is `html.escape`, which is the opposite of prose and had Kokoro pronouncing `&#x27;` and table pipes (F3b).
+- A low-confidence transcript degrades exactly like an empty one: untranscribed INBOX entry plus a notice. Whisper hallucinates words on near-silent audio and no decoding setting prevents it, so the guard is confidence, not settings — and a false reject is recoverable where a dispatched hallucination costs a real turn.
 
 ## Examples
 Test coverage: `tests/test_stt.py` (C1 transcription success, C3 empty/exception), `tests/test_tts.py` (C5 OGG/Opus encode), `tests/test_route_text.py` (C2 "bot" prefix via spoken=True), `tests/test_hotwords.py` (C4 editable data), integration verified in `tests/test_reply_voice.py`.

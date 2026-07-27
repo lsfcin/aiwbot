@@ -1,11 +1,15 @@
 # opencode.py — OpencodeBackend: normalizes `opencode run --format json` (JSONL stream).
 from __future__ import annotations
+import json
 from . import binaries, catalog, ocstore
 from .base import AgentEvent, TurnOptions, add_flag, try_json
 from .caps import Capabilities
 from .cli import CliBackend
 
 _MODES = ("build", "plan")
+# How much of an unrecognized error line to quote back. Enough to identify the shape when a
+# provider invents a new one, short enough not to dump a payload into a chat bubble.
+_ERROR_CHARS = 300
 
 
 def _row_to_item(row: tuple) -> dict:
@@ -18,8 +22,29 @@ def _row_to_item(row: tuple) -> dict:
             "mode": row[3], "model": model, "context_window": window}
 
 
+def _error_text(obj: dict) -> str:
+    """Captured live from the CLI (b2): an error line is
+    `{"type":"error","sessionID":…,"error":{"name":"UnknownError","data":{"message":…,"ref":…}}}`.
+    The nested message is the part worth reading — the outer name stays `UnknownError` even when
+    the cause is perfectly knowable ("ResourceExhausted: Worker local total request limit reached
+    (48/48)"). Fall back to the name, then the raw object, so no shape can yield an empty reason."""
+    error = obj.get("error")
+    text = ""
+    if isinstance(error, dict):
+        data = error.get("data")
+        if isinstance(data, dict):
+            text = data.get("message") or ""
+        if not text:
+            text = error.get("name") or ""
+    if not text:
+        dumped = json.dumps(obj)
+        text = dumped[:_ERROR_CHARS]
+    return text
+
+
 def _line_to_event(obj: dict) -> AgentEvent | None:
-    """opencode JSONL: type=text carries part.text, type=step_finish carries part.cost."""
+    """opencode JSONL: type=text carries part.text, type=step_finish carries part.cost,
+    type=error carries the reason a turn produced no text at all."""
     kind = obj.get("type")
     part = obj.get("part", {})
     sid = obj.get("sessionID")
@@ -30,6 +55,9 @@ def _line_to_event(obj: dict) -> AgentEvent | None:
     elif kind == "step_finish":
         cost = part.get("cost")
         result = AgentEvent(kind="result", session_id=sid, cost_usd=cost)
+    elif kind == "error":
+        text = _error_text(obj)
+        result = AgentEvent(kind="error", text=text, session_id=sid)
     return result
 
 
