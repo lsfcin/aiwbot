@@ -2,17 +2,13 @@
 from __future__ import annotations
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from . import config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, stt, tts, turnhelpers
+from . import config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, speech, startword, stt, tts, turnhelpers
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 DEFAULT_BACKEND = registry.DEFAULT_BACKEND
 
 
-def _strip_bot_prefix(text: str) -> str | None:
-    lowered = text.lower()
-    has_prefix = lowered.startswith("bot ") or lowered.startswith("bot,")
-    prompt = text[4:].strip() if has_prefix else None
-    return prompt
+_strip_bot_prefix = startword.strip_prefix
 
 
 def _empty_guard(transcript: str) -> bool:
@@ -41,7 +37,8 @@ async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
         msgmap.remember_reply(sent.message_id, result.session_id)
     if spoken:
         try:
-            speech_text = format.clip_chars(format.plain(result.text), 2000)
+            spoken_text = speech.to_speech(result.text)
+            speech_text = format.clip_chars(spoken_text, 2000)
             ogg_bytes = tts.synthesize(speech_text)
             await reply.send_voice(msg, ogg_bytes)
         except Exception as e:
@@ -105,10 +102,20 @@ async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
             return
     bot_prompt = _strip_bot_prefix(text)
     if bot_prompt is not None:
-        await _start_new(msg, bot_prompt, spoken=spoken)
+        prompt = turnhelpers.apply_directives(bot_prompt)
+        await _start_new(msg, prompt, spoken=spoken)
         return
     inbox.append_entry(inbox.build_entry(text, None, forwarded=msg.forward_origin is not None))
     await reply.safe_reply(msg, format.plain(phrases.pick(phrases.CAPTURE_ACKS)))
+
+
+async def _echo_transcript(msg, transcript: str) -> None:
+    """F2: quote back what STT heard, as a reply to Lucas's own voice note and before the turn
+    runs. Without it a mishearing is only ever inferred from a strange answer, minutes later —
+    and it is the instrument the audio punctuation/cadence work tunes against."""
+    quoted = format.plain(transcript)
+    line = phrases.TRANSCRIPT_ECHO.format(text=quoted)
+    await reply.safe_reply(msg, f"<blockquote>{line}</blockquote>")
 
 
 async def _handle_voice(msg, context) -> None:
@@ -120,6 +127,7 @@ async def _handle_voice(msg, context) -> None:
         inbox.append_entry(inbox.build_entry("voice note (untranscribed)", path, forwarded=msg.forward_origin is not None))
         await reply.safe_reply(msg, format.plain(phrases.pick(phrases.TRANSCRIBE_FAIL_PHRASES)))
         return
+    await _echo_transcript(msg, transcript)
     await _route_text(msg, transcript, context, spoken=True)
 
 

@@ -160,16 +160,31 @@ def _meta_line(provider: str | None, model: str | None, cost_usd: float | None,
     return " · ".join(bits)
 
 
+CONTINUES = "continua"
+
+
+def _anchor_line(sid: str, title: str | None) -> str:
+    """What a reply to this message continues, as the FIRST line — Telegram's reply preview
+    quotes a message from its start, so anything below the fold is invisible at the moment
+    Lucas is deciding what he is replying to. That was the whole affordance complaint: every
+    answer opened the compose box quoting its own opening words, which name no session."""
+    label = f"{CONTINUES} [{sid[:SESSION_ID_LABEL_LEN].upper()}] {title_words(title)}"
+    return html.escape(label)
+
+
 def answer_block(body: str, sid: str | None, title: str | None, provider: str | None = None,
                  model: str | None = None, cost_usd: float | None = None,
                  mode: str | None = None, context_used: int | None = None,
                  context_window: int | None = None) -> str:
-    """The network's answer with the session header as a footer (everything here is a response).
-    Footer meta reads provider · modelo · modo · X%contexto · $custo."""
-    lines = [format_body(body), "· · ·"]
+    """The network's answer, led by the line naming the session a reply would continue and
+    closed by meta: provider · modelo · modo · X%contexto · $custo."""
+    lines = []
     if sid:
-        label = f"[{sid[:SESSION_ID_LABEL_LEN].upper()}] {title_words(title)}"
-        lines.append(html.escape(label))
+        anchor = _anchor_line(sid, title)
+        lines.append(anchor)
+    formatted = format_body(body)
+    lines.append(formatted)
+    lines.append("· · ·")
     meta = _meta_line(provider, model, cost_usd, mode, context_used, context_window)
     if meta:
         lines.append(html.escape(meta))
