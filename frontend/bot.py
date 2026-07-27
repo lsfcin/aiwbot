@@ -1,8 +1,9 @@
 # bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX.
 from __future__ import annotations
+import asyncio
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from . import config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, speech, startword, stt, tts, turnhelpers
+from . import choices, config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, speech, startword, stt, tts, turnhelpers
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 DEFAULT_BACKEND = registry.DEFAULT_BACKEND
@@ -115,7 +116,7 @@ async def _echo_transcript(msg, transcript: str) -> None:
     and it is the instrument the audio punctuation/cadence work tunes against."""
     quoted = format.plain(transcript)
     line = phrases.TRANSCRIPT_ECHO.format(text=quoted)
-    await reply.safe_reply(msg, f"<blockquote>{line}</blockquote>")
+    await reply.safe_reply(msg, line)
 
 
 async def _handle_voice(msg, context) -> None:
@@ -127,8 +128,11 @@ async def _handle_voice(msg, context) -> None:
         inbox.append_entry(inbox.build_entry("voice note (untranscribed)", path, forwarded=msg.forward_origin is not None))
         await reply.safe_reply(msg, format.plain(phrases.pick(phrases.TRANSCRIBE_FAIL_PHRASES)))
         return
-    await _echo_transcript(msg, transcript)
-    await _route_text(msg, transcript, context, spoken=True)
+    # Echo and route the SAME string: the echo exists to show what reached the session, so
+    # routing's cleanup has to be visible in it (Lucas, 2026-07-27).
+    heard = startword.normalize(transcript)
+    await _echo_transcript(msg, heard)
+    await _route_text(msg, heard, context, spoken=True)
 
 
 async def _dispatch_command(text: str, msg) -> None:
@@ -176,6 +180,9 @@ async def _post_init(app: Application) -> None:
         BotCommand("resume", "Retoma uma sessão recente"),
         BotCommand("help", "Lista os comandos"),
     ])
+    # Off the event loop (it shells a CLI), and awaited before polling starts so no tap can
+    # race the warm and pay for it (F3c).
+    await asyncio.to_thread(choices.warm)
 
 
 def main() -> None:

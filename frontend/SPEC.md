@@ -11,12 +11,13 @@ verify: none
 
 ## Inputs
 - A Telegram voice note: `voice.file_id: str` reaching `bot._handle_message`.
-- `hotwords.HOTWORDS: list[str]` — explicit editable literal (workspace jargon + EN loanwords), no inline strings (C4). Joined by `hotwords.CARRIER`, punctuated carrier sentences in Lucas's register (F3b, 2026-07-26): whisper imitates the style it is primed with, so punctuation has to be *in* the prompt, and the jargon has to ride inside that same prompt because `initial_prompt` and faster-whisper's separate `hotwords=` arg compete for one conditioning slot.
+- `hotwords.HOTWORDS: list[str]` — explicit editable literal (workspace jargon, model names, EN loanwords), no inline strings (C4). It is the **checklist**, not the prompt: every word in it must appear inside some `hotwords.CARRIER` sentence, which `test_as_prompt_joins_every_hotword_into_one_string` enforces. Whisper imitates the style it is primed with, so punctuation has to be *in* the prompt — and **corrected 2026-07-27**: a bare word list ANYWHERE in the prompt suppresses punctuation, not merely at the tail. Measured on Lucas's chuveiro voice note: sentences-then-list 0.0 marks/100 words, list-then-sentences 1.1, jargon dissolved into the sentences 22.5. The prompt is prose end to end.
 - On voice-out: the delivered turn text `result.text: str` (plain-stripped via `format.plain`, clipped to a sane cap).
 - `stt.run` accepts an injectable `model` (the C1/C3 test seam); `tts.encode_ogg` accepts a synthetic numpy waveform + `sample_rate: int` (the C5 test seam).
 
 ## Outputs
-- `hotwords.as_prompt() -> str` — CARRIER sentences then HOTWORDS, fed to faster-whisper's `initial_prompt=` (was `hotwords=` before F3b; signature unchanged, mechanism changed).
+- `hotwords.as_prompt() -> str` — the CARRIER sentences and nothing else, fed to faster-whisper's `initial_prompt=` (was `hotwords=` before F3b, was `CARRIER + HOTWORDS` until 2026-07-27; signature unchanged throughout, mechanism corrected twice).
+- `startword.normalize(text: str) -> str` — a misheard `bote` opener rewritten to `bot`. The voice path echoes and routes the SAME normalized string, so the echo shows what actually reached the session.
 - `stt.run(path: Path, model) -> str` and `stt.transcribe(path: Path) -> str` — transcript text; `""` on empty/exception (C1/C3) **or on a transcript the model itself doubts** (F3b).
 - `stt.confident(segments) -> bool` — mean `avg_logprob` over the segments vs `_MIN_LOGPROB`.
 - `speech.to_speech(markdown: str) -> str` — an agent's markdown answer as prose a voice can read.

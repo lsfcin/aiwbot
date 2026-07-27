@@ -70,6 +70,24 @@ def values_for(scope: str, dim: str) -> tuple[list[str], bool]:
     return values, deep
 
 
+def warm() -> None:
+    """Ask every backend for its declaration once, at startup. opencode builds its catalogue by
+    shelling `opencode models` (839 ms measured here) and parsing a 3 MB models.json (26 ms),
+    then memoizes both for the process's life — so without this the FIRST model or menu tap
+    after each daemon restart pays ~865 ms BEFORE the callback is answered. That is the whole
+    "button feels slow" complaint on a restarted daemon, and it is the only part of a tap that
+    was ever ours to lose: warm, every path measures under 1 ms (F3c).
+
+    Provider-agnostic on purpose — it asks the seam, never opencode's catalogue directly, so a
+    third backend with its own expensive declaration is warmed by existing."""
+    for name in backend_names():
+        backend = get_backend(name)
+        caps = backend.capabilities()
+        favourites = caps.favourites
+        if favourites:
+            backend.efforts(favourites[0])
+
+
 def menu_dims(scope: str) -> list[str]:
     """Which dimensions this scope can actually change. A dimension with nothing to offer is
     dropped rather than shown and then refused — `effort` is the one that disappears."""
