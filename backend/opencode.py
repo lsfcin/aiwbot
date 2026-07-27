@@ -125,6 +125,13 @@ class OpencodeBackend(CliBackend):
         text, _ = ocstore.last_turn(session_id)
         return text
 
+    def occupancy(self, session_id: str, cwd: str) -> int | None:
+        """Per-message occupancy from the store — the same number the /resume list shows, so a
+        live turn and a listed session report context the same way (b3). The JSONL stream itself
+        carries no usage breakdown, so before this an opencode answer showed no % at all."""
+        _text, used = ocstore.last_turn(session_id)
+        return used
+
     def session_detail(self, session_id: str, cwd: str) -> dict:
         """The bits that cost a query: answer preview + context occupancy. Called for the
         page being rendered, not for all 59 listed sessions."""

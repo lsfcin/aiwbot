@@ -412,6 +412,31 @@ not demoted; the id and title live in the footer (`[ABC] TÍTULO · claude · so
 $0.031`), which is where he asked for them. `answer.py` now owns the answer message's shape —
 `format.py` stays shared text formatting, and the split is what kept it under the size gate.
 
+### AD-24 — Occupancy is the last request; anything summed is spend (2026-07-27, b3)
+
+A turn is not one API request. A turn that uses tools makes several, and each one re-reads the
+whole conversation from cache — so **any total over a turn measures money, and only the last
+request measures how full the window is.** Summing them put 100–200%+ in the footer of Lucas's
+answers; over real transcripts the same sum reaches 5921%, 6507% and 32533%. The denominator was
+never the problem — the learned windows were a correct 1,000,000.
+
+The subtle part, and the reason this is a spec and not a patch note: the wrong number is *not
+always visibly wrong*. One real session summed to a perfectly plausible 62% when the truth was
+5%. A bug that only sometimes looks like a bug is one that survives review, so the rule is
+structural rather than a range check.
+
+It lives on the seam, as `CliBackend.occupancy(session_id, cwd)` — every CLI records a
+per-message token breakdown in its own store, so each backend reads occupancy from there and the
+run's summary object is never trusted for it. claude takes the transcript's last assistant
+message; opencode takes `ocstore.last_turn`, which is also the first time an opencode answer
+reports a percentage at all. `ocstore.py` had documented this exact trap for opencode's
+accumulating `tokens_*` columns and the claude path walked into it anyway — one backend
+remembering a rule is not the same as the seam enforcing it.
+
+Belt and braces on top: `format.context_pct` withholds any share above 100%, because a share of
+the window cannot exceed the window. A visibly missing number is a better bug report than a
+confidently wrong one.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

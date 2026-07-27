@@ -123,14 +123,21 @@ def short_model(model: str | None) -> str | None:
     return result
 
 
+# A share of the window cannot exceed the window. Anything above this is a measurement bug, not
+# a full context, so it is withheld rather than shown — b3 put "200%" in front of Lucas for days
+# and a visibly missing number is a better bug report than a confidently wrong one.
+_MAX_PCT = 100
+
+
 def context_pct(used: int | None, window: int | None) -> str | None:
-    """Context occupancy as `32%`. None unless the provider reported both numbers —
-    claude gets them free from the result object's modelUsage (no extra tokens)."""
+    """Context occupancy as `32%`. None unless the provider reported both numbers, and None
+    when the pair is impossible — see `_MAX_PCT` and backend `occupancy()` (b3)."""
     result = None
     if used and window:
         ratio = 100 * used / window
         pct = round(ratio)
-        result = f"{pct}%"
+        if pct <= _MAX_PCT:
+            result = f"{pct}%"
     return result
 
 

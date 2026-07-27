@@ -4,18 +4,24 @@ Log as `- [ ] [bN] <symptom> — <where>`; a FIXED flip needs a `tests/**/b<N>-*
 regression test (see code/VERIFY.md).
 
 ## Open
-- [ ] **[b3] context occupancy reports impossible percentages** — the `X%` in an answer's meta
-  footer "passa de 100%, em alguns casos passando de 200%" (Lucas, INBOX 2026-07-26). Since the
-  number is a share of the window it cannot exceed 100% by definition, so either the numerator is
-  a lifetime sum rather than a per-message occupancy, or the window is wrong for the model that
-  actually ran. Both are live suspects and neither is confirmed:
-  `format.context_pct(used, window)` divides whatever it is handed; `ocstore.context_used`
-  deliberately reads per-message `tokens.input + cache.read + cache.write` *because* the session's
-  `tokens_*` columns accumulate (one real session summed to 175% of its window — see the comment
-  in `ocstore.py`, which means this exact failure was already understood once); and
-  `registry.remember_context_window` *learns* the window from a live turn, so one bad observation
-  poisons every later percentage for that model. Start by logging the raw pair, not the quotient.
-  Touches `frontend/format.py`, `backend/ocstore.py`, `backend/transcript.py`, `frontend/registry.py`.
+_(none)_ — b1, b2 fixed 2026-07-26; **b3 fixed 2026-07-27**, all archived in
+[HISTORY.md](HISTORY.md) § Resolved Bugs with their regression specs.
+
+- [x] **[b3] context occupancy reported impossible percentages** (Lucas, INBOX 2026-07-26:
+  "passando de 100%, em alguns casos passando de 200%") — **FIXED**, spec
+  `tests/test_b3_context_pct.py`. The denominator was innocent: the learned windows were a
+  correct 1,000,000. The numerator was a **sum over every API request in the turn**. A turn that
+  uses tools makes several requests and each re-reads the whole context from cache, so
+  `modelUsage`'s token fields measure *spend*, not how full the window is. Measured over real
+  transcripts the sums reach 5921%, 6507%, 32533% — and, worse, sometimes land on a
+  plausible-looking 62% that was really 5%. Occupancy is a property of the LAST request alone, so
+  it now comes from each provider's own per-message store through a new `CliBackend.occupancy()`
+  seam (claude: the transcript's last assistant message; opencode: `ocstore.last_turn`, which
+  also means an opencode answer reports a % at all for the first time). `format.context_pct`
+  additionally withholds any share above 100%, since such a pair cannot be true.
+  `ocstore.py` had already documented this exact trap for opencode's `tokens_*` columns; the
+  claude path walked into it anyway, which is why the seam now owns the rule instead of one
+  backend remembering it.
 
 ## Residual (by design)
 - Bot sessions created **before** 2026-07-23 stay invisible in Claude Code's native picker: the filter

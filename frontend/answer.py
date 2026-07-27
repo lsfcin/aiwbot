@@ -26,11 +26,12 @@ def _session_label(sid: str | None, title: str | None) -> str | None:
 
 def _footer(sid: str | None, title: str | None, provider: str | None, model: str | None,
             cost_usd: float | None, mode: str | None, used: int | None,
-            window: int | None) -> str:
+            window: int | None) -> list[str]:
+    """Two lines, not one (Lucas, 2026-07-27): which session this is, then what it ran on.
+    They answer different questions, and running them together made the title hard to find."""
     label = _session_label(sid, title)
     meta = _meta_line(provider, model, cost_usd, mode, used, window)
-    parts = [bit for bit in (label, meta) if bit]
-    return " · ".join(parts)
+    return [bit for bit in (label, meta) if bit]
 
 
 def block(body: str, sid: str | None, title: str | None, provider: str | None = None,
@@ -51,7 +52,7 @@ def block(body: str, sid: str | None, title: str | None, provider: str | None = 
     lines.append(formatted)
     lines.append(SEPARATOR)
     footer = _footer(sid, title, provider, model, cost_usd, mode, context_used, context_window)
-    if footer:
-        escaped = html.escape(footer)
+    for line in footer:
+        escaped = html.escape(line)
         lines.append(escaped)
     return "\n".join(lines)

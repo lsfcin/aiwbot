@@ -111,15 +111,19 @@ def test_short_model_extracts_family():
 
 
 def test_answer_body_first_then_the_footer_that_names_it():
+    """Footer is TWO lines (Lucas, 2026-07-27): which session, then what it ran on. Run
+    together the title was hard to pick out of the meta."""
     block = answer.block("oi tudo bem", "abc12345", "titulo da sessao",
                          provider="claude", model="claude-sonnet-5", cost_usd=0.022)
     lines = block.split("\n")
     assert lines[0] == "oi tudo bem"
     assert "· · ·" in block
-    assert lines[-1] == "[ABC] TITULO DA SESSAO · claude · sonnet · $0.022"
+    assert lines[-2] == "[ABC] TITULO DA SESSAO"
+    assert lines[-1] == "claude · sonnet · $0.022"
 
 
 def test_answer_footer_omits_missing_meta():
     block = answer.block("resposta", "abc12345", None, provider="opencode", model=None, cost_usd=None)
     lines = block.split("\n")
-    assert lines[-1] == "[ABC] (SEM TÍTULO) · opencode"
+    assert lines[-2] == "[ABC] (SEM TÍTULO)"
+    assert lines[-1] == "opencode"

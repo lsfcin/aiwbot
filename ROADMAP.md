@@ -37,8 +37,8 @@ capability.
 > **~~F0~~ → ~~F1~~ → ~~F2~~ → ~~F3~~ → ~~F5 answer shape~~ → F4 streaming → ask_user**
 > ┃ *line* ┃ ~~show-me~~ · ~~Phase D~~
 >
-> Next up: **[b3] context % over 100%** (small, and wrong on every answer), then **F4** — the
-> finish line itself. Everything before F4 is shipped.
+> Next up: **F4** — the finish line itself, and the only thing left before it. Everything
+> else is shipped; b3 closed 2026-07-27 (SPECS AD-24).
 
 | Stage | Contents | Why here |
 |-------|----------|----------|
