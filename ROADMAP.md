@@ -197,7 +197,7 @@ first, then move to KNOWN-BUGS.md with a `bN` id if they survive the round they 
       layout, not relief — and each package costs a facade plus a CONTEXT.md — so it is churn with
       no behaviour change. Worth doing when the audio work or a third picker makes the flat
       directory genuinely hard to read, not before.
-- [ ] **`bot.py` is at 197 LOC** (200 is the hard gate) after F3c's startup warm and the voice
+- [ ] **`bot.py` is at 198 LOC** (200 is the hard gate) after F3c's startup warm and the voice
       echo change — two lines of headroom left, so the next touch pays for the split. F4 puts
       streaming into exactly this file, so it *will* breach. Split when F4 starts, not now — the
       seam F4 introduces is what should decide where the cut goes.
