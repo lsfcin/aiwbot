@@ -13,6 +13,7 @@
 | [`ask.py`](ask.py) | — | `new_token`, `register`, `unregister`, `question_of`, `answer` | ask.py — the bot side of ask_user: hold a running turn open on a question until Lucas answers. |
 | [`askserver.py`](askserver.py) | — | `mcp_config`, `port`, `handle_rpc`, `start` | askserver.py — the daemon's own MCP server: one HTTP endpoint per live turn, JSON-RPC by hand. |
 | [`bot.py`](bot.py) | — | `main` | bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX. |
+| [`cadence.py`](cadence.py) | — | `Cadence`, `due`, `spaced`, `typing_due`, `mark_paint` | cadence.py — when a streamed answer is allowed to move: repaint rate, typing, bubble spacing. |
 | [`choices.py`](choices.py) | — | `harness_values`, `model_values`, `groups`, `effort_values`, `preferred` | choices.py — what a scope may be offered: the backends' declarations, asked per dimension. |
 | [`config.py`](config.py) | [`config.pyi`](config.pyi) | `config_dir`, `load_config`, `save_config`, `bot_token`, `allowed_chat_id` | config.py — aiwbot's own Telegram config dir (separate token/storage from the old workspace bot). |
 | [`directives.py`](directives.py) | — | `resolve` | directives.py — read leading harness/model words off a bot-prefixed message, no inference. |

@@ -133,12 +133,19 @@ Stage 3 **confirmed in chat** ("funciona"). Then his list, with what each turned
   listening" no longer re-queues) plus a regression test. Never fired in the live bot, where
   `on_bubble` is always set, but it was one call site away.
 
-Still open from that list, answers in the reply rather than in code:
-- **Bubble balance** (his #2) — the split is greedy at ~900 chars because sealing forbids
-  lookahead: a bubble is sent before the text that would balance it exists. Rebalancing means
-  giving up sealing. Left as is, on his "podemos ignorar".
-- **Pacing between bubbles** (his #3) — there is no inter-bubble delay to turn on; what exists is
-  the 3 s repaint floor and the typing indicator. Nothing was broken, nothing was enabled.
+Second round, same day (Stage 4 confirmed live in his chat — the interview ran):
+- **Exact `(n/N)` everywhere** — one closing pass stamps the sealed bubbles (AD-29). The single
+  sanctioned exception to AD-25.
+- **A real pause between bubbles** — `cadence.BUBBLE_GAP`, 4 s, one bubble per paint. The 3 s he
+  remembered was `MIN_INTERVAL`, which paces repaints of the live bubble and nothing else; the
+  confusion is now impossible to repeat, since timing lives in `cadence.py` with both constants
+  named for what they pace.
+- **`ask_user` interviewed him without buttons** — the tool description read `options` as optional
+  and the model skipped it. Rewritten so offering 2–4 options is the rule and free text the
+  exception. Behavioural, so it wants one live look.
+- Left as is, on his "podemos ignorar": **bubble balance** — the split is greedy at ~900 chars
+  because sealing forbids lookahead; a bubble ships before the text that would balance it exists,
+  so rebalancing means giving up sealing.
 
 #### F4 Stage 4 ✔ **code done 2026-07-28** — gate passed, live round trip proven off-Telegram
 The probe the stage was gated on passed: a stub HTTP MCP server + `claude -p --mcp-config

@@ -553,12 +553,22 @@ bubble of its own. The standalone echo (F2) cost a message and scrolled out of r
 the answer was long enough to need it. Repeated per bubble, any bubble he scrolls back to still
 says what it answers. It is escaped and clipped (`LEAD_CHARS`), because it is arbitrary speech.
 
-**Every bubble ends with its position**, `(2/3)` — and mid-stream, `(2)`. The total is genuinely
-unknowable while the answer is still arriving: bubble 3 exists only once the text that fills it
-does, and AD-25 forbids rewriting a sealed bubble to correct it. So a bubble shows the count it
-can know, and the finished answer is where the total appears. Exact `(n/N)` everywhere would
-require one edit pass over bubbles Lucas has already read — available, but it trades away the
-property that makes streaming feel like conversation.
+**Every bubble ends with its position**, `(2/3)`. The total is unknowable while the answer is
+still arriving — bubble 3 exists only once the text that fills it does — so a bubble is born
+carrying `(2)`, and **one closing pass** stamps the totals once the turn ends (Lucas asked for
+exact positions everywhere, 2026-07-28). That pass is the single exception to AD-25, which is why
+the rule reads "a sealed bubble is not rewritten *while the answer is streaming*" rather than
+"never": prefix-stability guarantees the counter is the only thing that changes, and the pass runs
+after the live bubble is finished, so the answer completes first and the stamping trails it.
+
+**Bubbles are paced apart, one per paint.** `cadence.BUBBLE_GAP` is the floor between one bubble
+appearing and the next; `MIN_INTERVAL` only ever paced repaints of the live bubble, and conflating
+the two is why the cadence appeared to do nothing. A stream that outruns the gap waits rather than
+losing text: the held text lands whole as the next bubble. `_grow` posts **exactly one** bubble per
+paint however far ahead the stream has run — posting every chunk that already fits would land
+three in the same second and undo the pause. The gap is a floor, never an added delay: a stream
+slower than it passes through untouched, and the first bubble is never held back, because the
+working message already is bubble one.
 
 **`·` is a divider, never an opener.** It separates (`· · ·`, `provider · modelo`), so it must not
 lead a line: `pensando…`, not `· pensando…`.

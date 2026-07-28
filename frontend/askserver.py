@@ -23,10 +23,16 @@ _UNKNOWN_METHOD = -32601
 
 TOOL = {
     "name": TOOL_NAME,
-    "description": ("Pergunta algo ao usuário no Telegram e ESPERA a resposta dele. Use quando "
-                    "uma decisão é dele (escolha de rumo, ambiguidade real, confirmação antes de "
-                    "algo custoso), não para narrar progresso. `options` vira botões; sem ela, o "
-                    "usuário responde em texto livre."),
+    # The first live interview (2026-07-28) came back as six free-text questions: the model read
+    # `options` as optional and skipped it, which is the worst answer on a phone. So the default
+    # is stated as the rule and free text as the exception.
+    "description": ("Pergunta algo ao usuário no Telegram e ESPERA a resposta dele. Use quando a "
+                    "decisão é dele (escolha de rumo, ambiguidade real, confirmação antes de algo "
+                    "custoso), nunca para narrar progresso. SEMPRE mande `options` com 2 a 4 "
+                    "alternativas curtas quando a pergunta admitir alternativas — elas viram "
+                    "botões, e um toque é muito mais barato que digitar no celular. Deixe sem "
+                    "`options` só quando a resposta for genuinamente aberta. O usuário pode "
+                    "responder em texto livre de qualquer forma."),
     "inputSchema": {
         "type": "object",
         "properties": {

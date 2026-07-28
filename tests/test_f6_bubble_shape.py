@@ -80,6 +80,48 @@ def test_a_streamed_voice_answer_keeps_the_quote_on_every_bubble():
         assert len(bubble.text) <= reply.TELEGRAM_MSG_LIMIT
 
 
+def _streamed(gap: float = 10.0) -> tuple:
+    origin = Origin()
+    clock = Clock()
+    live = painter.Painter(Bubble(origin.chat), "pensando…", clock=clock, origin=origin,
+                           on_bubble=lambda b, sid: None)
+
+    async def go():
+        for i in range(14):
+            clock.advance(gap)
+            await live.paint(f"paragrafo {i} " + "palavra " * 60 + "\n\n", session_id="s1")
+
+    asyncio.run(go())
+    return live, origin, clock
+
+
+def test_the_closing_pass_gives_every_bubble_its_exact_position():
+    """Lucas asked for `(n/N)` everywhere (2026-07-28). The total exists only once the answer is
+    finished, so exactly one pass at the end stamps the bubbles that were sealed with `(n)`.
+    Prefix-stability means the counter is the ONLY thing that changes under him."""
+    live, _, _ = _streamed()
+    assert len(live.sent) > 2, "the corpus did not produce enough bubbles"
+    body = live.text
+    block = body + "\n· · ·\n[ABC] TITULO\nclaude · sonnet"
+
+    sent = asyncio.run(live.finish(block))
+
+    total = len(sent)
+    for index, bubble in enumerate(sent[:-1], start=1):
+        assert bubble.text.endswith(f"({index}/{total})"), bubble.text[-40:]
+
+
+def test_a_sealed_bubble_is_stamped_and_otherwise_left_alone():
+    """The stamp is a counter, not a rewrite: the text a sealed bubble showed while streaming is
+    still the text it shows afterwards."""
+    live, _, _ = _streamed()
+    before = [b.text.rsplit(" (", 1)[0] for b in live.sent[:-1]]
+    block = live.text + "\n· · ·\n[ABC] TITULO"
+    asyncio.run(live.finish(block))
+    after = [b.text.rsplit(" (", 1)[0] for b in live.sent[:len(before)]]
+    assert after == before
+
+
 def test_the_pin_sits_below_the_counter():
     """Order on the live bubble: answer, then where it sits, then the status hanging under it."""
     frames = answer.frames("texto " * 400, pin="pensando…", limit=1000, soft=400)
