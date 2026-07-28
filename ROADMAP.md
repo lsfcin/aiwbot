@@ -142,7 +142,64 @@ local to update optimistically. That round trip is the product's floor, not a bu
 
 Regression: `tests/test_f5_answer_shape.py`.
 
-### F4 — heavy, strict order; the finish line sits at `ask_user`
+### F4 — staged plan, settled 2026-07-27
+
+Lucas asked for this one to be planned properly, with checkpoints, because it is the biggest change
+in the project. Scratch copy at `~/.claude/plans/sry-for-the-interruption-piped-dewdrop.md`; this is
+the canonical home.
+
+**The architectural crux, resolved.** linuz90's `ask_user` works only because it runs the Agent SDK
+`query()` **in-process** — its MCP tool handler can await a button press in the same process.
+aiwbot is a **subprocess** CLI, the opposite shape, and a stdio MCP server spawned by the CLI would
+be a child of the CLI, unable to reach the bot's Telegram state. Resolution, verified against
+`claude --help`: the daemon hosts an **HTTP MCP server in-process** and each turn passes
+`--mcp-config '<json>' --strict-mcp-config` pointing at `http://127.0.0.1:<port>/mcp/<turn_token>`.
+The handler runs *inside the daemon*, so it blocks the agent's turn exactly like the in-process
+version — **no Phase D rewrite**, and `opencode mcp` exists so provider-agnosticism holds.
+
+**Measured 2026-07-27, do not re-derive:**
+- `--output-format stream-json --verbose` → JSONL `system` / `assistant` (one *completed* message) /
+  `rate_limit_event` / `result`. Too coarse alone: a single-message answer shows nothing until the end.
+- `+ --include-partial-messages` → `type:"stream_event"` wrapping Anthropic SSE;
+  `event.delta = {"type":"text_delta","text":…}`. This is what gives token-level streaming.
+- `aiohttp` 3.13.5 installed, `mcp` SDK not — MCP over HTTP is plain JSON-RPC 2.0, **no new dep**.
+- **`split_html` is prefix-stable** — property-probed, 43 prefixes, 0 violations. `split_html(prefix)[:-1]`
+  is always a prefix of `split_html(full)` when `prefix` ends at a line boundary. This is what makes
+  mid-stream bubble sealing *compatible* with AD-23 rather than in conflict with it, and it makes
+  AD-23 stronger: bubbles get anchored the moment they are born, so Lucas can reply to bubble 1
+  while bubble 3 is still being written.
+- `format_body`'s fence regex needs both fences and `inline.convert` only emits balanced tags, so a
+  partial render never produces broken HTML — only HTML that may later change.
+
+**Decisions (Lucas):** all stages 0–5 · merge `feature/*` → `develop` after each approved checkpoint ·
+`ask_user` waits **1 h** then returns *text* (never an MCP error), pending a probe of the CLI's own
+tool timeout · streaming behind `TurnOptions.stream`, default off until Stage 3 passes ·
+token-level granularity · a mid-stream error **appends** a bubble, never deletes read text.
+
+| Stage | Goal | Checkpoint |
+|---|---|---|
+| **0** ✔ | split `bot.py` → `turnrun.py`, zero behaviour change | everything looks exactly as before |
+| **1** | streaming seam in the backend, still batch-delivered | log shows frames ticking; Telegram identical |
+| **2** | live bubble: throttled painter, `⏳` pinned | text grows ~every 1.5 s, footer+keyboard at the end |
+| **3** | seal bubbles mid-stream (full AD-23 under streaming) | reply to bubble 1 *while bubble 2 writes* |
+| **4** | `ask_user` MCP transport, probe-gated | question bubble → tap → streamed answer names the choice |
+| **5** | `ask_user` in anger, AD-25/AD-26, close F4 | a real plan-mode task, away from the PC |
+
+Key risks pre-empted: 64 KB subprocess stream limit (`limit=1<<20`); stderr pipe fills and hangs the
+child (sibling drain task); occupancy read before the transcript flushes would silently regress b3
+(`await proc.wait()` before yielding the result event); 429 pile-up (in-flight guard that *drops*
+rather than queues, plus self-tuning backoff); `bot.py` 198/200 and `claude.py` 194/200 both split
+**before** gaining code.
+
+#### F4 Stage 0 ✔ **SHIPPED 2026-07-27** — `frontend/turnrun.py`
+`bot.py` did four things and F4 touches exactly one: running a turn and putting its answer on
+screen. That is the cut — chosen by F4's seam rather than by line counting, as this roadmap asked.
+It also completes an existing pairing: `turnhelpers.py` is the pure half (*decides*, no I/O),
+`turnrun.py` is the impure half (*does*, awaits the backend and Telegram). `bot.py` 198 → 146,
+`turnrun.py` 72, and `bot.py` no longer imports `dispatch` at all — asserted by a test, so the two
+cannot quietly re-fuse.
+
+### F4 — original sketch (superseded by the staged plan above)
 - [ ] **Live feedback** (Phase C, linuz90 mold) — `stream-json`: edit the message as the agent's chat
       text arrives, appending in chunks, keeping "⏳ pensando…" pinned at the END until the turn
       finishes. Builds on the ⏳-morph already shipped. Changes the reply/dispatch mechanics other

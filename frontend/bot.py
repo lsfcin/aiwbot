@@ -3,10 +3,9 @@ from __future__ import annotations
 import asyncio
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from . import answer, choices, config, dispatch, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, speech, startword, stt, tts, turnhelpers
+from . import choices, config, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, startword, stt, turnhelpers, turnrun
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
-DEFAULT_BACKEND = registry.DEFAULT_BACKEND
 
 
 _strip_bot_prefix = startword.strip_prefix
@@ -15,45 +14,6 @@ _strip_bot_prefix = startword.strip_prefix
 def _empty_guard(transcript: str) -> bool:
     """C3: an empty/whitespace-only transcript must not be dispatched."""
     return not transcript.strip()
-
-
-async def _run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
-                           backend_name: str, title: str | None, scope: str,
-                           spoken: bool = False) -> None:
-    """Shared tail: dispatch one turn with the scope's sticky knobs, then deliver the answer
-    with its footer + the anchor keyboard. `spoken` (C5) additionally replies with a voice
-    note synthesized from the same answer — text-triggered turns leave it False and are
-    unaffected."""
-    options = turnhelpers.turn_options(scope, title)
-    try:
-        result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name, cwd=WORKSPACE_DIR, options=options)
-    except dispatch.DispatchError as e:
-        await reply.deliver(working, msg, turnhelpers.friendly_error(e))
-        return
-    turnhelpers.persist_turn(result.session_id, backend_name, title, result, options)
-    block = answer.block(result.text, result.session_id, title, provider=backend_name, model=result.model, cost_usd=result.cost_usd, mode=options.mode, context_used=result.context_used, context_window=result.context_window)
-    markup = panelmenu.root_markup(result.session_id, options.mode)
-    sent = await reply.deliver(working, msg, block, reply_markup=markup)
-    for message in sent:
-        msgmap.remember_reply(message.message_id, result.session_id)
-    if spoken:
-        try:
-            spoken_text = speech.to_speech(result.text)
-            speech_text = format.clip_chars(spoken_text, 2000)
-            ogg_bytes = tts.synthesize(speech_text)
-            await reply.send_voice(msg, ogg_bytes)
-        except Exception as e:
-            print(f"voice reply failed: {e}")
-
-
-async def _start_new(msg, prompt: str, *, spoken: bool = False) -> None:
-    """A new session runs on the NEW scope: whatever the last interaction used, minus anything
-    the /new config bubble changed since."""
-    working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
-    title = format.title_from_prompt(prompt)
-    harness = registry.harness_for(registry.NEW)
-    await _run_and_deliver(msg, working, prompt, session_id=None, backend_name=harness,
-                           title=title, scope=registry.NEW, spoken=spoken)
 
 
 async def _cmd_new(msg, arg: str) -> None:
@@ -72,19 +32,7 @@ async def _cmd_new(msg, arg: str) -> None:
         if asked is not None:
             msgmap.remember_pending_new(asked.message_id)
         return
-    await _start_new(msg, prompt)
-
-
-async def _handle_reply_continue(msg, sid: str, text: str, *, spoken: bool = False) -> None:
-    """`text` is the already-resolved prompt (msg.text for a text turn, the STT transcript for
-    a voice turn) — read from the caller's arg, never re-derived from `msg.text`, since a voice
-    message replying to a prior session anchor has no `.text` at all (only the transcript the
-    caller already computed)."""
-    harness = registry.backend_for(sid) or DEFAULT_BACKEND
-    working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
-    title = registry.title_for(sid)
-    await _run_and_deliver(msg, working, text, session_id=sid, backend_name=harness,
-                           title=title, scope=sid, spoken=spoken)
+    await turnrun.start_new(msg, prompt)
 
 
 async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
@@ -95,16 +43,16 @@ async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
         replied_to = msg.reply_to_message.message_id
         sid = msgmap.session_for_reply(replied_to)
         if sid:
-            await _handle_reply_continue(msg, sid, text, spoken=spoken)
+            await turnrun.handle_reply_continue(msg, sid, text, spoken=spoken)
             return
         awaiting = msgmap.pending_new(replied_to)
         if awaiting:
-            await _start_new(msg, text, spoken=spoken)
+            await turnrun.start_new(msg, text, spoken=spoken)
             return
     bot_prompt = _strip_bot_prefix(text)
     if bot_prompt is not None:
         prompt = turnhelpers.apply_directives(bot_prompt)
-        await _start_new(msg, prompt, spoken=spoken)
+        await turnrun.start_new(msg, prompt, spoken=spoken)
         return
     inbox.append_entry(inbox.build_entry(text, None, forwarded=msg.forward_origin is not None))
     await reply.safe_reply(msg, format.plain(phrases.pick(phrases.CAPTURE_ACKS)))
