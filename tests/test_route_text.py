@@ -1,7 +1,7 @@
 # test_route_text.py — free unit test: shared text/voice routing (_route_text), the C3
-# empty-transcript guard, and the C5 spoken-flag threading into _run_and_deliver.
+# empty-transcript guard, and the C5 spoken-flag threading into run_and_deliver.
 import asyncio
-from frontend import bot, msgmap, phrases, registry
+from frontend import bot, msgmap, phrases, registry, turnrun
 
 
 class FakeReplyAnchor:
@@ -20,7 +20,7 @@ def test_route_text_bot_prefix_starts_new_session_with_spoken_flag(store, monkey
     async def fake_start_new(msg, prompt, *, spoken=False):
         calls.append((prompt, spoken))
 
-    monkeypatch.setattr(bot, "_start_new", fake_start_new)
+    monkeypatch.setattr(turnrun, "start_new", fake_start_new)
     asyncio.run(bot._route_text(FakeMsg(), "bot faz isso", None, spoken=True))
     assert calls == [("faz isso", True)]
 
@@ -32,7 +32,7 @@ def test_route_text_reply_continue_threads_spoken_flag(store, monkeypatch):
     async def fake_reply_continue(msg, sid, text, *, spoken=False):
         calls.append((sid, text, spoken))
 
-    monkeypatch.setattr(bot, "_handle_reply_continue", fake_reply_continue)
+    monkeypatch.setattr(turnrun, "handle_reply_continue", fake_reply_continue)
     msg = FakeMsg(reply_to_message_id=42)
     asyncio.run(bot._route_text(msg, "oi, continua", None, spoken=True))
     assert calls == [("s1", "oi, continua", True)]
@@ -50,7 +50,7 @@ def test_route_text_reply_continue_forwards_transcript_not_msg_text(store, monke
     async def fake_reply_continue(msg, sid, text, *, spoken=False):
         calls.append(text)
 
-    monkeypatch.setattr(bot, "_handle_reply_continue", fake_reply_continue)
+    monkeypatch.setattr(turnrun, "handle_reply_continue", fake_reply_continue)
     msg = FakeMsg(reply_to_message_id=42)
     msg.text = None  # a real voice Update's Message.text is None; only the transcript has content
     asyncio.run(bot._route_text(msg, "faz o deploy", None, spoken=True))
@@ -60,7 +60,7 @@ def test_route_text_reply_continue_forwards_transcript_not_msg_text(store, monke
 def test_handle_reply_continue_dispatches_with_passed_text_not_msg_text(store, monkeypatch):
     """Direct-level companion to the regression above: even called on its own, _handle_reply_
     continue must run the turn on its `text` argument, never on `msg.text` — the real defect
-    this guards is `_run_and_deliver(msg, working, msg.text, ...)` silently reading None (or
+    this guards is `run_and_deliver(msg, working, msg.text, ...)` silently reading None (or
     stale content) for a voice message that has no `.text` at all."""
     prompts = []
 
@@ -70,11 +70,11 @@ def test_handle_reply_continue_dispatches_with_passed_text_not_msg_text(store, m
     async def fake_run_and_deliver(msg, working, prompt, *, session_id, backend_name, title, scope, spoken=False):
         prompts.append(prompt)
 
-    monkeypatch.setattr(bot.reply, "safe_reply", fake_safe_reply)
-    monkeypatch.setattr(bot, "_run_and_deliver", fake_run_and_deliver)
+    monkeypatch.setattr(turnrun.reply, "safe_reply", fake_safe_reply)
+    monkeypatch.setattr(turnrun, "run_and_deliver", fake_run_and_deliver)
     msg = FakeMsg()
     msg.text = None  # real voice Update.message.text
-    asyncio.run(bot._handle_reply_continue(msg, "s1", "transcrito da fala", spoken=True))
+    asyncio.run(turnrun.handle_reply_continue(msg, "s1", "transcrito da fala", spoken=True))
     assert prompts == ["transcrito da fala"]
 
 
@@ -93,7 +93,7 @@ def test_transcribe_fail_phrases_is_a_nonempty_pt_bank():
     assert all(isinstance(p, str) and p for p in phrases.TRANSCRIBE_FAIL_PHRASES)
 
 
-def test_run_and_deliver_spoken_sends_voice_in_addition_to_text(store, monkeypatch):
+def testrun_and_deliver_spoken_sends_voice_in_addition_to_text(store, monkeypatch):
     sent = {"voice": None, "text": None}
 
     class FakeResult:
@@ -116,17 +116,17 @@ def test_run_and_deliver_spoken_sends_voice_in_addition_to_text(store, monkeypat
         sent["voice"] = ogg_bytes
         return None
 
-    monkeypatch.setattr(bot.dispatch, "turn", fake_turn)
-    monkeypatch.setattr(bot.reply, "deliver", fake_deliver)
-    monkeypatch.setattr(bot.reply, "send_voice", fake_send_voice)
-    monkeypatch.setattr(bot, "tts", type("FakeTTS", (), {"synthesize": staticmethod(lambda t: b"OGG")}))
-    asyncio.run(bot._run_and_deliver(FakeMsg(), None, "prompt", session_id=None,
+    monkeypatch.setattr(turnrun.dispatch, "turn", fake_turn)
+    monkeypatch.setattr(turnrun.reply, "deliver", fake_deliver)
+    monkeypatch.setattr(turnrun.reply, "send_voice", fake_send_voice)
+    monkeypatch.setattr(turnrun, "tts", type("FakeTTS", (), {"synthesize": staticmethod(lambda t: b"OGG")}))
+    asyncio.run(turnrun.run_and_deliver(FakeMsg(), None, "prompt", session_id=None,
                                       backend_name="claude", title=None, scope=registry.NEW,
                                       spoken=True))
     assert sent["voice"] == b"OGG"
 
 
-def test_run_and_deliver_not_spoken_never_sends_voice(store, monkeypatch):
+def testrun_and_deliver_not_spoken_never_sends_voice(store, monkeypatch):
     sent = {"voice_called": False}
 
     class FakeResult:
@@ -147,10 +147,19 @@ def test_run_and_deliver_not_spoken_never_sends_voice(store, monkeypatch):
         sent["voice_called"] = True
         return None
 
-    monkeypatch.setattr(bot.dispatch, "turn", fake_turn)
-    monkeypatch.setattr(bot.reply, "deliver", fake_deliver)
-    monkeypatch.setattr(bot.reply, "send_voice", fake_send_voice)
-    asyncio.run(bot._run_and_deliver(FakeMsg(), None, "prompt", session_id=None,
+    monkeypatch.setattr(turnrun.dispatch, "turn", fake_turn)
+    monkeypatch.setattr(turnrun.reply, "deliver", fake_deliver)
+    monkeypatch.setattr(turnrun.reply, "send_voice", fake_send_voice)
+    asyncio.run(turnrun.run_and_deliver(FakeMsg(), None, "prompt", session_id=None,
                                       backend_name="claude", title=None, scope=registry.NEW,
                                       spoken=False))
     assert sent["voice_called"] is False
+
+
+def test_bot_no_longer_owns_running_a_turn():
+    """Stage 0 of F4: `bot.py` is PTB wiring + routing, `turnrun.py` runs a turn and puts its
+    answer on screen. F4 changes only the latter, so the two must not re-fuse — if `bot` starts
+    importing `dispatch` again, the seam the streaming work needs has been lost."""
+    assert not hasattr(bot, "dispatch")
+    assert not hasattr(bot, "answer")
+    assert hasattr(turnrun, "dispatch")
