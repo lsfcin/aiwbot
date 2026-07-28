@@ -17,7 +17,7 @@ class FakeMsg:
 def test_route_text_bot_prefix_starts_new_session_with_spoken_flag(store, monkeypatch):
     calls = []
 
-    async def fake_start_new(msg, prompt, *, spoken=False):
+    async def fake_start_new(msg, prompt, *, spoken=False, working=None):
         calls.append((prompt, spoken))
 
     monkeypatch.setattr(turnrun, "start_new", fake_start_new)
@@ -29,7 +29,7 @@ def test_route_text_reply_continue_threads_spoken_flag(store, monkeypatch):
     msgmap.remember_reply(42, "s1")
     calls = []
 
-    async def fake_reply_continue(msg, sid, text, *, spoken=False):
+    async def fake_reply_continue(msg, sid, text, *, spoken=False, working=None):
         calls.append((sid, text, spoken))
 
     monkeypatch.setattr(turnrun, "handle_reply_continue", fake_reply_continue)
@@ -47,7 +47,7 @@ def test_route_text_reply_continue_forwards_transcript_not_msg_text(store, monke
     msgmap.remember_reply(42, "s1")
     calls = []
 
-    async def fake_reply_continue(msg, sid, text, *, spoken=False):
+    async def fake_reply_continue(msg, sid, text, *, spoken=False, working=None):
         calls.append(text)
 
     monkeypatch.setattr(turnrun, "handle_reply_continue", fake_reply_continue)

@@ -57,6 +57,16 @@ RESUME_ANCHOR_PHRASES = [
     "pronto, essa é a ativa. responde essa mensagem pra seguir",
     "retomei essa sessão. manda a próxima como resposta a essa mensagem",
 ]
+# Sent the instant a voice note lands, BEFORE the download and the ~seconds of transcription, and
+# then morphed into the turn's working message (Lucas, 2026-07-28: "demora para aparecer qualquer
+# feedback"). It names what is actually happening rather than saying "ok", so a slow transcription
+# reads as progress instead of silence.
+LISTENING_PHRASES = [
+    "ouvindo o áudio…",
+    "transcrevendo…",
+    "escutando o recado…",
+    "passando o áudio pra texto…",
+]
 TRANSCRIBE_FAIL_PHRASES = [
     "não consegui transcrever o áudio — guardei em brain/INBOX.md",
     "esse áudio não rolou de transcrever, mas já tá salvo no INBOX.md",

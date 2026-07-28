@@ -34,7 +34,7 @@ async def _cmd_new(msg, arg: str) -> None:
     await turnrun.start_new(msg, prompt)
 
 
-async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
+async def _route_text(msg, text: str, context, *, spoken: bool = False, working=None) -> None:
     """Shared reply-continue / pending-new / "bot"-prefix / INBOX-fallback routing (steps
     3-6 of the old `_handle_message`), reused verbatim by text (spoken=False) and voice
     (spoken=True, C2/C5)."""
@@ -48,16 +48,16 @@ async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
             return
         sid = msgmap.session_for_reply(replied_to)
         if sid:
-            await turnrun.handle_reply_continue(msg, sid, text, spoken=spoken)
+            await turnrun.handle_reply_continue(msg, sid, text, spoken=spoken, working=working)
             return
         awaiting = msgmap.pending_new(replied_to)
         if awaiting:
-            await turnrun.start_new(msg, text, spoken=spoken)
+            await turnrun.start_new(msg, text, spoken=spoken, working=working)
             return
     bot_prompt = _strip_bot_prefix(text)
     if bot_prompt is not None:
         prompt = turnhelpers.apply_directives(bot_prompt)
-        await turnrun.start_new(msg, prompt, spoken=spoken)
+        await turnrun.start_new(msg, prompt, spoken=spoken, working=working)
         return
     inbox.append_entry(inbox.build_entry(text, None, forwarded=msg.forward_origin is not None))
     await reply.safe_reply(msg, format.plain(phrases.pick(phrases.CAPTURE_ACKS)))
@@ -66,6 +66,9 @@ async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
 async def _handle_voice(msg, context) -> None:
     """C1/C3: transcribe, then either route through the same text dispatch (spoken=True) or
     degrade safely to the untranscribed-INBOX fallback."""
+    # Before the download and the seconds of transcription, not after: an audio turn used to sit
+    # silent until whisper finished, which reads as "the bot ignored me" (Lucas, 2026-07-28).
+    heard_msg = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.LISTENING_PHRASES)))
     path = await inbox.save_media(msg.voice.file_id, context, ".ogg")
     transcript = stt.transcribe(path)
     if _empty_guard(transcript):
@@ -76,7 +79,7 @@ async def _handle_voice(msg, context) -> None:
     # the top of every answer bubble (Lucas, 2026-07-28). What is echoed is still the NORMALIZED
     # transcript, so it shows what actually reached the session, cleanup included.
     heard = startword.normalize(transcript)
-    await _route_text(msg, heard, context, spoken=True)
+    await _route_text(msg, heard, context, spoken=True, working=heard_msg)
 
 
 async def _dispatch_command(text: str, msg) -> None:

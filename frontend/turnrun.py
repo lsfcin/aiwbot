@@ -105,22 +105,34 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
         await _speak(msg, result.text)
 
 
-async def start_new(msg, prompt: str, *, spoken: bool = False) -> None:
+async def _working(msg, working):
+    """The bubble the answer will be written into. A voice turn already put one on screen while
+    it was transcribing, so it is morphed rather than joined by a second status message."""
+    result = working
+    if result is None:
+        result = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
+    else:
+        await reply.edit_text(result, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
+    return result
+
+
+async def start_new(msg, prompt: str, *, spoken: bool = False, working=None) -> None:
     """A new session runs on the NEW scope: whatever the last interaction used, minus anything
     the /new config bubble changed since."""
-    working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
+    working = await _working(msg, working)
     title = format.title_from_prompt(prompt)
     harness = registry.harness_for(registry.NEW)
     await run_and_deliver(msg, working, prompt, session_id=None, backend_name=harness,
                           title=title, scope=registry.NEW, spoken=spoken)
 
 
-async def handle_reply_continue(msg, sid: str, text: str, *, spoken: bool = False) -> None:
+async def handle_reply_continue(msg, sid: str, text: str, *, spoken: bool = False,
+                                working=None) -> None:
     """`text` is the already-resolved prompt (msg.text for a text turn, the STT transcript for a
     voice turn) — read from the caller's arg, never re-derived from `msg.text`, since a voice
     message replying to a prior session anchor has no `.text` at all."""
     harness = registry.backend_for(sid) or registry.DEFAULT_BACKEND
-    working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
+    working = await _working(msg, working)
     title = registry.title_for(sid)
     await run_and_deliver(msg, working, text, session_id=sid, backend_name=harness,
                           title=title, scope=sid, spoken=spoken)

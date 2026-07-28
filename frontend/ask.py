@@ -16,6 +16,8 @@ WAIT_SECONDS = 55 * 60
 # 64 bytes and an option is written by the agent, so only the index rides along and the text is
 # read back from the question the broker is still holding.
 TAP = "a:"
+# A full-width Telegram button holds about this much before it is truncated with an ellipsis.
+LABEL_CHARS = 30
 # These three go to the AGENT, not to the chat: they are what the tool call returns when nobody
 # answered. Text, never an MCP error — an error aborts the turn and throws away everything the
 # agent had already worked out (Lucas's decision, 2026-07-27).
@@ -100,11 +102,17 @@ async def handle_callback(update, context) -> None:
 
 
 def _markup(question_id: str, options: list[str]):
-    """Buttons only when the agent offered choices; a free-text reply always works as well."""
+    """Buttons only when the agent offered choices; a free-text reply always works as well.
+
+    The row width is chosen from the labels rather than fixed at four: an option is a phrase the
+    agent wrote, not a model id, and four across truncated them to "Coding loca…" (Lucas,
+    2026-07-28). A label longer than even a full-width button is clipped HERE, while the answer
+    sent back to the agent stays whole — the tap carries an index, never the text."""
     markup = None
     if options:
-        cells = [keyboard.cell(text, f"{TAP}{question_id}:{i}") for i, text in enumerate(options)]
-        rows = keyboard.chunk(cells)
+        labels = [format.clip_chars(text, LABEL_CHARS) for text in options]
+        cells = [keyboard.cell(label, f"{TAP}{question_id}:{i}") for i, label in enumerate(labels)]
+        rows = keyboard.chunk(cells, keyboard.per_row(labels))
         markup = InlineKeyboardMarkup(rows)
     return markup
 

@@ -23,7 +23,7 @@
 | [`htmlsplit.py`](htmlsplit.py) | — | `split_html`, `strip_tags` | htmlsplit.py — split Telegram HTML into sendable chunks without ever breaking a tag. |
 | [`inbox.py`](inbox.py) | [`inbox.pyi`](inbox.pyi) | `append_entry`, `build_entry`, `save_media` | inbox.py — capture plain text/media into brain/INBOX.md ($0, no backend call). |
 | [`inline.py`](inline.py) | — | `convert` | inline.py — markdown inline spans -> Telegram HTML (bold, strike, code, links, italic). |
-| [`keyboard.py`](keyboard.py) | — | `cell`, `segment`, `chunk`, `framed` | keyboard.py — inline-keyboard primitives: rows of at most four, framed by the panel's controls. |
+| [`keyboard.py`](keyboard.py) | — | `per_row`, `cell`, `segment`, `chunk`, `framed` | keyboard.py — inline-keyboard primitives: rows of at most four, framed by the panel's controls. |
 | [`labels.py`](labels.py) | — | `provider_short`, `model_label` | labels.py — fit a model id into a button: provider prefix, then compress only if it overflows. |
 | [`markdown.py`](markdown.py) | — | `stable_prefix`, `format_body` | markdown.py — agent markdown -> Telegram HTML: block level (fences, tables, headings, lists). |
 | [`msgmap.py`](msgmap.py) | — | `remember_reply`, `session_for_reply`, `remember_pending_new`, `pending_new`, `remember_ask` | msgmap.py — bounded message_id -> value maps: which session, which scope, which panel state. |

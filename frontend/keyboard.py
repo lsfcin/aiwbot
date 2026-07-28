@@ -10,6 +10,27 @@ MAX_PER_ROW = 4
 NOOP = "noop:"
 
 
+# Telegram divides a row's width evenly and then TRUNCATES a label that does not fit — it never
+# wraps — so the number of buttons in a row is really a choice about how many characters survive.
+# Measured on Lucas's phone (2026-07-28), a full-width button holds roughly 30 characters, half
+# that at two per row, a third at three. Model ids are short enough to sit four across; a sentence
+# the agent wrote as an `ask_user` option is not, and came out as "Coding loca…".
+_CHARS_PER_ROW = {4: 7, 3: 9, 2: 14, 1: 30}
+
+
+def per_row(labels: list[str]) -> int:
+    """How many of THESE labels fit on one row without being cut — the WIDEST row that still
+    holds the longest label, since a row is only as readable as its worst button. Falls to one
+    per row for anything phrase-length, which is what an `ask_user` option usually is."""
+    longest = max((len(label) for label in labels), default=0)
+    fits = 1
+    for count in (MAX_PER_ROW, 3, 2):
+        if longest <= _CHARS_PER_ROW[count]:
+            fits = count
+            break
+    return fits
+
+
 def cell(label: str, data: str | None) -> InlineKeyboardButton:
     """A control. `data=None` means the button is drawn but inert — a page arrow parked at the
     end of its range keeps its slot so the row never changes shape."""

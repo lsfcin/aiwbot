@@ -129,5 +129,43 @@ def test_the_pin_sits_below_the_counter():
     assert frames[0].rstrip().endswith("(1)")
 
 
+def test_a_row_holds_only_as_many_buttons_as_fit_uncut():
+    """Telegram truncates a label that does not fit — it never wraps — so four phrase-length
+    options across came out as "Coding loca…" on Lucas's phone (2026-07-28). Width per button is
+    what decides the row, and the longest label decides the width."""
+    from frontend import keyboard
+    assert keyboard.per_row(["sim", "não"]) == keyboard.MAX_PER_ROW
+    assert keyboard.per_row(["opus", "sonnet", "fable"]) == keyboard.MAX_PER_ROW
+    assert keyboard.per_row(["Coding local day-to-day", "Mobile/remoto"]) == 1
+    assert keyboard.per_row([]) == keyboard.MAX_PER_ROW
+
+
+def test_a_long_option_is_clipped_on_the_button_but_not_in_the_answer():
+    """The tap carries an index, so what the agent hears back is the option it wrote — however
+    much of it the button had room to show."""
+    from frontend import ask, askserver
+    origin = Origin()
+    ask.register("tok", origin)
+    spelled = "Coding local day-to-day com bastante refactor e revisão"
+    params = {"name": askserver.TOOL_NAME,
+              "arguments": {"question": "qual?", "options": [spelled, "Mobile"]}}
+    call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}
+
+    async def go():
+        pending = asyncio.create_task(askserver.handle_rpc("tok", call))
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        bubble = origin.sent[0]
+        label = bubble.markup.inline_keyboard[0][0].text
+        ask.answer_tap(bubble.markup.inline_keyboard[0][0].callback_data)
+        answered = await pending
+        return label, answered["result"]["content"][0]["text"]
+
+    label, answered = asyncio.run(go())
+    assert len(label) <= ask.LABEL_CHARS + 1
+    assert answered == spelled
+    ask.unregister("tok")
+
+
 def test_the_status_line_never_opens_with_the_divider():
     assert not phrases.pin().startswith("·")

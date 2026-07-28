@@ -38,7 +38,10 @@ TOOL = {
         "properties": {
             "question": {"type": "string", "description": "A pergunta, curta e direta."},
             "options": {"type": "array", "items": {"type": "string"},
-                        "description": "Escolhas prontas, se houver. Cada uma vira um botão."},
+                        "description": ("Escolhas prontas, se houver. Cada uma vira um botão, "
+                                        "então mantenha CURTAS — até ~25 caracteres. Rótulo "
+                                        "longo é cortado no celular; o detalhe vai na pergunta, "
+                                        "não no botão.")},
         },
         "required": ["question"],
     },
