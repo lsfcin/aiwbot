@@ -96,10 +96,23 @@ async def _dispatch_command(text: str, msg) -> None:
         await reply.safe_reply(msg, format.plain(phrases.pick(phrases.UNKNOWN_CMD_PHRASES, cmd=cmd)))
 
 
+def _log_entities(msg) -> None:
+    """What formatting Telegram actually delivers to a bot. Bot API 10.0's entity list has no
+    HEADING and no TABLE, which says the new rich editor is a client-side composer rather than
+    new bot surface — but that is an argument from a constants list, and Lucas's screenshots
+    show the composer really does offer both. So the question is settled by measurement: send
+    the bot a message written with headings and a table and read this line (2026-07-27)."""
+    found = list(msg.entities or []) + list(msg.caption_entities or [])
+    if found:
+        kinds = sorted({e.type for e in found})
+        print(f"entities: {kinds}")
+
+
 async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None or update.message.chat_id != config.allowed_chat_id():
         return
     msg = update.message
+    _log_entities(msg)
     if msg.text and msg.text.startswith("/"):
         context.application.create_task(_dispatch_command(msg.text, msg))
         return

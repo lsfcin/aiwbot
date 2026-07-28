@@ -91,3 +91,11 @@ def pick(bank: list[str], **kw) -> str:
     if kw:
         result = text.format(**kw)
     return result
+
+
+def pin() -> str:
+    """The still-working line held under a streaming answer. Same words as WORKING_PHRASES but
+    WITHOUT the leading glyph: the `·` marks a standalone status bubble, and under an answer it
+    read as a stray bullet rather than as a status (Lucas, 2026-07-27)."""
+    phrase = pick(WORKING_PHRASES)
+    return phrase.lstrip("· ")

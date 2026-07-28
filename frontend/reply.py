@@ -1,5 +1,6 @@
 # reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery.
 from __future__ import annotations
+from telegram.constants import ChatAction
 from telegram.error import TelegramError
 from .htmlsplit import split_html, strip_tags
 
@@ -53,6 +54,34 @@ async def safe_reply(msg, html_text: str, reply_markup=None) -> "telegram.Messag
             if attempt == 1:
                 print(f"reply_text failed after retry: {e}")
     return result
+
+
+async def send_typing(message) -> None:
+    """Light Telegram's native "typing…" indicator in the chat header. Best-effort: it is a
+    decoration on top of an answer that is arriving anyway, so a failure is dropped rather than
+    allowed to interrupt the turn. It expires after ~5s and must be re-sent to stay lit."""
+    try:
+        await message.chat.send_action(ChatAction.TYPING)
+    except TelegramError as e:
+        print(f"send_typing failed: {e}")
+
+
+async def edit_text(message, html_text: str, reply_markup=None) -> bool:
+    """Repaint one live message. Returns whether Telegram accepted it.
+
+    "Message is not modified" is not an error here — it means the throttle let through a paint
+    whose content had not actually changed — so it is reported as success and never retried,
+    while a real failure (rate limit, network) is left for the caller's backoff to widen."""
+    ok = False
+    try:
+        await message.edit_text(html_text, parse_mode="HTML", reply_markup=reply_markup)
+        ok = True
+    except TelegramError as e:
+        if "not modified" in str(e).lower():
+            ok = True
+        else:
+            print(f"stream edit failed: {e}")
+    return ok
 
 
 async def _edit_or_send(working_msg, msg, html_text: str, reply_markup=None) -> "telegram.Message | None":

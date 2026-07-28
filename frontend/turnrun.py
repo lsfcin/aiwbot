@@ -4,13 +4,31 @@
 # then deliver" into "paint as it arrives, then seal", and everything that changes is in here, so
 # bot.py's PTB wiring and routing stay untouched by it.
 from __future__ import annotations
-from . import answer, dispatch, msgmap, panelmenu, phrases, registry, reply, speech, tts, turnhelpers
+from . import answer, dispatch, msgmap, painter, panelmenu, phrases, registry, reply, speech, tts, turnhelpers
 from . import config, format
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 # The voice reply is synthesized from the answer, and a whole answer can be far longer than anyone
 # wants read aloud, so the spoken copy is capped where the text one is not.
 SPOKEN_CHARS = 2000
+
+
+def _painter(msg, working, streaming: bool):
+    """The live bubbles, or None when this turn is not streaming. The pin phrase is drawn ONCE
+    here rather than per frame: re-rolling it every few seconds would make the line visibly
+    flicker between wordings while Lucas is reading.
+
+    `on_bubble` anchors each bubble the moment it is born rather than at the end of the turn,
+    which is what makes AD-23 continuous under streaming (F4 Stage 3)."""
+    result = None
+    if streaming and working is not None:
+        result = painter.Painter(working, phrases.pin(), origin=msg,
+                                 on_bubble=_anchor_bubble)
+    return result
+
+
+def _anchor_bubble(bubble, session_id: str) -> None:
+    msgmap.remember_reply(bubble.message_id, session_id)
 
 
 async def _speak(msg, text: str) -> None:
@@ -32,9 +50,11 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     and the anchor keyboard. `spoken` (C5) additionally replies with a voice note synthesized from
     the same answer — text-triggered turns leave it False and are unaffected."""
     options = turnhelpers.turn_options(scope, title)
+    live = _painter(msg, working, options.stream)
+    on_text = live.paint if live is not None else None
     try:
         result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name,
-                                     cwd=WORKSPACE_DIR, options=options)
+                                     cwd=WORKSPACE_DIR, options=options, on_text=on_text)
     except dispatch.DispatchError as e:
         await reply.deliver(working, msg, turnhelpers.friendly_error(e))
         return
@@ -43,8 +63,15 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
                          model=result.model, cost_usd=result.cost_usd, mode=options.mode,
                          context_used=result.context_used, context_window=result.context_window)
     markup = panelmenu.root_markup(result.session_id, options.mode)
-    sent = await reply.deliver(working, msg, block, reply_markup=markup)
+    if live is not None:
+        # Bubbles the painter already sealed are final and on screen — delivering the whole
+        # answer again would duplicate it, so only the live bubble onward is written.
+        await live.note_session(result.session_id)
+        sent = await live.finish(block, markup)
+    else:
+        sent = await reply.deliver(working, msg, block, reply_markup=markup)
     # Every bubble, not just the last: Lucas replies to whichever one he is reading (AD-23).
+    # Idempotent, so re-anchoring one the painter already claimed costs nothing.
     for message in sent:
         msgmap.remember_reply(message.message_id, result.session_id)
     if spoken:

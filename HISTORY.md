@@ -1,3 +1,180 @@
+## Completed — 2026-07-27
+
+Method throughout: every decision measured, not reasoned about. Three separate times the
+measurement overturned the stated theory — F3c's "our latency is already gone", F3b's
+"punctuation comes from the prompt's tail", and b3's assumption that the context window was the
+suspect. That is the session's real lesson: a plausible mechanism written in a spec is not
+evidence, and the cost of checking was minutes each time.
+
+### F3c ✔ **SHIPPED 2026-07-27** — button-tap latency, measured then cut
+
+The prior finding ("the optimistic edit already removed our latency") was **half right, and the
+half it got wrong was the whole complaint**. Measured rather than reasoned about — benchmark of
+every callback path against a copy of the live config, plus RTT to `api.telegram.org` from
+Lucas's machine:
+
+| | measured |
+|---|---|
+| bot-side work, warm, worst path (`menu_dims` on opencode) | **0.8 ms** |
+| `api.telegram.org` RTT, pooled connection | **222 ms** median (175 min / 287 max) |
+| `catalog.model_ids()` — `opencode models` subprocess | **839 ms**, once per process |
+
+So our compute never mattered — it is ~0.3% of one round trip. Three real costs, all fixed:
+
+1. **Two sequential round trips per tap.** `answerCallbackQuery` (clears the button spinner) and
+   `editMessageReplyMarkup` (moves the bracket) were awaited one after the other: ~445 ms. They
+   are independent calls on different objects, so `panel._redraw` now `asyncio.gather`s them —
+   **~445 ms → ~222 ms**.
+2. **Three round trips on the commonest tap.** Picking a model/effort value answered *twice* —
+   once in `_choose`, then again in the `_open` it routed into (~667 ms). `_route` now takes the
+   toast as an argument so every branch ends in exactly one `_redraw`. **~667 ms → ~222 ms.**
+3. **A ~865 ms stall on the first tap after every daemon restart.** `opencode models` (839 ms) +
+   the 3 MB `models.json` parse (26 ms) are memoized for the process's life, but the first
+   model/menu tap paid them *before* answering. New `choices.warm()`, awaited in `_post_init`
+   off the event loop, moves that to startup. Asked through the backend seam, so a third backend
+   is warmed by existing.
+
+**The floor is one round trip (~222 ms) and no trick beats it.** That answers the question this
+item was actually posed as: a Telegram client renders an inline keyboard purely from server
+state — there is no client-side optimistic update, no local echo. The only instant feedback that
+exists is the button's built-in spinner, which is already what `answerCallbackQuery` clears.
+`concurrent_updates(True)` was **considered and rejected**: it lets back-to-back taps overlap but
+does nothing for the latency of a single tap (the complaint), while widening the race window on
+`config.json`'s non-atomic read-modify-write.
+
+Regression spec: `tests/test_f3c_tap_latency.py` — asserts the *count* of round trips per tap
+(one answer, one redraw, started concurrently), which is the only part we control.
+
+
+### Voice + picker fixes ✔ **SHIPPED 2026-07-27** — from Lucas's live test right after F3c
+Found by him using the bot, not by a sweep. All four measured against his real chuveiro voice
+note rather than reasoned about; specs in AD-21 / AD-22, regression in
+`tests/test_voice_echo_and_picker.py`.
+
+- **Punctuation was completely dead** (0.0 marks/100 words), and F3b's stated mechanism was
+  wrong: it is not about the prompt's tail, it is that a bare word list *anywhere* suppresses
+  punctuation. Jargon dissolved into sentences → **22.5 marks/100 words**.
+- **`claude sonnet` → `claudsonner`**, because no model name was primed at all — which also meant
+  the F3a spoken directive had been silently dead for anyone saying a model out loud.
+- **Transcript echo** is now `<i>"…"</i>` with no `ouvi:` label and no blockquote, echoing the
+  *normalized* string that routing acts on (new `startword.normalize`), so it answers the only
+  question it exists for: what reached the session.
+- **Picker stopped reshuffling itself** on every pick (AD-22).
+
+Still open from the same test: **[b3] context % over 100%** — see [KNOWN-BUGS.md](KNOWN-BUGS.md).
+And **submenu latency has no remaining fix**: after F3c a tap is one round trip, measured at
+~200 ms Recife→Telegram, and forcing IPv4 was tested and is *slower* than the IPv6 default
+(203 vs 191 ms median). Lucas asked whether it could change fast even if the backend lags — it
+cannot: a Telegram client draws an inline keyboard only from server state, so there is nothing
+local to update optimistically. That round trip is the product's floor, not a bug.
+
+
+### F5 ✔ **SHIPPED 2026-07-27** — answer-shape papercuts (Lucas, INBOX 2026-07-26)
+
+- **a. Every bubble of a long answer continues the session.** `reply.deliver` now returns *every*
+      message it sent instead of just the last, and both callers anchor all of them. Anchoring
+      only the tail meant replying to an earlier bubble missed `session_for_reply` and silently
+      fell through to INBOX capture — exactly the condition Lucas put on the split UX:
+      *"desde que me permitisse, respondendo qualquer uma delas, continuar na mesma sessão"*.
+      `msgmap.MAX` went 50 → 400, since one answer now costs as many entries as it has bubbles.
+- **b. Long answers split at paragraph boundaries on purpose**, not only when 4096 forces it —
+      Lucas's call, asked directly. `split_html` takes an optional soft size
+      (`reply.SOFT_CHARS = 900`): past it, the chunk ends at the next blank line, so a bubble
+      never stops mid-thought. The hard limit still wins, and a run of blank lines can no longer
+      seal an empty chunk. Same path now delivers the `/resume` anchor, which **removes
+      `ANCHOR_BODY_MAX`** — that 3000-char mid-word clip, not Telegram's limit, is where the
+      `[…]` Lucas reported came from.
+- **c. The `continua [5FE] TÍTULO` anchor line is deleted**; the id and title moved to the
+      footer (`[ABC] TÍTULO · claude · sonnet · build · $0.031`). This **reverses F2's reply
+      anchor** from 2026-07-26 — see AD-23 for why F2's reasoning was sound but aimed at the
+      wrong reader. `answer_block` moved out of `format.py` into its own `answer.py` on the way,
+      because the change would have pushed `format.py` past the 200-line gate.
+
+Regression: `tests/test_f5_answer_shape.py`.
+
+
+#### F4 Stage 0 ✔ **SHIPPED 2026-07-27** — `frontend/turnrun.py`
+`bot.py` did four things and F4 touches exactly one: running a turn and putting its answer on
+screen. That is the cut — chosen by F4's seam rather than by line counting, as this roadmap asked.
+It also completes an existing pairing: `turnhelpers.py` is the pure half (*decides*, no I/O),
+`turnrun.py` is the impure half (*does*, awaits the backend and Telegram). `bot.py` 198 → 146,
+`turnrun.py` 72, and `bot.py` no longer imports `dispatch` at all — asserted by a test, so the two
+cannot quietly re-fuse.
+
+
+### F4 Stages 1–3 ✔ **SHIPPED 2026-07-27** — live streaming
+Staged plan and its measured facts stay in [ROADMAP.md](ROADMAP.md) § F4 (Stages 4–5 still open).
+
+- **Stage 1 — the streaming seam.** `proc.communicate()` blocked until the CLI exited, so no line
+  could reach Python before the turn was over. New `proc.stream_lines` yields each stdout line as
+  it lands, then one terminal tuple *after* the process exits — that ordering is load-bearing,
+  because occupancy is read from the provider's store and the store is only written on exit, so
+  emitting the result event earlier silently reintroduces b3. Two traps built in from the start,
+  both of which only ever appear live on long turns: the asyncio reader's 64 KB line limit raised
+  to 1 MB, and stderr drained by a sibling task (a child whose stderr pipe fills blocks forever).
+  `AgentEvent.partial` distinguishes deltas (concatenate) from whole segments (join with `\n`),
+  defaulting to `False` so every existing fixture stayed correct untouched. `claude.py` 194 → 142
+  by moving parsing to `claudeparse.py` **before** it gained flags. Verified live: first text
+  1.54 s before process exit, `ctx=31067/1000000` proving occupancy still read correctly.
+- **Stage 2 — the live bubble.** `answer.frames()` renders settled markdown and appends the still
+  arriving tail as escaped plain text; `markdown.stable_prefix` defines "settled" as everything up
+  to the last blank line *outside an open code fence* — a parity count, not a regex, because
+  inside a fence a blank line is code, not a paragraph break. `block()` delegates to `frames()`,
+  so the finished answer and a streamed frame are one code path, which is what makes the AD-23
+  non-regression meaningful rather than two implementations that happen to agree. The throttle is
+  a clock gate inside `paint()`, not a background ticker, so nothing races the end of the turn; a
+  paint already in flight is **dropped, not queued**, which is lossless because every frame
+  recomputes from the whole text.
+- **Stage 3 — sealing.** `split_html` is prefix-stable: a single forward pass whose seams depend
+  only on lines already consumed, so appending can change nothing but the last chunk. Property
+  test written *first*, over 25 corpora × every line-boundary prefix: **0 violations**. Bubbles
+  are therefore sent the moment they appear and never touched again, and anchored on arrival —
+  making AD-23 *continuous* and strictly stronger than before, since a reply to bubble 1 works
+  while bubble 3 is still being written. `painter.finish()` writes only the live bubble onward,
+  because re-delivering sealed ones would post the answer twice.
+
+### Tuning and operational fixes (2026-07-27)
+- **The daemon's stdout was block-buffered.** The journal is a pipe, so every `print()` sat in an
+  8 KB buffer until the process exited — meaning *every* diagnostic in the bot had been invisible
+  while it ran, error paths included, and only surfaced in a burst at shutdown. Found because a
+  streaming log line Lucas was told to grep for never appeared; restarting flushed the buffer and
+  proved the turn had streamed correctly all along. Fixed with `PYTHONUNBUFFERED=1` in the
+  systemd unit, documented in README.
+- Repaint cadence tuned by Lucas against real turns: 1.5 s → 5 s → **3 s**. The test pins the
+  *spacing* invariant against the constant rather than a literal, so tuning never edits a test.
+- Native `ChatAction.TYPING`, re-lit every 4 s, fired on the **first** delta independently of the
+  repaint gate — so the wait before the first visible words is never silent.
+- Pin lost its `·` and gained a blank line of distance; footer title 3 → 5 words, with
+  `title_words` gaining a `limit` separate from `n` because the `/resume` picker budgets for
+  bubble *width* while a footer line does not.
+
+### Assessed and rejected (2026-07-27)
+- **Telegram's new rich text editor** — the blog announces headings and tables, and Lucas's
+  screenshots confirm the composer offers both. But Bot API 10.0's entity list has no `HEADING`
+  and no `TABLE`: it is a **client-side composer**, not new bot surface. So AD-18's
+  pipe-tables-as-row-blocks stands as correct rather than as a workaround. Left instrumented
+  rather than merely argued: `bot.py` logs incoming entity types, so one message written with a
+  heading and a table settles it by measurement.
+- **`concurrent_updates(True)`** — overlaps separate taps but does nothing for a single tap's
+  latency (the actual complaint), while widening the race on `config.json`'s non-atomic write.
+- **Forcing IPv4 to Telegram** — measured *slower* than the IPv6 default (203 vs 191 ms median).
+
+## Resolved Bugs — 2026-07-27
+
+- **[b3] context occupancy reported impossible percentages** (over 100%, sometimes over 200%).
+  The denominator was innocent — the learned windows were a correct 1,000,000. The numerator was
+  a **sum over every API request in the turn**: a turn using tools makes several requests and each
+  re-reads the whole context from cache, so `modelUsage`'s token fields measure *spend*, not how
+  full the window is. Real transcripts summed to 5921%, 6507%, 32533%. The insidious part, and
+  why it earned a spec (AD-24) rather than a patch: the wrong number was **not always visibly
+  wrong** — one session summed to a perfectly plausible 62% when the truth was 5%. Fixed with a
+  `CliBackend.occupancy()` seam reading each provider's own per-message store (claude: the
+  transcript's last assistant message; opencode: `ocstore.last_turn`, which also gave opencode a
+  context percentage for the first time). `ocstore.py` had already documented this exact trap for
+  opencode's accumulating `tokens_*` columns and the claude path walked into it anyway — which is
+  why the rule now lives on the seam instead of in one backend's memory. Regression:
+  `tests/test_b3_context_pct.py`.
+
 # aiwbot — History
 > Archive of completed work. Open work lives in [ROADMAP.md](ROADMAP.md).
 
