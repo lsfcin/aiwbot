@@ -33,7 +33,17 @@ def test_no_bank_phrase_starts_with_a_capital():
 def test_status_phrases_carry_no_gradient_emoji():
     for phrase in phrases.WORKING_PHRASES:
         assert "⏳" not in phrase
-        assert phrase.startswith("· ")
+
+
+def test_no_phrase_opens_with_the_divider_glyph():
+    """`·` separates (`· · ·`, `provider · modelo`), so it cannot also open a line — Lucas,
+    2026-07-28: "o · nunca deveria ir no começo, é um divisor"."""
+    banks = [phrases.WORKING_PHRASES, phrases.CAPTURE_ACKS, phrases.ERROR_PHRASES,
+             phrases.TRANSCRIBE_FAIL_PHRASES, phrases.RESUME_ANCHOR_PHRASES,
+             phrases.NEW_EMPTY_PROMPT_PHRASES, [phrases.ASK_HINT, phrases.pin()]]
+    for bank in banks:
+        for phrase in bank:
+            assert not phrase.startswith("·"), phrase
 
 
 # --- the reply anchor: REVERSED by Lucas 2026-07-27, see F5c and answer.block's docstring.

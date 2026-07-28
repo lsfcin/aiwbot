@@ -13,7 +13,7 @@ WORKSPACE_DIR = config.WORKSPACE_DIR
 SPOKEN_CHARS = 2000
 
 
-def _painter(msg, working, streaming: bool):
+def _painter(msg, working, streaming: bool, lead: str = ""):
     """The live bubbles, or None when this turn is not streaming. The pin phrase is drawn ONCE
     here rather than per frame: re-rolling it every few seconds would make the line visibly
     flicker between wordings while Lucas is reading.
@@ -23,12 +23,26 @@ def _painter(msg, working, streaming: bool):
     result = None
     if streaming and working is not None:
         result = painter.Painter(working, phrases.pin(), origin=msg,
-                                 on_bubble=_anchor_bubble)
+                                 on_bubble=_anchor_bubble, lead=lead)
     return result
 
 
 def _anchor_bubble(bubble, session_id: str) -> None:
     msgmap.remember_reply(bubble.message_id, session_id)
+
+
+async def guarded(coro, msg) -> None:
+    """Run a turn as a detached task that cannot fail silently.
+
+    Every turn is dispatched with `create_task`, so an exception inside one used to reach stderr
+    and nothing else: Lucas sent a voice note and simply never heard back (2026-07-28). Nothing
+    is retried here — the point is only that a turn which died SAYS so, in the chat, where the
+    message that started it is."""
+    try:
+        await coro
+    except Exception as e:
+        print(f"turn failed: {e!r}")
+        await reply.safe_reply(msg, format.plain(phrases.pick(phrases.ERROR_PHRASES, e=e)))
 
 
 async def _speak(msg, text: str) -> None:
@@ -50,7 +64,11 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     and the anchor keyboard. `spoken` (C5) additionally replies with a voice note synthesized from
     the same answer — text-triggered turns leave it False and are unaffected."""
     options = turnhelpers.turn_options(scope, title)
-    live = _painter(msg, working, options.stream)
+    # A voice turn quotes what was heard at the top of every bubble it produces, instead of
+    # spending a bubble of its own on the echo (Lucas, 2026-07-28). `prompt` is exactly the
+    # string that reached the session, which is what the echo existed to show.
+    lead = answer.quote(prompt) if spoken else ""
+    live = _painter(msg, working, options.stream, lead)
     on_text = live.paint if live is not None else None
     # The token is registered BEFORE the backend starts and released in the `finally` whatever
     # happens: an agent can call ask_user in its first second, and a token that outlived its turn
@@ -62,7 +80,7 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
         result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name,
                                      cwd=WORKSPACE_DIR, options=options, on_text=on_text)
     except dispatch.DispatchError as e:
-        await reply.deliver(working, msg, turnhelpers.friendly_error(e))
+        await reply.deliver(working, msg, turnhelpers.friendly_error(e), lead=lead)
         return
     finally:
         if token:
@@ -71,14 +89,14 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     block = answer.block(result.text, result.session_id, title, provider=backend_name,
                          model=result.model, cost_usd=result.cost_usd, mode=options.mode,
                          context_used=result.context_used, context_window=result.context_window)
-    markup = panelmenu.root_markup(result.session_id, options.mode)
+    markup = panelmenu.root_markup(result.session_id)
     if live is not None:
         # Bubbles the painter already sealed are final and on screen — delivering the whole
         # answer again would duplicate it, so only the live bubble onward is written.
         await live.note_session(result.session_id)
         sent = await live.finish(block, markup)
     else:
-        sent = await reply.deliver(working, msg, block, reply_markup=markup)
+        sent = await reply.deliver(working, msg, block, reply_markup=markup, lead=lead)
     # Every bubble, not just the last: Lucas replies to whichever one he is reading (AD-23).
     # Idempotent, so re-anchoring one the painter already claimed costs nothing.
     for message in sent:

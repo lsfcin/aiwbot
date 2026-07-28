@@ -25,10 +25,9 @@ async def _cmd_new(msg, arg: str) -> None:
     if backend_name:
         registry.set_setting(registry.NEW, "backend", backend_name)
     if not prompt.strip():
-        ask = format.plain(phrases.pick(phrases.NEW_EMPTY_PROMPT_PHRASES))
-        current = registry.mode_for(registry.NEW)
-        markup = panelmenu.root_markup(registry.NEW, current)
-        asked = await reply.safe_reply(msg, ask, reply_markup=markup)
+        invite = format.plain(phrases.pick(phrases.NEW_EMPTY_PROMPT_PHRASES))
+        markup = panelmenu.root_markup(registry.NEW)
+        asked = await reply.safe_reply(msg, invite, reply_markup=markup)
         if asked is not None:
             msgmap.remember_pending_new(asked.message_id)
         return
@@ -64,15 +63,6 @@ async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
     await reply.safe_reply(msg, format.plain(phrases.pick(phrases.CAPTURE_ACKS)))
 
 
-async def _echo_transcript(msg, transcript: str) -> None:
-    """F2: quote back what STT heard, as a reply to Lucas's own voice note and before the turn
-    runs. Without it a mishearing is only ever inferred from a strange answer, minutes later —
-    and it is the instrument the audio punctuation/cadence work tunes against."""
-    quoted = format.plain(transcript)
-    line = phrases.TRANSCRIPT_ECHO.format(text=quoted)
-    await reply.safe_reply(msg, line)
-
-
 async def _handle_voice(msg, context) -> None:
     """C1/C3: transcribe, then either route through the same text dispatch (spoken=True) or
     degrade safely to the untranscribed-INBOX fallback."""
@@ -82,10 +72,10 @@ async def _handle_voice(msg, context) -> None:
         inbox.append_entry(inbox.build_entry("voice note (untranscribed)", path, forwarded=msg.forward_origin is not None))
         await reply.safe_reply(msg, format.plain(phrases.pick(phrases.TRANSCRIBE_FAIL_PHRASES)))
         return
-    # Echo and route the SAME string: the echo exists to show what reached the session, so
-    # routing's cleanup has to be visible in it (Lucas, 2026-07-27).
+    # The echo is no longer a message of its own: `run_and_deliver` quotes this same string at
+    # the top of every answer bubble (Lucas, 2026-07-28). What is echoed is still the NORMALIZED
+    # transcript, so it shows what actually reached the session, cleanup included.
     heard = startword.normalize(transcript)
-    await _echo_transcript(msg, heard)
     await _route_text(msg, heard, context, spoken=True)
 
 
@@ -120,13 +110,13 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     msg = update.message
     _log_entities(msg)
     if msg.text and msg.text.startswith("/"):
-        context.application.create_task(_dispatch_command(msg.text, msg))
+        context.application.create_task(turnrun.guarded(_dispatch_command(msg.text, msg), msg))
         return
     if msg.text:
-        context.application.create_task(_route_text(msg, msg.text, context, spoken=False))
+        context.application.create_task(turnrun.guarded(_route_text(msg, msg.text, context, spoken=False), msg))
         return
     if msg.voice is not None:
-        context.application.create_task(_handle_voice(msg, context))
+        context.application.create_task(turnrun.guarded(_handle_voice(msg, context), msg))
         return
     forwarded = msg.forward_origin is not None
     if msg.photo:

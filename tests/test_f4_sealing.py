@@ -127,6 +127,18 @@ def test_a_session_id_that_arrives_late_still_anchors_everything():
     assert len(anchored) == len(p.sent)
 
 
+def test_a_painter_with_nobody_listening_does_not_requeue_forever():
+    """The pending drain used to iterate the very list `_anchor` appends to, so a painter built
+    without `on_bubble` grew it without bound the moment a session id arrived — RAM until the OOM
+    killer, which is how this was found (2026-07-28). Two independent fixes: the queue is
+    snapshotted and cleared before the drain, and "nobody is listening" no longer re-queues."""
+    origin = Origin()
+    p = painter.Painter(Bubble(origin.chat), "pensando…", origin=origin)
+    p.pending = [Bubble(origin.chat), Bubble(origin.chat)]
+    asyncio.run(p.note_session("s1"))
+    assert p.pending == []
+
+
 def test_sealing_can_be_turned_off_without_touching_the_streaming_knob():
     """STREAM_SEAL is the Stage 3 rollback: it reverts to Stage 2's single frozen bubble while
     leaving streaming itself on."""

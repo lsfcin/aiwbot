@@ -117,6 +117,29 @@ child (sibling drain task); occupancy read before the transcript flushes would s
 rather than queues, plus self-tuning backoff); `bot.py` 198/200 and `claude.py` 194/200 both split
 **before** gaining code.
 
+#### Lucas's 2026-07-28 batch ✔ — decisions taken, papercuts fixed
+Stage 3 **confirmed in chat** ("funciona"). Then his list, with what each turned into:
+- **AD-27 decision: option A.** Build only. Mode coerced + panel opens on the knobs (AD-28).
+- **`·` never opens a line** — it is a divider (AD-29), enforced by a phrase-bank test.
+- **The voice transcript moved inside the answer**, quoted at the top of every bubble, and the
+  standalone echo bubble is deleted along with the `TRANSCRIPT_ECHO` phrase (AD-29).
+- **Bubbles say where they sit** — `(2/3)` finished, `(2)` mid-stream (AD-29).
+- **A turn can no longer fail silently.** Every turn runs as a detached PTB task, so an exception
+  reached stderr and nothing else — which is why one voice note simply vanished. `turnrun.guarded`
+  now replies with the error instead.
+- **Latent RAM bug, found and fixed:** `painter.note_session` iterated the very list `_anchor`
+  appends to, so a Painter built without `on_bubble` grew it without bound — RAM until the OOM
+  killer took the editor with it. Two independent fixes (snapshot-then-drain, and "nobody
+  listening" no longer re-queues) plus a regression test. Never fired in the live bot, where
+  `on_bubble` is always set, but it was one call site away.
+
+Still open from that list, answers in the reply rather than in code:
+- **Bubble balance** (his #2) — the split is greedy at ~900 chars because sealing forbids
+  lookahead: a bubble is sent before the text that would balance it exists. Rebalancing means
+  giving up sealing. Left as is, on his "podemos ignorar".
+- **Pacing between bubbles** (his #3) — there is no inter-bubble delay to turn on; what exists is
+  the 3 s repaint floor and the typing indicator. Nothing was broken, nothing was enabled.
+
 #### F4 Stage 4 ✔ **code done 2026-07-28** — gate passed, live round trip proven off-Telegram
 The probe the stage was gated on passed: a stub HTTP MCP server + `claude -p --mcp-config
 '<json>' --strict-mcp-config` really does expose `mcp__aiwbot__ask_user` to the agent, with the

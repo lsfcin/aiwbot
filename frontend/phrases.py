@@ -5,7 +5,9 @@ import random
 # Tone (Lucas, 2026-07-26): lowercase, no trailing period. These banks arrived copied from the
 # old workspace bot in sentence-case, which reads stiff in a chat bubble — an ack is an aside,
 # not a sentence. Glyphs are flat for the same reason: `·` and `▸`, never the gradient emoji.
-# Keep both rules when adding a bank; HELP_TEXT stays prose, since it IS a document.
+# And `·` is a DIVIDER, never an opener (Lucas, 2026-07-28): it separates (`· · ·`, `a · b`) and
+# so must not lead a line — "pensando…", not "· pensando…".
+# Keep all three rules when adding a bank; HELP_TEXT stays prose, since it IS a document.
 
 CAPTURE_ACKS = [
     "guardado em brain/INBOX.md",
@@ -15,11 +17,11 @@ CAPTURE_ACKS = [
     "registrado em brain/INBOX.md",
 ]
 WORKING_PHRASES = [
-    "· trabalhando…",
-    "· rodando…",
-    "· processando…",
-    "· um instante…",
-    "· pensando…",
+    "trabalhando…",
+    "rodando…",
+    "processando…",
+    "um instante…",
+    "pensando…",
 ]
 NEW_EMPTY_PROMPT_PHRASES = [
     "sessão nova — ajusta abaixo se quiser e responde essa mensagem com o prompt",
@@ -60,18 +62,10 @@ TRANSCRIBE_FAIL_PHRASES = [
     "esse áudio não rolou de transcrever, mas já tá salvo no INBOX.md",
     "falhou a transcrição — deixei o áudio guardado no brain/INBOX.md",
 ]
-# What the bot heard, echoed under Lucas's own voice note so a misheard word is visible before
-# the answer arrives rather than inferred from a strange one (F2). Italic inside quotation marks
-# and nothing else — the `ouvi:` label and the <blockquote> were both dropped on Lucas's call
-# (2026-07-27): quoted italics already read as reported speech, and the label was a word he had
-# to skip past every time. What it echoes is the NORMALIZED transcript, so the message answers
-# the only question it exists to answer — what exactly reached the session.
-TRANSCRIPT_ECHO = '<i>"{text}"</i>'
-
 # The agent asked something and its turn is parked on the answer (F4 Stage 4). The hint appears
 # only under a question with no buttons — with buttons the affordance is on screen already. The
 # toasts are what a tap says back; a stale one is the button of a question already answered.
-ASK_HINT = "· responde essa mensagem"
+ASK_HINT = "responde essa mensagem"
 ASK_TAKEN = "anotado"
 ASK_STALE = "essa pergunta já passou"
 
@@ -85,7 +79,7 @@ HELP_TEXT = (
     "Começar com <code>bot …</code> abre sessão nova. Pode nomear harness/model logo no início "
     "(<code>bot, opencode glm resume o pdf</code> ou <code>bot sonnet explica isso</code>) — "
     "sem gastar inferência; o resto da frase é o prompt.\n\n"
-    "O botão <code>+</code> embaixo de cada resposta abre model e effort da sessão. "
+    "Os botões embaixo de cada resposta mudam model e effort da sessão. "
     "O harness (claude/opencode) só dá pra escolher em sessão nova — uma sessão não troca de "
     "harness, porque nenhum dos dois importa o contexto do outro.\n\n"
     "Sessão nova herda harness/model/effort da última interação."
@@ -101,8 +95,6 @@ def pick(bank: list[str], **kw) -> str:
 
 
 def pin() -> str:
-    """The still-working line held under a streaming answer. Same words as WORKING_PHRASES but
-    WITHOUT the leading glyph: the `·` marks a standalone status bubble, and under an answer it
-    read as a stray bullet rather than as a status (Lucas, 2026-07-27)."""
-    phrase = pick(WORKING_PHRASES)
-    return phrase.lstrip("· ")
+    """The still-working line held under a streaming answer — the same words a status bubble
+    shows, because they are the same status."""
+    return pick(WORKING_PHRASES)

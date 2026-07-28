@@ -527,6 +527,46 @@ where interviewing matters most; the substitute that measures out is
 verified live), which trades plan mode's own prompt for the ability to ask. Not adopted
 unilaterally — it changes what `mode=plan` means, so it is Lucas's call before Stage 5.
 
+### AD-28 — Build only, so the panel opens on the knobs (2026-07-28)
+
+Lucas took option A of AD-27: plan mode is not supported through the bot. Two things follow, and
+both are the point rather than side effects.
+
+**Mode is coerced, not offered.** `registry.mode_for` returns `build` whatever is stored, so a
+session started on the PC in plan mode and continued from the phone silently becomes a build
+turn instead of inheriting a mode the bot cannot honour. The knob survives on the seam
+(`TurnOptions.mode`, each backend's mapping) — restoring plan is one line if a future CLI stops
+blocking MCP in it — but nothing in the bot writes anything else.
+
+**The panel lost a level.** BUILD/PLAN was a two-option segmented control with one reachable
+option, and the `+` that used to open the dimension menu existed only to get past it. Both are
+gone: the root keyboard IS harness/model/effort, so the panel costs one tap where it cost two.
+Keyboards already sitting in the chat still carry `p:mode:*` buttons, so that callback stays
+routed — to a redraw of the current panel, never to setting a mode.
+
+### AD-29 — A bubble carries its question and its position (2026-07-28)
+
+Three shape rules, all from Lucas reading real turns:
+
+**The voice transcript rides inside the answer, quoted, at the top of every bubble** — not in a
+bubble of its own. The standalone echo (F2) cost a message and scrolled out of reach exactly when
+the answer was long enough to need it. Repeated per bubble, any bubble he scrolls back to still
+says what it answers. It is escaped and clipped (`LEAD_CHARS`), because it is arbitrary speech.
+
+**Every bubble ends with its position**, `(2/3)` — and mid-stream, `(2)`. The total is genuinely
+unknowable while the answer is still arriving: bubble 3 exists only once the text that fills it
+does, and AD-25 forbids rewriting a sealed bubble to correct it. So a bubble shows the count it
+can know, and the finished answer is where the total appears. Exact `(n/N)` everywhere would
+require one edit pass over bubbles Lucas has already read — available, but it trades away the
+property that makes streaming feel like conversation.
+
+**`·` is a divider, never an opener.** It separates (`· · ·`, `provider · modelo`), so it must not
+lead a line: `pensando…`, not `· pensando…`.
+
+The furniture is budgeted BEFORE the split, not appended after: a chunk sized to the full limit
+and then given a lead and a counter is a message Telegram rejects — and only ever on the long
+voice answers this exists to serve.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

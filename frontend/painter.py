@@ -35,8 +35,10 @@ class Painter:
     drifted could not corrupt the delivered answer."""
 
     def __init__(self, working, pin: str, clock=time.monotonic, origin=None,
-                 on_bubble=None, seal: bool = STREAM_SEAL):
+                 on_bubble=None, seal: bool = STREAM_SEAL, lead: str = ""):
         self.pin = pin
+        # The quoted transcript that opens every bubble of a voice turn; "" for a typed one.
+        self.lead = lead
         self.clock = clock
         self.origin = origin
         self.on_bubble = on_bubble
@@ -61,15 +63,23 @@ class Painter:
         if not session_id or self.session_id:
             return
         self.session_id = session_id
-        for bubble in self.pending:
-            self._anchor(bubble)
+        # Drained into a snapshot and emptied BEFORE anchoring, never iterated in place: an
+        # `_anchor` that re-queued while this loop walked the same list would append forever and
+        # eat the machine's memory. Structural, so the loop is impossible rather than merely
+        # unlikely (found 2026-07-28 by a Painter built without `on_bubble`).
+        queued = self.pending
         self.pending = []
+        for bubble in queued:
+            self._anchor(bubble)
 
     def _anchor(self, bubble) -> None:
-        if self.session_id and self.on_bubble is not None:
-            self.on_bubble(bubble, self.session_id)
-        else:
+        """Queue only for the reason queuing exists — the session id is not known yet. A painter
+        with no `on_bubble` has nowhere to anchor TO, which is a different condition and must not
+        re-queue: conflating the two is what made the drain above unbounded."""
+        if not self.session_id:
             self.pending.append(bubble)
+        elif self.on_bubble is not None:
+            self.on_bubble(bubble, self.session_id)
 
     # --- throttle ----------------------------------------------------------------------------
 
@@ -109,7 +119,7 @@ class Painter:
         settled, unsettled = markdown.stable_prefix(self.text)
         soft = reply.SOFT_CHARS if self.seal else None
         chunks = answer.frames(settled, unsettled, pin=self.pin,
-                               limit=reply.TELEGRAM_MSG_LIMIT, soft=soft)
+                               limit=reply.TELEGRAM_MSG_LIMIT, soft=soft, lead=self.lead)
         if not self.seal and len(chunks) > 1:
             # Stage 2 behaviour: one bubble that stops updating once the answer outgrows a
             # message, leaving the finished delivery to do the splitting.
@@ -139,7 +149,11 @@ class Painter:
         ones already hold exactly their final text, so re-sending them would duplicate the answer
         and re-editing them would spend round trips to change nothing. The footer and keyboard
         only ever affect the last chunk, and the pin disappears because `block` has none."""
-        chunks = split_html(block, reply.TELEGRAM_MSG_LIMIT, reply.SOFT_CHARS)
+        budget = answer.room(reply.TELEGRAM_MSG_LIMIT, self.lead)
+        chunks = split_html(block, budget, reply.SOFT_CHARS)
+        # The total is knowable only here, at the end, so this is the one place `(n/N)` can be
+        # written. Sealed bubbles keep the `(n)` they were born with rather than being rewritten.
+        chunks = answer.decorate(chunks, self.lead, total=len(chunks))
         live = len(self.sent) - 1
         for i in range(live, len(chunks)):
             last = i == len(chunks) - 1
