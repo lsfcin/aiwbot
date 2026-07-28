@@ -41,6 +41,11 @@ class TurnOptions:
     # Default off: it changes the CLI's invocation, so the rollback Lucas needs from his phone is
     # one line in config.json plus a restart, never a code change (F4).
     stream: bool = False
+    # MCP servers this turn may call, as the JSON its CLI's own config flag takes. Set only when
+    # the frontend has an ask broker listening for this turn; None leaves the invocation exactly
+    # as it was. Opaque here on purpose — the seam carries provider-agnostic knobs, and which
+    # flag (if any) this maps to is each backend's business (F4 Stage 4).
+    mcp_config: str | None = None
 
 
 def add_flag(args: list[str], name: str, value: str | None) -> None:
@@ -81,6 +86,12 @@ class AgentBackend(Protocol):
     def efforts(self, model: str | None = None) -> list[str]:
         """Effort vocabulary for a model — per-model because opencode's `--variant` values are
         (claude's `--effort low..max` is one ladder for everything). Empty = no effort knob."""
+        ...
+
+    def supports_ask(self, options: TurnOptions) -> bool:
+        """Can this backend, WITH these options, call back into the bot to ask the user? Takes
+        the options because the answer is not a property of the provider alone: claude hosts MCP
+        happily in build mode and refuses every MCP tool in plan mode (F4 Stage 4)."""
         ...
 
 

@@ -43,6 +43,11 @@ class CliBackend:
         """Extra environment for the subprocess. Default: none — backends override."""
         return None
 
+    def supports_ask(self, options: TurnOptions) -> bool:
+        """Default: no. Asking the user mid-turn needs the CLI to host an MCP server pointed at
+        the daemon, so it is opt-in per provider and never assumed from the presence of a flag."""
+        return False
+
     def capabilities(self) -> Capabilities:
         """Default: nothing selectable, so the panel simply shows no rows for this backend."""
         return Capabilities()

@@ -1,12 +1,17 @@
 # answer.py — the shape of one answer message: the agent's text, then the footer that names it.
 from __future__ import annotations
 import html
-from .format import SESSION_ID_LABEL_LEN, format_body, meta_bits, title_words
+from .format import SESSION_ID_LABEL_LEN, clip_chars, format_body, meta_bits, title_words
 from .htmlsplit import split_html
 
 SEPARATOR = "· · ·"
 # Slack so a chunk sized with the pin still fits once the pin is swapped for the footer.
 _PIN_MARGIN = 16
+# Room for the ` (12/12)` a bubble ends with.
+_COUNT_MARGIN = 10
+# A voice note can run for minutes; its transcript opens every bubble of the answer, so it is
+# clipped to something that reads as a reminder of the question rather than as the message.
+LEAD_CHARS = 300
 # `block` wants the whole answer as one string and lets reply.deliver do the splitting, so it
 # calls `frames` with a limit nothing can reach.
 _UNBOUNDED = 10 ** 9
@@ -45,9 +50,52 @@ def _footer(sid: str | None, title: str | None, provider: str | None, model: str
     return [bit for bit in (label, meta) if bit]
 
 
+def quote(transcript: str) -> str:
+    """What the bot heard, as the opening line of every bubble of the answer to it.
+
+    It used to be a bubble of its own, sent before the turn ran (F2). Lucas, 2026-07-28: *"eu
+    gostava quando a transcrição aparecia dentro do bubble... a transcrição não teria uma bubble
+    só para si"* — a standalone echo costs a message, and a long answer left it scrolled far
+    above the part being read. Repeated per bubble, the answer always says what it is answering.
+    Clipped, because a two-minute voice note would otherwise open every bubble with a wall."""
+    text = clip_chars(transcript.strip(), LEAD_CHARS)
+    escaped = html.escape(text)
+    return f'<blockquote><i>"{escaped}"</i></blockquote>\n'
+
+
+def _counter(index: int, total: int | None) -> str:
+    """`(2/3)` when the answer is finished and `(2)` while it is still arriving: mid-stream the
+    total is genuinely unknown — bubble 3 exists only once the text that fills it does — and a
+    sealed bubble is never rewritten to correct it (AD-25). So the count that is knowable is
+    shown, and the last bubble of a finished answer is the one that carries the total."""
+    label = f"({index}/{total})" if total else f"({index})"
+    return label
+
+
+def decorate(chunks: list[str], lead: str = "", total: int | None = None) -> list[str]:
+    """Put the per-bubble furniture on chunks that are already split: the quoted transcript at
+    the top, the position at the end. Both are omitted when they would say nothing — no lead
+    without a voice note, no count for an answer that is one bubble."""
+    counted = len(chunks) > 1
+    out = []
+    for index, chunk in enumerate(chunks, start=1):
+        body = f"{lead}{chunk}" if lead else chunk
+        if counted:
+            body = f"{body} {_counter(index, total)}"
+        out.append(body)
+    return out
+
+
+def room(limit: int, lead: str = "", pin: str | None = None) -> int:
+    """The budget left for the answer's own text once its furniture is accounted for. Reserved
+    up front rather than trimmed afterwards: a chunk that fits only until the footer replaces the
+    pin is a message Telegram rejects at the moment the turn ends."""
+    return limit - len(pin or "") - len(lead) - _PIN_MARGIN - _COUNT_MARGIN
+
+
 def frames(settled: str, unsettled: str = "", pin: str | None = None,
-           footer: list[str] | None = None, limit: int = 4096, soft: int | None = None
-           ) -> list[str]:
+           footer: list[str] | None = None, limit: int = 4096, soft: int | None = None,
+           lead: str = "") -> list[str]:
     """The bubbles an answer occupies right now — mid-stream or finished.
 
     `settled` is markdown that can no longer change and so is rendered; `unsettled` is the
@@ -66,8 +114,8 @@ def frames(settled: str, unsettled: str = "", pin: str | None = None,
     for line in footer or []:
         parts.append(html.escape(line))
     text = "\n".join(part for part in parts if part)
-    room = limit - len(pin or "") - _PIN_MARGIN
-    chunks = split_html(text, room, soft)
+    chunks = split_html(text, room(limit, lead, pin), soft)
+    chunks = decorate(chunks, lead)
     if pin:
         # A blank line of distance, so the pin reads as a status hanging under the answer rather
         # than as the answer's next line (Lucas, 2026-07-27).

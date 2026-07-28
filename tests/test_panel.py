@@ -12,10 +12,15 @@ def test_effort_disappears_when_the_model_declares_none(store):
     registry.set_setting("s1", "model", "opencode/a")
     assert choices.menu_dims("s1") == ["m", "e"]
 
-def test_root_is_plus_then_the_mode_segments(store):
-    rows = _labels(panelmenu.root_markup("s1", "build"))
-    assert rows[0][:3] == ["+", "[ BUILD ]", "PLAN"]
-    assert len(rows) == 1
+def test_root_is_the_dimension_row_because_mode_is_gone(store):
+    """The panel used to open on `+ [ BUILD ] PLAN` and cost a second tap to reach the knobs.
+    Build-only (2026-07-28) leaves nothing to segment, so the knobs ARE the root."""
+    rows = _labels(panelmenu.root_markup("s1"))
+    assert rows == _labels(panelmenu.menu_markup("s1"))
+    assert "+" not in rows[0]
+    for row in rows:
+        for label in row:
+            assert label.lower() not in ("build", "plan", "[ build ]", "[ plan ]")
 
 def test_session_menu_hides_harness_but_new_offers_it(store):
     """A running lineage cannot change harness — no CLI imports the other's transcript — so

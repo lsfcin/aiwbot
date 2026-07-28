@@ -1,6 +1,6 @@
 # test_voice_echo_and_picker.py — Lucas's 2026-07-27 live test: STT conditioning prompt shape,
 # the transcript echo, and a picker that stops reshuffling itself under his thumb.
-from frontend import hotwords, panelmenu, phrases, startword
+from frontend import answer, hotwords, panelmenu, phrases, startword
 from .panelkit import texts as _texts
 
 # Longest run of words the prompt may go without a punctuation mark. The bug was a 26-word bare
@@ -46,9 +46,11 @@ def test_the_models_lucas_says_out_loud_are_in_the_vocabulary():
 
 
 def test_the_echo_is_italic_quotes_and_carries_no_label():
-    """Lucas: just the text in italic within quotes — no `ouvi:`, no blockquote."""
-    line = phrases.TRANSCRIPT_ECHO.format(text="oi")
-    assert line == '<i>"oi"</i>'
+    """Still italic inside quotes and still label-free (Lucas, 2026-07-27), but it is no longer a
+    message of its own: since 2026-07-28 it opens every bubble of the answer, so it lives in
+    `answer.quote` and the standalone `TRANSCRIPT_ECHO` phrase is gone."""
+    line = answer.quote("oi")
+    assert '<i>"oi"</i>' in line
     assert "ouvi" not in line
 
 

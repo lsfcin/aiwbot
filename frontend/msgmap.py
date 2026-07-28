@@ -49,6 +49,17 @@ def pending_new(message_id: int) -> str | None:
     return _value_by_message("pending_new", message_id)
 
 
+def remember_ask(message_id: int, question_id: str) -> None:
+    """Question bubble -> the question waiting on it, so a reply to it answers the agent instead
+    of continuing the session. Kept here rather than in `ask` because eviction is the same
+    problem every message map has, and it is already solved once (F4 Stage 4)."""
+    _remember_by_message("ask_map", message_id, question_id)
+
+
+def ask_question(message_id: int) -> str | None:
+    return _value_by_message("ask_map", message_id)
+
+
 def remember_panel(message_id: int, state: str) -> None:
     """Which panel state this message is showing, so a selection can return to it instead of
     collapsing to the mode row. It lives here rather than in callback_data because there is no

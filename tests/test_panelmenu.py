@@ -5,7 +5,7 @@ from .panelkit import FAVS as _FAVS, labels as _labels, texts as _texts, data as
 
 
 def _states(scope="s1"):
-    return [panelmenu.root_markup(scope, "build"),
+    return [panelmenu.root_markup(scope),
             panelmenu.menu_markup(scope),
             panelmenu.menu_markup(registry.NEW),
             panelmenu.values_markup("m", _FAVS, None, extra=[panelmenu.all_button()]),
@@ -19,8 +19,10 @@ def test_no_row_exceeds_four_buttons(store):
             assert 1 <= len(row) <= keyboard.MAX_PER_ROW
 
 def test_first_button_opens_or_goes_back_and_last_expands_or_collapses(store):
-    """The panel's one layout rule, so the two controls are always where the thumb expects."""
-    for markup in _states():
+    """The panel's one layout rule, so the two controls are always where the thumb expects. The
+    root is exempt since build-only made it the top level: there is nothing above it to go back
+    to, and nothing left to open (2026-07-28)."""
+    for markup in _states()[3:]:
         flat = _texts(markup)
         assert flat[0] in ("+", "‹")
     for markup in _states()[3:5]:
@@ -28,7 +30,6 @@ def test_first_button_opens_or_goes_back_and_last_expands_or_collapses(store):
 
 def test_back_walks_one_level_not_straight_to_the_root(store):
     """`‹` used to be an `x` that jumped to the mode row, which read as cancel, not back."""
-    assert _data(panelmenu.menu_markup("s1"))[0] == "p:root"
     assert _data(panelmenu.values_markup("m", _FAVS, None))[0] == "p:menu"
     assert _data(panelmenu.providers_markup("s1"))[0] == "p:d:m"
     assert _data(panelmenu.provider_markup("s1", "big", 0))[0] == "p:g"

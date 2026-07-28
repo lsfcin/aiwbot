@@ -9,8 +9,11 @@
 |------|-----------|-----|-------------|
 | [`__init__.py`](__init__.py) | — | — | **facade** — __init__.py — facade: Telegram frontend on the AgentBackend seam. Import frontend only through here. |
 | [`SPEC.md`](SPEC.md) | — | — | SPEC: frontend — audio-in-out voice pipeline |
-| [`answer.py`](answer.py) | — | `frames`, `block` | answer.py — the shape of one answer message: the agent's text, then the footer that names it. |
+| [`answer.py`](answer.py) | — | `quote`, `decorate`, `room`, `frames`, `block` | answer.py — the shape of one answer message: the agent's text, then the footer that names it. |
+| [`ask.py`](ask.py) | — | `new_token`, `register`, `unregister`, `question_of`, `answer` | ask.py — the bot side of ask_user: hold a running turn open on a question until Lucas answers. |
+| [`askserver.py`](askserver.py) | — | `mcp_config`, `port`, `handle_rpc`, `start` | askserver.py — the daemon's own MCP server: one HTTP endpoint per live turn, JSON-RPC by hand. |
 | [`bot.py`](bot.py) | — | `main` | bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX. |
+| [`cadence.py`](cadence.py) | — | `Cadence`, `due`, `spaced`, `typing_due`, `mark_paint` | cadence.py — when a streamed answer is allowed to move: repaint rate, typing, bubble spacing. |
 | [`choices.py`](choices.py) | — | `harness_values`, `model_values`, `groups`, `effort_values`, `preferred` | choices.py — what a scope may be offered: the backends' declarations, asked per dimension. |
 | [`config.py`](config.py) | [`config.pyi`](config.pyi) | `config_dir`, `load_config`, `save_config`, `bot_token`, `allowed_chat_id` | config.py — aiwbot's own Telegram config dir (separate token/storage from the old workspace bot). |
 | [`directives.py`](directives.py) | — | `resolve` | directives.py — read leading harness/model words off a bot-prefixed message, no inference. |
@@ -20,10 +23,10 @@
 | [`htmlsplit.py`](htmlsplit.py) | — | `split_html`, `strip_tags` | htmlsplit.py — split Telegram HTML into sendable chunks without ever breaking a tag. |
 | [`inbox.py`](inbox.py) | [`inbox.pyi`](inbox.pyi) | `append_entry`, `build_entry`, `save_media` | inbox.py — capture plain text/media into brain/INBOX.md ($0, no backend call). |
 | [`inline.py`](inline.py) | — | `convert` | inline.py — markdown inline spans -> Telegram HTML (bold, strike, code, links, italic). |
-| [`keyboard.py`](keyboard.py) | — | `cell`, `segment`, `chunk`, `framed` | keyboard.py — inline-keyboard primitives: rows of at most four, framed by the panel's controls. |
+| [`keyboard.py`](keyboard.py) | — | `per_row`, `cell`, `segment`, `chunk`, `framed` | keyboard.py — inline-keyboard primitives: rows of at most four, framed by the panel's controls. |
 | [`labels.py`](labels.py) | — | `provider_short`, `model_label` | labels.py — fit a model id into a button: provider prefix, then compress only if it overflows. |
 | [`markdown.py`](markdown.py) | — | `stable_prefix`, `format_body` | markdown.py — agent markdown -> Telegram HTML: block level (fences, tables, headings, lists). |
-| [`msgmap.py`](msgmap.py) | — | `remember_reply`, `session_for_reply`, `remember_pending_new`, `pending_new`, `remember_panel` | msgmap.py — bounded message_id -> value maps: which session, which scope, which panel state. |
+| [`msgmap.py`](msgmap.py) | — | `remember_reply`, `session_for_reply`, `remember_pending_new`, `pending_new`, `remember_ask` | msgmap.py — bounded message_id -> value maps: which session, which scope, which panel state. |
 | [`painter.py`](painter.py) | — | `Painter`, `note_session`, `frames`, `finish`, `paint` | painter.py — keep the chat showing the answer as it arrives, throttled. One object per turn. |
 | [`panel.py`](panel.py) | — | `apply`, `handle_callback` | panel.py — panel routing: which grid a tap opens, and which scope it writes to. |
 | [`panelmenu.py`](panelmenu.py) | — | `root_markup`, `menu_markup`, `values_markup`, `all_button`, `providers_markup` | panelmenu.py — the panel's states drawn as keyboards: mode row, dimension menu, value pickers. |
@@ -37,6 +40,6 @@
 | [`stt.py`](stt.py) | — | `confident`, `run`, `transcribe` | stt.py — STT wrapper: faster-whisper large-v3-turbo, lazy-loaded; fails safe to "" (C1, C3). |
 | [`table.py`](table.py) | — | `is_row`, `is_separator`, `render` | table.py — pipe-tables -> Telegram row blocks: rows become labelled text, never a <pre> box. |
 | [`tts.py`](tts.py) | — | `encode_ogg`, `synthesize` | tts.py — TTS wrapper: Kokoro-82M pf_dora voice, lazy-loaded; local OGG/Opus encode (C5, C6). |
-| [`turnhelpers.py`](turnhelpers.py) | — | `friendly_error`, `parse_new_arg`, `apply_directives`, `turn_options`, `persist_turn` | turnhelpers.py — turn plumbing: friendly errors, /new arg parsing, sticky options, persistence. |
-| [`turnrun.py`](turnrun.py) | — | `run_and_deliver`, `start_new`, `handle_reply_continue` | turnrun.py — run one turn and put its answer on screen: dispatch, deliver, anchor, speak. |
+| [`turnhelpers.py`](turnhelpers.py) | — | `friendly_error`, `parse_new_arg`, `apply_directives`, `turn_options`, `enable_ask` | turnhelpers.py — turn plumbing: friendly errors, /new arg parsing, sticky options, persistence. |
+| [`turnrun.py`](turnrun.py) | — | `guarded`, `run_and_deliver`, `start_new`, `handle_reply_continue` | turnrun.py — run one turn and put its answer on screen: dispatch, deliver, anchor, speak. |
 <!-- routing:end -->

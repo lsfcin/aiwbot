@@ -1,7 +1,7 @@
 # test_f4_streaming.py — F4 Stage 2: the live bubble. Throttle mechanics, the pin, and the
 # guarantee that a streamed turn still ends as byte-for-byte today's answer.
 import asyncio
-from frontend import answer, markdown, painter, reply
+from frontend import answer, cadence, markdown, painter, reply
 from frontend.htmlsplit import split_html
 from .streamkit import Clock
 
@@ -38,7 +38,7 @@ class _LiveMsg:
 
 
 def _painter(msg, clock):
-    return painter.Painter(msg, "· pensando…", clock=clock)
+    return painter.Painter(msg, "pensando…", clock=clock)
 
 
 def _feed(p, chunks, clock, gap=2.0):
@@ -61,7 +61,7 @@ def test_paints_are_spaced_by_the_throttle_interval():
     msg, clock = _LiveMsg(), Clock()
     p = _painter(msg, clock)
     big = "palavra " * 20
-    _feed(p, [big] * 4, clock, gap=painter.MIN_INTERVAL)
+    _feed(p, [big] * 4, clock, gap=cadence.MIN_INTERVAL)
     assert len(msg.edits) == 4
     _feed(p, [big] * 4, clock, gap=0.1)
     assert len(msg.edits) == 4
@@ -86,26 +86,26 @@ def test_a_failed_paint_widens_the_gap_and_a_good_one_narrows_it():
     msg, clock = _LiveMsg(), Clock()
     p = _painter(msg, clock)
     msg.fail = True
-    _feed(p, ["palavra " * 20] * 3, clock, gap=painter.MAX_INTERVAL)
-    assert p.interval > painter.MIN_INTERVAL
+    _feed(p, ["palavra " * 20] * 3, clock, gap=cadence.MAX_INTERVAL)
+    assert p.clock.interval > cadence.MIN_INTERVAL
     msg.fail = False
-    _feed(p, ["palavra " * 20] * 4, clock, gap=painter.MAX_INTERVAL)
-    assert p.interval == painter.MIN_INTERVAL
+    _feed(p, ["palavra " * 20] * 4, clock, gap=cadence.MAX_INTERVAL)
+    assert p.clock.interval == cadence.MIN_INTERVAL
 
 
 def test_the_interval_never_runs_away():
     msg, clock = _LiveMsg(), Clock()
     p = _painter(msg, clock)
     msg.fail = True
-    _feed(p, ["palavra " * 20] * 30, clock, gap=painter.MAX_INTERVAL)
-    assert p.interval <= painter.MAX_INTERVAL
+    _feed(p, ["palavra " * 20] * 30, clock, gap=cadence.MAX_INTERVAL)
+    assert p.clock.interval <= cadence.MAX_INTERVAL
 
 
 def test_the_pin_sits_at_the_end_of_the_live_bubble():
     msg, clock = _LiveMsg(), Clock()
     p = _painter(msg, clock)
     _feed(p, ["primeiro paragrafo aqui.\n\nsegundo em andamento " * 3], clock, gap=10)
-    assert msg.edits[-1].endswith("· pensando…")
+    assert msg.edits[-1].endswith("pensando…")
 
 
 def test_the_finished_answer_carries_no_pin():
@@ -133,7 +133,7 @@ def test_typing_is_relit_but_not_spammed():
     p = _painter(msg, clock)
     _feed(p, ["a"] * 10, clock, gap=0)
     assert len(msg.chat.actions) == 1
-    _feed(p, ["a"] * 10, clock, gap=painter.TYPING_EVERY)
+    _feed(p, ["a"] * 10, clock, gap=cadence.TYPING_EVERY)
     assert len(msg.chat.actions) == 11
 
 
@@ -155,7 +155,7 @@ def test_no_two_repaints_land_closer_than_the_configured_floor():
     _feed(p, ["palavra " * 20] * 12, clock, gap=1.0)
     assert len(at) > 1, "a 12-second stream should repaint more than once"
     gaps = [b - a for a, b in zip(at, at[1:])]
-    assert min(gaps) >= painter.MIN_INTERVAL
+    assert min(gaps) >= cadence.MIN_INTERVAL
 
 
 def test_the_pin_hangs_a_blank_line_below_the_answer_and_carries_no_glyph():

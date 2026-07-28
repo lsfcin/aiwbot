@@ -33,7 +33,9 @@ def test_harness_of_the_new_scope_is_a_knob(store):
 def test_a_turn_leaves_its_knobs_as_the_defaults_a_new_session_inherits(store):
     registry.remember_defaults("opencode", "plan", "opencode/a", "high")
     assert registry.harness_for(registry.NEW) == "opencode"
-    assert registry.mode_for(registry.NEW) == "plan"
+    # Coerced, not inherited: the bot runs build only, so a stored `plan` — from before the
+    # decision, or from a desktop session — comes back as build (2026-07-28, AD-27 option A).
+    assert registry.mode_for(registry.NEW) == "build"
     assert registry.setting_for(registry.NEW, "model") == "opencode/a"
     assert registry.setting_for(registry.NEW, "effort") == "high"
 
