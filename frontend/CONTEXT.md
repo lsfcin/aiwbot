@@ -24,7 +24,7 @@
 | [`labels.py`](labels.py) | — | `provider_short`, `model_label` | labels.py — fit a model id into a button: provider prefix, then compress only if it overflows. |
 | [`markdown.py`](markdown.py) | — | `stable_prefix`, `format_body` | markdown.py — agent markdown -> Telegram HTML: block level (fences, tables, headings, lists). |
 | [`msgmap.py`](msgmap.py) | — | `remember_reply`, `session_for_reply`, `remember_pending_new`, `pending_new`, `remember_panel` | msgmap.py — bounded message_id -> value maps: which session, which scope, which panel state. |
-| [`painter.py`](painter.py) | — | `Painter`, `frame`, `paint` | painter.py — keep the chat showing the answer as it arrives, throttled. One object per turn. |
+| [`painter.py`](painter.py) | — | `Painter`, `note_session`, `frames`, `finish`, `paint` | painter.py — keep the chat showing the answer as it arrives, throttled. One object per turn. |
 | [`panel.py`](panel.py) | — | `apply`, `handle_callback` | panel.py — panel routing: which grid a tap opens, and which scope it writes to. |
 | [`panelmenu.py`](panelmenu.py) | — | `root_markup`, `menu_markup`, `values_markup`, `all_button`, `providers_markup` | panelmenu.py — the panel's states drawn as keyboards: mode row, dimension menu, value pickers. |
 | [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick`, `pin` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |

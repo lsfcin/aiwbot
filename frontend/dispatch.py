@@ -63,7 +63,7 @@ async def turn(prompt: str, *, session_id: str | None, backend_name: str, cwd: s
     async for event in stream:
         events.append(event)
         if on_text is not None and event.kind == "text":
-            await on_text(event.text)
+            await on_text(event.text, event.session_id)
     if options.stream:
         _log_stream(events)
     return events_to_result(events)

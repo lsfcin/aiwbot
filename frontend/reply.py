@@ -66,7 +66,7 @@ async def send_typing(message) -> None:
         print(f"send_typing failed: {e}")
 
 
-async def edit_text(message, html_text: str) -> bool:
+async def edit_text(message, html_text: str, reply_markup=None) -> bool:
     """Repaint one live message. Returns whether Telegram accepted it.
 
     "Message is not modified" is not an error here — it means the throttle let through a paint
@@ -74,7 +74,7 @@ async def edit_text(message, html_text: str) -> bool:
     while a real failure (rate limit, network) is left for the caller's backoff to widen."""
     ok = False
     try:
-        await message.edit_text(html_text, parse_mode="HTML")
+        await message.edit_text(html_text, parse_mode="HTML", reply_markup=reply_markup)
         ok = True
     except TelegramError as e:
         if "not modified" in str(e).lower():
