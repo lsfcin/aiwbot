@@ -91,3 +91,19 @@ def test_the_footer_rides_the_last_bubble():
     chunks = split_html(block, 4096, reply.SOFT_CHARS)
     assert "[ABC]" in chunks[-1]
     assert answer.SEPARATOR in chunks[-1]
+
+
+def test_the_footer_title_runs_to_five_words():
+    """Three words was too terse to recognise a turn by (Lucas, 2026-07-27). The /resume picker
+    keeps its own tighter budget, because there the cap exists to stop the bubble resizing."""
+    block = answer.block("corpo", "abc12345", "explica o ciclo da agua em quatro paragrafos",
+                         provider="claude")
+    label = block.split("\n")[-2]
+    assert label == "[ABC] EXPLICA O CICLO DA AGUA"
+    assert len(label.split()) == 1 + 5
+
+
+def test_the_resume_picker_title_budget_is_unchanged():
+    from frontend.format import title_words, TITLE_CHARS
+    assert title_words("um dois tres quatro cinco seis") == "UM DOIS TRES"
+    assert len(title_words("palavralonga " * 6, 5)) <= TITLE_CHARS + 1
