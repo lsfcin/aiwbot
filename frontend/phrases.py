@@ -68,6 +68,13 @@ TRANSCRIBE_FAIL_PHRASES = [
 # the only question it exists to answer — what exactly reached the session.
 TRANSCRIPT_ECHO = '<i>"{text}"</i>'
 
+# The agent asked something and its turn is parked on the answer (F4 Stage 4). The hint appears
+# only under a question with no buttons — with buttons the affordance is on screen already. The
+# toasts are what a tap says back; a stale one is the button of a question already answered.
+ASK_HINT = "· responde essa mensagem"
+ASK_TAKEN = "anotado"
+ASK_STALE = "essa pergunta já passou"
+
 HELP_TEXT = (
     "<b>Comandos</b>\n"
     "<code>/new</code> [--backend claude|opencode] &lt;prompt&gt; — inicia sessão nova, já fica selecionada\n"

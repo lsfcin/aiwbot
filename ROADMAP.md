@@ -108,14 +108,43 @@ drastic first: `painter.STREAM_SEAL = False` (back to one freezing bubble, keepi
 | **1** ✔ | streaming seam in the backend, still batch-delivered | log shows frames ticking; Telegram identical |
 | **2** ✔ | live bubble: throttled painter, pin held below | text grows ~every 3 s, footer+keyboard at the end |
 | **3** ✔ code | seal bubbles mid-stream (full AD-23 under streaming) | **UNCONFIRMED** — reply to bubble 1 *while bubble 2 writes* |
-| **4** | `ask_user` MCP transport, probe-gated | question bubble → tap → streamed answer names the choice |
-| **5** | `ask_user` in anger, AD-25/AD-26, close F4 | a real plan-mode task, away from the PC |
+| **4** ✔ code | `ask_user` MCP transport, probe-gated | **UNCONFIRMED in chat** — question bubble → tap → the same turn names the choice |
+| **5** | `ask_user` in anger, close F4 | a real task away from the PC — **blocked on the plan-mode decision below** |
 
 Key risks pre-empted: 64 KB subprocess stream limit (`limit=1<<20`); stderr pipe fills and hangs the
 child (sibling drain task); occupancy read before the transcript flushes would silently regress b3
 (`await proc.wait()` before yielding the result event); 429 pile-up (in-flight guard that *drops*
 rather than queues, plus self-tuning backoff); `bot.py` 198/200 and `claude.py` 194/200 both split
 **before** gaining code.
+
+#### F4 Stage 4 ✔ **code done 2026-07-28** — gate passed, live round trip proven off-Telegram
+The probe the stage was gated on passed: a stub HTTP MCP server + `claude -p --mcp-config
+'<json>' --strict-mcp-config` really does expose `mcp__aiwbot__ask_user` to the agent, with the
+turn token surviving in the URL path. Then the real thing, end to end with Telegram faked and the
+real `askserver` + broker + `CliBackend.send`: **question → buttons → tap → the same turn resumed
+and named the choice, 15 s wall.** Shape and rationale are in SPECS AD-26/AD-27.
+
+**Measured, do not re-derive:**
+- A tool call is killed at **~60 s** by default. `MCP_TOOL_TIMEOUT` (ms, subprocess env) lifts it;
+  the bot waits 55 min *under* a 60 min ceiling so the timeout path is always ours and always text.
+- The CLI sends **`initialize` three times** per invocation → the handshake must be stateless.
+- **Plan mode refuses every MCP tool** — see the decision below.
+- `aiohttp` was already installed; the `mcp` SDK is still not a dependency.
+
+Rollbacks, least drastic first: `"ask": "false"` in `config.json` + restart (turn invoked exactly
+as in Stage 3) → the server failing to bind, which disables ask by itself and leaves the daemon up.
+
+**⛔ Decision Lucas owes before Stage 5 — ask_user cannot run in plan mode.**
+`claude -p --permission-mode plan` answers the call with *"Cannot call mcp__aiwbot__ask_user while
+in plan mode"*; `--allowedTools` does not lift it (both measured). Plan mode is exactly where
+interviewing pays off, so this is the stage's one real dent. Options:
+- **A — leave it.** Ask works in build mode only; a plan-mode turn behaves as it does today. Zero
+  risk, and Stage 5's "real task" has to be a build-mode one.
+- **B — re-implement `mode=plan` as read-only build.** `--permission-mode bypassPermissions
+  --tools "Read,Grep,Glob"` keeps the MCP tool callable and still touches nothing — verified live.
+  It trades away plan mode's own system prompt (no ExitPlanMode, no plan formatting), so the
+  answers will read differently. It changes what a mode Lucas uses daily *means*, which is why it
+  is not taken unilaterally.
 
 #### F4 Stages 0–3 ✔ **SHIPPED 2026-07-27** — archived in [HISTORY.md](HISTORY.md)
 Stage 0 split `bot.py` → `turnrun.py` (the cut chosen by F4's seam, not by line counting);

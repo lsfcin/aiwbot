@@ -477,6 +477,56 @@ has to be reachable from Lucas's phone — one line in `config.json` plus a rest
 change. `painter.STREAM_SEAL` is the finer-grained rollback that gives up sealing while keeping
 live text.
 
+### AD-26 — The bot hosts the MCP server; the turn is named by the URL (2026-07-27, F4 Stage 4)
+
+`ask_user` only works in linuz90's bot because the SDK runs the agent **in-process**: its tool
+handler awaits a button press in the same process that owns the chat. aiwbot drives a
+**subprocess CLI**, the opposite shape — a stdio MCP server would be spawned *by* that CLI, a
+child of it, with no way to reach the daemon's Telegram state.
+
+So the relationship is inverted: **the daemon hosts an HTTP MCP server in its own event loop, and
+each turn points its CLI at it** (`--mcp-config '<json>' --strict-mcp-config`). The handler runs
+where the chat already lives, blocks the agent's turn exactly like the in-process version, and no
+Phase D rewrite is needed. It is plain JSON-RPC 2.0 over `aiohttp` — the `mcp` SDK would be a new
+dependency for ~40 lines.
+
+**The turn a question belongs to comes from the URL path** (`/mcp/<token>`), never from the
+payload: an MCP request carries no turn id, and turns run concurrently as PTB tasks, so there is
+nothing else to correlate on. The token is registered before the backend starts and released in a
+`finally`, so it cannot outlive its turn. Two consequences that are easy to get wrong:
+
+- **The handshake must be a pure function of the request.** Measured: one `claude -p` run sends
+  `initialize` *three times*. A server holding per-connection state would answer the repeats from
+  a half-built session.
+- **`--strict-mcp-config` is not optional.** Without it the turn also loads whatever MCP servers
+  Lucas configured for interactive Claude Code — a different tool surface than the one the turn
+  was reasoned about with.
+
+### AD-27 — An unanswered question returns text, and plan mode cannot ask at all (2026-07-27)
+
+Two limits of the CLI, both measured against the binary rather than read off documentation, both
+load-bearing:
+
+**The tool call dies at ~60 s** ("Tool timed out. No answer got.") — nothing next to the hour
+Lucas wants to answer in, away from his phone. `MCP_TOOL_TIMEOUT` (ms, in the subprocess env)
+lifts it, and the bot's own `ask.WAIT_SECONDS` is set *below* the raised ceiling so the wait that
+ends first is always ours. That ordering is what makes the next rule reachable:
+
+**Every exit of a wait is a string.** Timeout, a turn that ended, a bubble Telegram refused — all
+return *content* the agent can act on ("siga com a hipótese mais razoável e diga qual assumiu"),
+never an MCP error. An error aborts the turn and throws away everything the agent had already
+worked out; a sentence costs it one paragraph. Lucas's call, and the reason `ask()` has no raising
+path at all.
+
+**Plan mode refuses the whole MCP surface**: `claude -p --permission-mode plan` answers the call
+with *"Cannot call mcp__aiwbot__ask_user while in plan mode"*, and an explicit `--allowedTools`
+does **not** lift it. So `supports_ask` is a function of the *options*, not of the provider —
+claude asks in build mode and never in plan. This is a real gap, because plan mode is exactly
+where interviewing matters most; the substitute that measures out is
+`--permission-mode bypassPermissions --tools "Read,Grep,Glob"` (read-only built-ins, MCP intact,
+verified live), which trades plan mode's own prompt for the ability to ask. Not adopted
+unilaterally — it changes what `mode=plan` means, so it is Lucas's call before Stage 5.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

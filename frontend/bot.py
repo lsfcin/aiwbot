@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from . import choices, config, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, startword, stt, turnhelpers, turnrun
+from . import ask, askserver, choices, config, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, startword, stt, turnhelpers, turnrun
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 
@@ -41,6 +41,12 @@ async def _route_text(msg, text: str, context, *, spoken: bool = False) -> None:
     (spoken=True, C2/C5)."""
     if msg.reply_to_message is not None:
         replied_to = msg.reply_to_message.message_id
+        # A reply to a question the agent is still waiting on answers THAT, before anything else:
+        # the turn is blocked inside the daemon, so this text belongs to the running turn rather
+        # than starting a new exchange with it (F4 Stage 4).
+        question = ask.question_of(replied_to)
+        if question and ask.answer(question, text):
+            return
         sid = msgmap.session_for_reply(replied_to)
         if sid:
             await turnrun.handle_reply_continue(msg, sid, text, spoken=spoken)
@@ -144,10 +150,15 @@ async def _post_init(app: Application) -> None:
     # Off the event loop (it shells a CLI), and awaited before polling starts so no tap can
     # race the warm and pay for it (F3c).
     await asyncio.to_thread(choices.warm)
+    # The MCP endpoint each turn's CLI is pointed at, in this same loop so its handler can reach
+    # the chat. A port it cannot bind leaves ask disabled and the daemon otherwise intact.
+    listening = await askserver.start()
+    print(f"aiwbot: ask server on {askserver.HOST}:{listening}" if listening else "aiwbot: no ask server")
 
 
 def main() -> None:
     app = Application.builder().token(config.bot_token()).post_init(_post_init).build()
+    app.add_handler(CallbackQueryHandler(ask.handle_callback, pattern="^a:"))
     app.add_handler(CallbackQueryHandler(panel.handle_callback, pattern="^p:"))
     app.add_handler(CallbackQueryHandler(resume.handle_callback, pattern="^(resume|page|noop):"))
     app.add_handler(MessageHandler(filters.ALL, _handle_message))

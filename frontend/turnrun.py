@@ -4,7 +4,7 @@
 # then deliver" into "paint as it arrives, then seal", and everything that changes is in here, so
 # bot.py's PTB wiring and routing stay untouched by it.
 from __future__ import annotations
-from . import answer, dispatch, msgmap, painter, panelmenu, phrases, registry, reply, speech, tts, turnhelpers
+from . import answer, ask, dispatch, msgmap, painter, panelmenu, phrases, registry, reply, speech, tts, turnhelpers
 from . import config, format
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
@@ -52,12 +52,21 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     options = turnhelpers.turn_options(scope, title)
     live = _painter(msg, working, options.stream)
     on_text = live.paint if live is not None else None
+    # The token is registered BEFORE the backend starts and released in the `finally` whatever
+    # happens: an agent can call ask_user in its first second, and a token that outlived its turn
+    # would leave a question waiting on a future nobody can resolve (F4 Stage 4).
+    token = turnhelpers.enable_ask(scope, backend_name, options)
+    if token:
+        ask.register(token, msg)
     try:
         result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name,
                                      cwd=WORKSPACE_DIR, options=options, on_text=on_text)
     except dispatch.DispatchError as e:
         await reply.deliver(working, msg, turnhelpers.friendly_error(e))
         return
+    finally:
+        if token:
+            ask.unregister(token)
     turnhelpers.persist_turn(result.session_id, backend_name, title, result, options)
     block = answer.block(result.text, result.session_id, title, provider=backend_name,
                          model=result.model, cost_usd=result.cost_usd, mode=options.mode,
