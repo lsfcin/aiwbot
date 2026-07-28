@@ -1,0 +1,72 @@
+# turnrun.py — run one turn and put its answer on screen: dispatch, deliver, anchor, speak.
+# The impure sibling of turnhelpers.py: that module DECIDES (pure, no I/O), this one DOES (awaits
+# the backend and Telegram). Split out of bot.py for F4 — streaming changes "await the whole result,
+# then deliver" into "paint as it arrives, then seal", and everything that changes is in here, so
+# bot.py's PTB wiring and routing stay untouched by it.
+from __future__ import annotations
+from . import answer, dispatch, msgmap, panelmenu, phrases, registry, reply, speech, tts, turnhelpers
+from . import config, format
+
+WORKSPACE_DIR = config.WORKSPACE_DIR
+# The voice reply is synthesized from the answer, and a whole answer can be far longer than anyone
+# wants read aloud, so the spoken copy is capped where the text one is not.
+SPOKEN_CHARS = 2000
+
+
+async def _speak(msg, text: str) -> None:
+    """Best-effort voice reply (C5). Additive: the text is already delivered, so any failure here
+    is logged and dropped rather than surfaced — it must never cost an answer Lucas already has."""
+    try:
+        spoken_text = speech.to_speech(text)
+        speech_text = format.clip_chars(spoken_text, SPOKEN_CHARS)
+        ogg_bytes = tts.synthesize(speech_text)
+        await reply.send_voice(msg, ogg_bytes)
+    except Exception as e:
+        print(f"voice reply failed: {e}")
+
+
+async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
+                          backend_name: str, title: str | None, scope: str,
+                          spoken: bool = False) -> None:
+    """Dispatch one turn with the scope's sticky knobs, then deliver the answer with its footer
+    and the anchor keyboard. `spoken` (C5) additionally replies with a voice note synthesized from
+    the same answer — text-triggered turns leave it False and are unaffected."""
+    options = turnhelpers.turn_options(scope, title)
+    try:
+        result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name,
+                                     cwd=WORKSPACE_DIR, options=options)
+    except dispatch.DispatchError as e:
+        await reply.deliver(working, msg, turnhelpers.friendly_error(e))
+        return
+    turnhelpers.persist_turn(result.session_id, backend_name, title, result, options)
+    block = answer.block(result.text, result.session_id, title, provider=backend_name,
+                         model=result.model, cost_usd=result.cost_usd, mode=options.mode,
+                         context_used=result.context_used, context_window=result.context_window)
+    markup = panelmenu.root_markup(result.session_id, options.mode)
+    sent = await reply.deliver(working, msg, block, reply_markup=markup)
+    # Every bubble, not just the last: Lucas replies to whichever one he is reading (AD-23).
+    for message in sent:
+        msgmap.remember_reply(message.message_id, result.session_id)
+    if spoken:
+        await _speak(msg, result.text)
+
+
+async def start_new(msg, prompt: str, *, spoken: bool = False) -> None:
+    """A new session runs on the NEW scope: whatever the last interaction used, minus anything
+    the /new config bubble changed since."""
+    working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
+    title = format.title_from_prompt(prompt)
+    harness = registry.harness_for(registry.NEW)
+    await run_and_deliver(msg, working, prompt, session_id=None, backend_name=harness,
+                          title=title, scope=registry.NEW, spoken=spoken)
+
+
+async def handle_reply_continue(msg, sid: str, text: str, *, spoken: bool = False) -> None:
+    """`text` is the already-resolved prompt (msg.text for a text turn, the STT transcript for a
+    voice turn) — read from the caller's arg, never re-derived from `msg.text`, since a voice
+    message replying to a prior session anchor has no `.text` at all."""
+    harness = registry.backend_for(sid) or registry.DEFAULT_BACKEND
+    working = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
+    title = registry.title_for(sid)
+    await run_and_deliver(msg, working, text, session_id=sid, backend_name=harness,
+                          title=title, scope=sid, spoken=spoken)
