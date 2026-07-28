@@ -437,6 +437,46 @@ Belt and braces on top: `format.context_pct` withholds any share above 100%, bec
 the window cannot exceed the window. A visibly missing number is a better bug report than a
 confidently wrong one.
 
+### AD-25 — Streaming seals bubbles; it never rewrites one (2026-07-27, F4 Stages 1–3)
+
+Painting an answer as it arrives could easily have contradicted AD-23, which says a long answer is
+several bubbles and every one of them is repliable. It does the opposite — it makes AD-23
+*continuous* — and the reason is a property, not a convention:
+
+**`split_html` is prefix-stable.** Its loop is a single forward pass whose seams are decided only
+from lines already consumed, so appending text can change nothing but the **last** chunk.
+Property-tested over 25 corpora × every line-boundary prefix of each: zero violations. Therefore
+every chunk but the last is already final, and a bubble can be sent the moment it appears and
+**never touched again**. Each is anchored on arrival rather than at the end of the turn, so a
+reply to bubble 1 continues the session while bubble 3 is still being written — strictly better
+than the batch path, which could only anchor once everything existed.
+
+Three rules follow, and they are the ones to preserve:
+
+1. **Only text that can no longer change is rendered.** `markdown.stable_prefix` settles
+   everything up to the last blank line *outside an open code fence* — a parity count, not a
+   regex, because inside a fence a blank line is code, not a paragraph break. The unsettled tail
+   rides as escaped plain text; rendering it would make it flicker between literal and formatted
+   as closing markers land.
+2. **One code path for streamed and finished.** `answer.block` delegates to `answer.frames`, so
+   the shipped answer *is* a frame with no pin and a footer. That is what makes the AD-23
+   non-regression test meaningful rather than two implementations that happen to agree today.
+3. **Throttling drops, never queues.** The gate is a clock check inside `paint()`, not a
+   background ticker, so nothing races the end of the turn. A paint already in flight is
+   discarded, which is lossless because every frame recomputes from the whole accumulated text —
+   and it is what stops a fast stream from piling requests up behind a ~200 ms round trip (AD-20).
+
+The cadence itself (`MIN_INTERVAL`, `MIN_GROWTH`) is a **UX knob Lucas tunes by reading real turns
+in the chat**, not a rate-limit constant — it went 1.5 s → 5 s → 3 s in one session. Tests pin the
+*spacing invariant against the constant*, never a literal, so tuning never edits a test. Telegram's
+native `ChatAction.TYPING` carries the gap between repaints and is deliberately lit on the FIRST
+delta, independent of the repaint gate, so the wait before the first visible words is never silent.
+
+Streaming stays behind `TurnOptions.stream` because it changes the CLI's invocation: the rollback
+has to be reachable from Lucas's phone — one line in `config.json` plus a restart, never a code
+change. `painter.STREAM_SEAL` is the finer-grained rollback that gives up sealing while keeping
+live text.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.
