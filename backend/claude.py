@@ -18,6 +18,11 @@ _MODES = ("build", "plan")
 _MODELS = ("sonnet", "opus", "fable")
 # One ladder for every claude model — verified in `claude --help` 2026-07-23.
 _EFFORTS = ("low", "medium", "high", "xhigh", "max")
+# Measured 2026-07-27: the CLI aborts an MCP tool call after ~60 s ("Tool timed out. No answer
+# got."), which is nothing next to the hour Lucas wants to answer a question in. This env var
+# lifts the ceiling; the bot's own wait still ends first, so the timeout path stays ours and the
+# agent gets text back instead of a dead tool call.
+_TOOL_TIMEOUT_MS = 3_600_000
 
 
 def _project_dir(cwd: str) -> pathlib.Path:
@@ -77,6 +82,12 @@ class ClaudeBackend(CliBackend):
         args.extend(_output_args(options.stream))
         add_flag(args, "--model", options.model)
         add_flag(args, "--effort", options.effort)
+        add_flag(args, "--mcp-config", options.mcp_config)
+        if options.mcp_config:
+            # Only the bot's own ask server: without this the turn would also load whatever MCP
+            # servers Lucas has configured for interactive Claude Code, which is a different
+            # tool surface than the one this turn was costed and reasoned about with.
+            args.append("--strict-mcp-config")
         if session_id:
             add_flag(args, "--resume", session_id)
         else:
@@ -121,8 +132,18 @@ class ClaudeBackend(CliBackend):
         """AD-8 (revised): Claude Code's native picker hides sessions whose ORIGINATING
         entrypoint is `sdk-cli`, which is what a bare headless `-p` records. The entrypoint
         comes from this env var, not from the flags — setting it makes bot-created sessions
-        show up in the VSCode/terminal picker like any other. Verified live 2026-07-23."""
-        return {"CLAUDE_CODE_ENTRYPOINT": _ENTRYPOINT}
+        show up in the VSCode/terminal picker like any other. Verified live 2026-07-23.
+
+        MCP_TOOL_TIMEOUT is the ask_user round trip's ceiling (F4 Stage 4)."""
+        return {"CLAUDE_CODE_ENTRYPOINT": _ENTRYPOINT,
+                "MCP_TOOL_TIMEOUT": str(_TOOL_TIMEOUT_MS)}
+
+    def supports_ask(self, options: TurnOptions) -> bool:
+        """Measured 2026-07-27: in plan mode the CLI answers an MCP tool call with "Cannot call
+        mcp__aiwbot__ask_user while in plan mode", and `--allowedTools` does not lift it — plan
+        mode blocks the whole MCP surface, not just edits. So the tool is offered in build mode
+        only; offering it in plan would spend a turn on a call that cannot land."""
+        return options.mode != "plan"
 
     def stream_parser(self) -> StreamParser:
         return StreamParser()

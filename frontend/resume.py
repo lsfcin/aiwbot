@@ -143,8 +143,7 @@ async def _anchor(query, sid: str) -> None:
     block = format.session_block(phrase, sid, title, body=body, backend=backend)
     # The anchor is a repliable message like any answer, so it carries the same mode toggle:
     # without it you re-anchor a session unable to see the mode you're about to run in.
-    current = registry.mode_for(sid)
-    markup = panelmenu.root_markup(sid, current)
+    markup = panelmenu.root_markup(sid)
     # Delivered exactly like an answer — split on paragraph boundaries, every bubble anchored.
     # It used to be one `safe_reply` over a body hard-clipped at 3000 chars, which is where the
     # `[…]` Lucas hit came from: not Telegram's 4096 limit, ours, and mid-word (F5b).

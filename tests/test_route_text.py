@@ -17,7 +17,7 @@ class FakeMsg:
 def test_route_text_bot_prefix_starts_new_session_with_spoken_flag(store, monkeypatch):
     calls = []
 
-    async def fake_start_new(msg, prompt, *, spoken=False):
+    async def fake_start_new(msg, prompt, *, spoken=False, working=None):
         calls.append((prompt, spoken))
 
     monkeypatch.setattr(turnrun, "start_new", fake_start_new)
@@ -29,7 +29,7 @@ def test_route_text_reply_continue_threads_spoken_flag(store, monkeypatch):
     msgmap.remember_reply(42, "s1")
     calls = []
 
-    async def fake_reply_continue(msg, sid, text, *, spoken=False):
+    async def fake_reply_continue(msg, sid, text, *, spoken=False, working=None):
         calls.append((sid, text, spoken))
 
     monkeypatch.setattr(turnrun, "handle_reply_continue", fake_reply_continue)
@@ -47,7 +47,7 @@ def test_route_text_reply_continue_forwards_transcript_not_msg_text(store, monke
     msgmap.remember_reply(42, "s1")
     calls = []
 
-    async def fake_reply_continue(msg, sid, text, *, spoken=False):
+    async def fake_reply_continue(msg, sid, text, *, spoken=False, working=None):
         calls.append(text)
 
     monkeypatch.setattr(turnrun, "handle_reply_continue", fake_reply_continue)
@@ -107,8 +107,9 @@ def testrun_and_deliver_spoken_sends_voice_in_addition_to_text(store, monkeypatc
     async def fake_turn(*a, **kw):
         return FakeResult()
 
-    async def fake_deliver(working, msg, block, reply_markup=None):
+    async def fake_deliver(working, msg, block, reply_markup=None, lead=""):
         sent["text"] = block
+        sent["lead"] = lead
         # deliver returns EVERY bubble it sent (F5a), so the caller can anchor them all.
         return []
 
@@ -124,6 +125,8 @@ def testrun_and_deliver_spoken_sends_voice_in_addition_to_text(store, monkeypatc
                                       backend_name="claude", title=None, scope=registry.NEW,
                                       spoken=True))
     assert sent["voice"] == b"OGG"
+    # The transcript rides inside the answer now, quoted, instead of in a bubble of its own.
+    assert "prompt" in sent["lead"] and "<blockquote>" in sent["lead"]
 
 
 def testrun_and_deliver_not_spoken_never_sends_voice(store, monkeypatch):
@@ -140,7 +143,8 @@ def testrun_and_deliver_not_spoken_never_sends_voice(store, monkeypatch):
     async def fake_turn(*a, **kw):
         return FakeResult()
 
-    async def fake_deliver(working, msg, block, reply_markup=None):
+    async def fake_deliver(working, msg, block, reply_markup=None, lead=""):
+        sent["lead"] = lead
         return []
 
     async def fake_send_voice(msg, ogg_bytes):
@@ -154,6 +158,7 @@ def testrun_and_deliver_not_spoken_never_sends_voice(store, monkeypatch):
                                       backend_name="claude", title=None, scope=registry.NEW,
                                       spoken=False))
     assert sent["voice_called"] is False
+    assert sent["lead"] == "", "a typed turn has nothing to echo"
 
 
 def test_bot_no_longer_owns_running_a_turn():

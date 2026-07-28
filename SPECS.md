@@ -477,6 +477,106 @@ has to be reachable from Lucas's phone — one line in `config.json` plus a rest
 change. `painter.STREAM_SEAL` is the finer-grained rollback that gives up sealing while keeping
 live text.
 
+### AD-26 — The bot hosts the MCP server; the turn is named by the URL (2026-07-27, F4 Stage 4)
+
+`ask_user` only works in linuz90's bot because the SDK runs the agent **in-process**: its tool
+handler awaits a button press in the same process that owns the chat. aiwbot drives a
+**subprocess CLI**, the opposite shape — a stdio MCP server would be spawned *by* that CLI, a
+child of it, with no way to reach the daemon's Telegram state.
+
+So the relationship is inverted: **the daemon hosts an HTTP MCP server in its own event loop, and
+each turn points its CLI at it** (`--mcp-config '<json>' --strict-mcp-config`). The handler runs
+where the chat already lives, blocks the agent's turn exactly like the in-process version, and no
+Phase D rewrite is needed. It is plain JSON-RPC 2.0 over `aiohttp` — the `mcp` SDK would be a new
+dependency for ~40 lines.
+
+**The turn a question belongs to comes from the URL path** (`/mcp/<token>`), never from the
+payload: an MCP request carries no turn id, and turns run concurrently as PTB tasks, so there is
+nothing else to correlate on. The token is registered before the backend starts and released in a
+`finally`, so it cannot outlive its turn. Two consequences that are easy to get wrong:
+
+- **The handshake must be a pure function of the request.** Measured: one `claude -p` run sends
+  `initialize` *three times*. A server holding per-connection state would answer the repeats from
+  a half-built session.
+- **`--strict-mcp-config` is not optional.** Without it the turn also loads whatever MCP servers
+  Lucas configured for interactive Claude Code — a different tool surface than the one the turn
+  was reasoned about with.
+
+### AD-27 — An unanswered question returns text, and plan mode cannot ask at all (2026-07-27)
+
+Two limits of the CLI, both measured against the binary rather than read off documentation, both
+load-bearing:
+
+**The tool call dies at ~60 s** ("Tool timed out. No answer got.") — nothing next to the hour
+Lucas wants to answer in, away from his phone. `MCP_TOOL_TIMEOUT` (ms, in the subprocess env)
+lifts it, and the bot's own `ask.WAIT_SECONDS` is set *below* the raised ceiling so the wait that
+ends first is always ours. That ordering is what makes the next rule reachable:
+
+**Every exit of a wait is a string.** Timeout, a turn that ended, a bubble Telegram refused — all
+return *content* the agent can act on ("siga com a hipótese mais razoável e diga qual assumiu"),
+never an MCP error. An error aborts the turn and throws away everything the agent had already
+worked out; a sentence costs it one paragraph. Lucas's call, and the reason `ask()` has no raising
+path at all.
+
+**Plan mode refuses the whole MCP surface**: `claude -p --permission-mode plan` answers the call
+with *"Cannot call mcp__aiwbot__ask_user while in plan mode"*, and an explicit `--allowedTools`
+does **not** lift it. So `supports_ask` is a function of the *options*, not of the provider —
+claude asks in build mode and never in plan. This is a real gap, because plan mode is exactly
+where interviewing matters most; the substitute that measures out is
+`--permission-mode bypassPermissions --tools "Read,Grep,Glob"` (read-only built-ins, MCP intact,
+verified live), which trades plan mode's own prompt for the ability to ask. Not adopted
+unilaterally — it changes what `mode=plan` means, so it is Lucas's call before Stage 5.
+
+### AD-28 — Build only, so the panel opens on the knobs (2026-07-28)
+
+Lucas took option A of AD-27: plan mode is not supported through the bot. Two things follow, and
+both are the point rather than side effects.
+
+**Mode is coerced, not offered.** `registry.mode_for` returns `build` whatever is stored, so a
+session started on the PC in plan mode and continued from the phone silently becomes a build
+turn instead of inheriting a mode the bot cannot honour. The knob survives on the seam
+(`TurnOptions.mode`, each backend's mapping) — restoring plan is one line if a future CLI stops
+blocking MCP in it — but nothing in the bot writes anything else.
+
+**The panel lost a level.** BUILD/PLAN was a two-option segmented control with one reachable
+option, and the `+` that used to open the dimension menu existed only to get past it. Both are
+gone: the root keyboard IS harness/model/effort, so the panel costs one tap where it cost two.
+Keyboards already sitting in the chat still carry `p:mode:*` buttons, so that callback stays
+routed — to a redraw of the current panel, never to setting a mode.
+
+### AD-29 — A bubble carries its question and its position (2026-07-28)
+
+Three shape rules, all from Lucas reading real turns:
+
+**The voice transcript rides inside the answer, quoted, at the top of every bubble** — not in a
+bubble of its own. The standalone echo (F2) cost a message and scrolled out of reach exactly when
+the answer was long enough to need it. Repeated per bubble, any bubble he scrolls back to still
+says what it answers. It is escaped and clipped (`LEAD_CHARS`), because it is arbitrary speech.
+
+**Every bubble ends with its position**, `(2/3)`. The total is unknowable while the answer is
+still arriving — bubble 3 exists only once the text that fills it does — so a bubble is born
+carrying `(2)`, and **one closing pass** stamps the totals once the turn ends (Lucas asked for
+exact positions everywhere, 2026-07-28). That pass is the single exception to AD-25, which is why
+the rule reads "a sealed bubble is not rewritten *while the answer is streaming*" rather than
+"never": prefix-stability guarantees the counter is the only thing that changes, and the pass runs
+after the live bubble is finished, so the answer completes first and the stamping trails it.
+
+**Bubbles are paced apart, one per paint.** `cadence.BUBBLE_GAP` is the floor between one bubble
+appearing and the next; `MIN_INTERVAL` only ever paced repaints of the live bubble, and conflating
+the two is why the cadence appeared to do nothing. A stream that outruns the gap waits rather than
+losing text: the held text lands whole as the next bubble. `_grow` posts **exactly one** bubble per
+paint however far ahead the stream has run — posting every chunk that already fits would land
+three in the same second and undo the pause. The gap is a floor, never an added delay: a stream
+slower than it passes through untouched, and the first bubble is never held back, because the
+working message already is bubble one.
+
+**`·` is a divider, never an opener.** It separates (`· · ·`, `provider · modelo`), so it must not
+lead a line: `pensando…`, not `· pensando…`.
+
+The furniture is budgeted BEFORE the split, not appended after: a chunk sized to the full limit
+and then given a lead and a counter is a message Telegram rejects — and only ever on the long
+voice answers this exists to serve.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

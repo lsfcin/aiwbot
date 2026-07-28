@@ -122,16 +122,37 @@ STREAM_DEFAULT = False
 def streams(scope: str) -> bool:
     """Whether this scope's turns stream. Stored as a string like every other knob, so the
     existing per-scope machinery (and a future panel dimension) needs no special case."""
-    raw = setting_for(scope, "stream")
-    result = STREAM_DEFAULT
+    return _flag(scope, "stream", STREAM_DEFAULT)
+
+
+# Same rollback shape as streaming, for the same reason: `"ask": "false"` plus a restart takes
+# the tool away from the agent without touching code (F4 Stage 4).
+ASK_DEFAULT = True
+
+
+def asks(scope: str) -> bool:
+    """Whether this scope's turns may stop and ask Lucas something mid-turn."""
+    return _flag(scope, "ask", ASK_DEFAULT)
+
+
+def _flag(scope: str, name: str, default: bool) -> bool:
+    raw = setting_for(scope, name)
+    result = default
     if raw is not None:
         result = str(raw).lower() in ("1", "true", "yes", "on")
     return result
 
 
 def mode_for(scope: str, default: str = DEFAULT_MODE) -> str:
-    """Sticky mode ∈ {build, plan}; defaults to build when unset."""
-    return setting_for(scope, "mode", default) or default
+    """Build, always (Lucas, 2026-07-28 — option A of the AD-27 decision).
+
+    The CLI refuses every MCP tool in plan mode, which would take `ask_user` away exactly where
+    interviewing pays off, so the bot stopped offering plan at all. This coerces rather than
+    reads: a session whose stored mode says `plan` — set before this decision, or continued from
+    a desktop session that was planning — comes back as build instead of resurrecting a mode the
+    bot cannot support. The argument is kept so callers read the same, and so restoring plan is
+    one line if a future CLI lifts the block."""
+    return DEFAULT_MODE
 
 
 def set_mode(scope: str, mode: str) -> None:

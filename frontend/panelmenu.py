@@ -37,28 +37,25 @@ def _cells(values: list[str], current: str | None, dim: str,
     return buttons
 
 
-def root_markup(scope: str, current_mode: str) -> InlineKeyboardMarkup:
-    """What every answer and re-anchor carries: `+` to open the panel, then the mode segments.
-    Nothing to expand here, so there is no trailing control."""
-    modes = []
-    for name in ("build", "plan"):
-        selected = name == current_mode
-        label = keyboard.segment(name.upper(), selected)
-        button = InlineKeyboardButton(label, callback_data=f"p:mode:{name}")
-        modes.append(button)
-    opener = keyboard.cell(_OPEN, "p:menu")
-    rows = keyboard.framed(opener, modes)
-    return InlineKeyboardMarkup(rows)
+def root_markup(scope: str) -> InlineKeyboardMarkup:
+    """What every answer and re-anchor carries: the dimensions this scope can change, directly.
 
-
-def menu_markup(scope: str) -> InlineKeyboardMarkup:
-    """`‹` goes back to the mode row; the rest of the row is whatever this scope can change."""
+    The mode row is gone (Lucas, 2026-07-28): the bot runs build only, so BUILD/PLAN was a
+    two-option control with one reachable option. Its `+` opener went with it — it existed to
+    open the dimension menu that is now the root itself, so the panel costs one tap where it
+    used to cost two."""
     buttons = []
     for key in choices.menu_dims(scope):
         button = InlineKeyboardButton(choices.LABELS[key], callback_data=f"p:d:{key}")
         buttons.append(button)
-    rows = keyboard.framed(_back("p:root"), buttons)
+    rows = keyboard.chunk(buttons)
     return InlineKeyboardMarkup(rows)
+
+
+def menu_markup(scope: str) -> InlineKeyboardMarkup:
+    """The dimension menu IS the root now. Kept as its own name because `p:menu` is a stored
+    panel state on messages already in the chat, and a tap on one of those must still resolve."""
+    return root_markup(scope)
 
 
 def _pager(prefix: str, page: int, pages: int) -> list[InlineKeyboardButton]:

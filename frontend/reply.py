@@ -2,6 +2,7 @@
 from __future__ import annotations
 from telegram.constants import ChatAction
 from telegram.error import TelegramError
+from . import answer
 from .htmlsplit import split_html, strip_tags
 
 TELEGRAM_MSG_LIMIT = 4096
@@ -109,12 +110,13 @@ async def send_voice(msg, ogg_bytes: bytes) -> "telegram.Message | None":
     return result
 
 
-async def deliver(working_msg, msg, html_text: str, reply_markup=None) -> list:
+async def deliver(working_msg, msg, html_text: str, reply_markup=None, lead: str = "") -> list:
     """Returns EVERY message sent, not just the last. A long answer arrives as several bubbles
     and Lucas replies to whichever one he happens to be reading — so the caller has to be able
     to anchor all of them to the session. Anchoring only the tail is what made a reply to an
     earlier bubble fall through to INBOX capture instead of continuing the turn (F5a)."""
-    chunks = split_html(html_text, TELEGRAM_MSG_LIMIT, SOFT_CHARS)
+    chunks = split_html(html_text, answer.room(TELEGRAM_MSG_LIMIT, lead), SOFT_CHARS)
+    chunks = answer.decorate(chunks, lead, total=len(chunks))
     first = chunks[0]
     single = len(chunks) == 1
     markup = reply_markup if single else None

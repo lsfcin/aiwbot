@@ -70,13 +70,13 @@ def test_every_navigation_tap_is_one_answer_and_one_redraw(store):
         assert len(query.drawn) == 1, data
 
 
-def test_retapping_the_selected_mode_spends_no_redraw(store):
-    """Nothing to move, so the bracket costs the answer alone."""
-    registry.set_mode("s1", "build")
+def test_a_mode_button_left_in_the_chat_redraws_instead_of_setting_a_mode(store):
+    """Mode is gone (2026-07-28, build only), but keyboards already sent still carry its buttons.
+    A tap on one must resolve to the panel as it is now — still inside the one-round-trip rule."""
     query = _Query()
     _tap(query, "s1", "p:mode:build")
-    assert query.notes == ["modo: build"]
-    assert query.drawn == []
+    assert len(query.notes) == 1
+    assert len(query.drawn) == 1
 
 
 def test_a_dimension_with_nothing_to_offer_alerts_without_redrawing(store):

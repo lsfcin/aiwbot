@@ -4,6 +4,7 @@ import asyncio
 import random
 from frontend import painter, reply
 from frontend.htmlsplit import split_html
+from .chatkit import Bubble, Origin
 from .streamkit import Clock
 
 _WORDS = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota"]
@@ -41,52 +42,9 @@ def test_split_html_is_prefix_stable_at_line_boundaries():
     assert violations == 0
 
 
-class _Bubble:
-    def __init__(self, chat, text=""):
-        self.chat = chat
-        self.text = text
-        self.message_id = chat.next_id()
-        self.edits = 0
-
-    async def edit_text(self, text, parse_mode=None, reply_markup=None):
-        self.text = text
-        self.edits += 1
-        self.chat.log.append(("edit", self.message_id))
-
-
-class _Chat:
-    def __init__(self):
-        self._id = 100
-        self.actions = []
-        # Ordered record of every write to the chat, so "was this bubble touched AFTER a later
-        # one existed?" is answerable — which is the actual sealing invariant.
-        self.log = []
-
-    def next_id(self):
-        self._id += 1
-        return self._id
-
-    async def send_action(self, action):
-        self.actions.append(action)
-
-
-class _Origin:
-    """Lucas's own message: new bubbles are sent as replies to it."""
-
-    def __init__(self):
-        self.chat = _Chat()
-        self.sent = []
-
-    async def reply_text(self, text, parse_mode=None, do_quote=False, reply_markup=None):
-        bubble = _Bubble(self.chat, text)
-        self.sent.append(bubble)
-        self.chat.log.append(("send", bubble.message_id))
-        return bubble
-
-
 def _run(deltas, gap=10.0, seal=True):
-    origin = _Origin()
-    working = _Bubble(origin.chat)
+    origin = Origin()
+    working = Bubble(origin.chat)
     clock = Clock()
     anchored = []
     p = painter.Painter(working, "pensando…", clock=clock, origin=origin,
@@ -150,8 +108,8 @@ def test_no_bubble_ever_exceeds_the_telegram_limit():
 
 def test_a_session_id_that_arrives_late_still_anchors_everything():
     """claude's system:init carries it before any text, but nothing may DEPEND on that."""
-    origin = _Origin()
-    working = _Bubble(origin.chat)
+    origin = Origin()
+    working = Bubble(origin.chat)
     clock = Clock()
     anchored = []
     p = painter.Painter(working, "pensando…", clock=clock, origin=origin,
@@ -167,6 +125,18 @@ def test_a_session_id_that_arrives_late_still_anchors_everything():
     assert len(p.pending) == len(p.sent)
     asyncio.run(p.note_session("s1"))
     assert len(anchored) == len(p.sent)
+
+
+def test_a_painter_with_nobody_listening_does_not_requeue_forever():
+    """The pending drain used to iterate the very list `_anchor` appends to, so a painter built
+    without `on_bubble` grew it without bound the moment a session id arrived — RAM until the OOM
+    killer, which is how this was found (2026-07-28). Two independent fixes: the queue is
+    snapshotted and cleared before the drain, and "nobody is listening" no longer re-queues."""
+    origin = Origin()
+    p = painter.Painter(Bubble(origin.chat), "pensando…", origin=origin)
+    p.pending = [Bubble(origin.chat), Bubble(origin.chat)]
+    asyncio.run(p.note_session("s1"))
+    assert p.pending == []
 
 
 def test_sealing_can_be_turned_off_without_touching_the_streaming_knob():

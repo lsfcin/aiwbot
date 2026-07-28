@@ -32,23 +32,8 @@ async def _redraw(query, note: str | None, markup, state: str | None = None) -> 
 
 
 async def _to_root(query, scope: str, note: str | None = None) -> None:
-    current = registry.mode_for(scope)
-    markup = panelmenu.root_markup(scope, current)
+    markup = panelmenu.root_markup(scope)
     await _redraw(query, note, markup, "p:root")
-
-
-async def _set_mode(query, scope: str, target: str) -> None:
-    """Optimistic: answer + redraw go out before the config write, so the bracket moves at once
-    instead of after it. Tapping the mode already selected has nothing to redraw, so it costs
-    the answer alone."""
-    note = f"modo: {target}"
-    current = registry.mode_for(scope)
-    if target == current:
-        await query.answer(text=note)
-    else:
-        markup = panelmenu.root_markup(scope, target)
-        await _redraw(query, note, markup, "p:root")
-        registry.set_mode(scope, target)
 
 
 def _values_of(scope: str, dim: str) -> tuple[list[str], list]:
@@ -123,7 +108,9 @@ async def _route(query, scope: str, parts: list[str], note: str | None = None) -
     elif head == "root":
         await _to_root(query, scope, note)
     elif head == "mode":
-        await _set_mode(query, scope, parts[2])
+        # Keyboards already in the chat still carry BUILD/PLAN buttons; the mode they name no
+        # longer exists (2026-07-28), so the tap redraws the current panel instead of setting it.
+        await _to_root(query, scope, note)
     elif head == "d":
         await _dimension(query, scope, parts[2], False, 0, note)
     elif head == "x":

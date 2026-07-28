@@ -1,8 +1,8 @@
 # turnhelpers.py — turn plumbing: friendly errors, /new arg parsing, sticky options, persistence.
 # Extracted out of bot.py (size gate) — pure helpers with no test-visible monkeypatch seam.
 from __future__ import annotations
-from backend import TurnOptions
-from . import directives, format, panel, phrases, registry
+from backend import TurnOptions, get_backend
+from . import ask, askserver, directives, format, panel, phrases, registry
 
 _BUSY_MARKERS = ("no conversation found", "currently running as a background agent")
 
@@ -51,6 +51,21 @@ def turn_options(scope: str, title: str | None) -> TurnOptions:
     effort = registry.setting_for(scope, "effort")
     streaming = registry.streams(scope)
     return TurnOptions(mode=mode_name, title=title, model=model, effort=effort, stream=streaming)
+
+
+def enable_ask(scope: str, backend_name: str, options: TurnOptions) -> str | None:
+    """Give this turn a way to ask Lucas something, when the scope allows it, the backend can use
+    one, and the broker is actually listening. Returns the turn's token (the caller owns
+    registering and releasing it), or None — in which case the CLI is invoked exactly as before
+    and the agent simply has no ask tool, which is how every off switch here degrades: to Stage 3
+    behaviour, never to a broken turn."""
+    token = None
+    backend = get_backend(backend_name)
+    listening = askserver.port() if registry.asks(scope) else 0
+    if listening and backend.supports_ask(options):
+        token = ask.new_token()
+        options.mcp_config = askserver.mcp_config(token, listening)
+    return token
 
 
 def persist_turn(session_id: str, backend_name: str, title: str | None, result, options: TurnOptions) -> None:
