@@ -9,7 +9,7 @@
 |------|-----------|-----|-------------|
 | [`__init__.py`](__init__.py) | — | — | **facade** — __init__.py — facade: Telegram frontend on the AgentBackend seam. Import frontend only through here. |
 | [`SPEC.md`](SPEC.md) | — | — | SPEC: frontend — audio-in-out voice pipeline |
-| [`answer.py`](answer.py) | — | `block` | answer.py — the shape of one answer message: the agent's text, then the footer that names it. |
+| [`answer.py`](answer.py) | — | `frames`, `block` | answer.py — the shape of one answer message: the agent's text, then the footer that names it. |
 | [`bot.py`](bot.py) | — | `main` | bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX. |
 | [`choices.py`](choices.py) | — | `harness_values`, `model_values`, `groups`, `effort_values`, `preferred` | choices.py — what a scope may be offered: the backends' declarations, asked per dimension. |
 | [`config.py`](config.py) | [`config.pyi`](config.pyi) | `config_dir`, `load_config`, `save_config`, `bot_token`, `allowed_chat_id` | config.py — aiwbot's own Telegram config dir (separate token/storage from the old workspace bot). |
@@ -22,13 +22,14 @@
 | [`inline.py`](inline.py) | — | `convert` | inline.py — markdown inline spans -> Telegram HTML (bold, strike, code, links, italic). |
 | [`keyboard.py`](keyboard.py) | — | `cell`, `segment`, `chunk`, `framed` | keyboard.py — inline-keyboard primitives: rows of at most four, framed by the panel's controls. |
 | [`labels.py`](labels.py) | — | `provider_short`, `model_label` | labels.py — fit a model id into a button: provider prefix, then compress only if it overflows. |
-| [`markdown.py`](markdown.py) | — | `format_body` | markdown.py — agent markdown -> Telegram HTML: block level (fences, tables, headings, lists). |
+| [`markdown.py`](markdown.py) | — | `stable_prefix`, `format_body` | markdown.py — agent markdown -> Telegram HTML: block level (fences, tables, headings, lists). |
 | [`msgmap.py`](msgmap.py) | — | `remember_reply`, `session_for_reply`, `remember_pending_new`, `pending_new`, `remember_panel` | msgmap.py — bounded message_id -> value maps: which session, which scope, which panel state. |
+| [`painter.py`](painter.py) | — | `Painter`, `note_session`, `frames`, `finish`, `paint` | painter.py — keep the chat showing the answer as it arrives, throttled. One object per turn. |
 | [`panel.py`](panel.py) | — | `apply`, `handle_callback` | panel.py — panel routing: which grid a tap opens, and which scope it writes to. |
 | [`panelmenu.py`](panelmenu.py) | — | `root_markup`, `menu_markup`, `values_markup`, `all_button`, `providers_markup` | panelmenu.py — the panel's states drawn as keyboards: mode row, dimension menu, value pickers. |
-| [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |
+| [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick`, `pin` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |
 | [`registry.py`](registry.py) | — | `remember`, `adopt`, `defaults`, `setting_for`, `set_setting` | registry.py — bot-owned per-session state in config.json: knobs, titles, message maps. |
-| [`reply.py`](reply.py) | — | `safe_reply`, `send_voice`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |
+| [`reply.py`](reply.py) | — | `safe_reply`, `send_typing`, `edit_text`, `send_voice`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |
 | [`resume.py`](resume.py) | — | `cmd_resume`, `handle_callback` | resume.py — /resume picker (Claude-Code-style): list recent sessions, tap to re-anchor + continue. |
 | [`sessions.py`](sessions.py) | — | `recent`, `count`, `last_response` | sessions.py — cross-backend session listing: the /resume picker aggregates each backend's own |
 | [`speech.py`](speech.py) | — | `to_speech` | speech.py — an agent's markdown answer -> prose a TTS voice can actually read aloud. |
