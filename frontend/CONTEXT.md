@@ -14,7 +14,7 @@
 | [`choices.py`](choices.py) | — | `harness_values`, `model_values`, `groups`, `effort_values`, `preferred` | choices.py — what a scope may be offered: the backends' declarations, asked per dimension. |
 | [`config.py`](config.py) | [`config.pyi`](config.pyi) | `config_dir`, `load_config`, `save_config`, `bot_token`, `allowed_chat_id` | config.py — aiwbot's own Telegram config dir (separate token/storage from the old workspace bot). |
 | [`directives.py`](directives.py) | — | `resolve` | directives.py — read leading harness/model words off a bot-prefixed message, no inference. |
-| [`dispatch.py`](dispatch.py) | [`dispatch.pyi`](dispatch.pyi) | `TurnResult`, `DispatchError`, `events_to_result`, `turn` | dispatch.py — one call site that drains any AgentBackend.send() into a single reply. |
+| [`dispatch.py`](dispatch.py) | [`dispatch.pyi`](dispatch.pyi) | `TurnResult`, `DispatchError`, `join_texts`, `events_to_result`, `turn` | dispatch.py — one call site that drains any AgentBackend.send() into a single reply. |
 | [`format.py`](format.py) | [`format.pyi`](format.pyi) | `relative_time`, `plain`, `clip_chars`, `title_words`, `title_from_prompt` | format.py — pure text formatting: markdown/tables -> Telegram HTML, session headers. No I/O. |
 | [`hotwords.py`](hotwords.py) | — | `as_prompt` | hotwords.py — explicit editable data (C4): what the STT is primed with before it listens. |
 | [`htmlsplit.py`](htmlsplit.py) | — | `split_html`, `strip_tags` | htmlsplit.py — split Telegram HTML into sendable chunks without ever breaking a tag. |

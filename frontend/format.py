@@ -45,13 +45,16 @@ def clip_chars(text: str, limit: int) -> str:
     return result
 
 
-def title_words(name: str | None, n: int = 3) -> str:
+def title_words(name: str | None, n: int = 3, limit: int = TITLE_CHARS) -> str:
+    """`limit` is separate from `n` because the two callers budget differently: the /resume
+    picker needs a stable bubble WIDTH (hence the tight char cap), while an answer's footer is
+    just a line of text and can afford more of the title."""
     result = "(SEM TÍTULO)"
     if name and name.strip():
         words = name.split()[:n]
         joined = " ".join(words)
         upper = joined.upper()
-        result = clip_chars(upper, TITLE_CHARS)
+        result = clip_chars(upper, limit)
     return result
 
 

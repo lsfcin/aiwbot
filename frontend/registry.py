@@ -113,6 +113,22 @@ def backend_for(session_id: str) -> str | None:
     return entry.get("backend")
 
 
+# Streaming changes how the CLI is invoked, so its rollback has to be reachable from Lucas's
+# phone: one line in config.json plus a daemon restart, never a code change (F4). Flipped to True
+# once the mid-stream sealing checkpoint passes.
+STREAM_DEFAULT = False
+
+
+def streams(scope: str) -> bool:
+    """Whether this scope's turns stream. Stored as a string like every other knob, so the
+    existing per-scope machinery (and a future panel dimension) needs no special case."""
+    raw = setting_for(scope, "stream")
+    result = STREAM_DEFAULT
+    if raw is not None:
+        result = str(raw).lower() in ("1", "true", "yes", "on")
+    return result
+
+
 def mode_for(scope: str, default: str = DEFAULT_MODE) -> str:
     """Sticky mode ∈ {build, plan}; defaults to build when unset."""
     return setting_for(scope, "mode", default) or default

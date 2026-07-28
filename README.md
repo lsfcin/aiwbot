@@ -34,6 +34,13 @@ systemctl --user start   aiwbot.service
 journalctl --user -u aiwbot.service -f    # follow logs live
 ```
 
+The unit **must** carry `Environment=PYTHONUNBUFFERED=1`. The journal is a pipe, so Python
+block-buffers stdout and every `print()` sits in an 8 KB buffer until the process exits — which
+made every diagnostic in the bot invisible *while it was running*, error paths included. A
+restart flushes the buffer, so the missing lines all arrive at once at shutdown, which is exactly
+how this was found (2026-07-27, a streaming log line that never appeared). If logs ever go quiet
+again, check this line first.
+
 `Restart=always` (5s backoff, capped 10 restarts/5min) — crashes self-heal. `Wants=network-online.target`
 so it waits for network on boot, but the user unit itself does **not** survive a reboot without a login
 session unless lingering is enabled (`loginctl enable-linger lucas`, needs sudo — not currently set).
