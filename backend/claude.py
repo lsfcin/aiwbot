@@ -3,6 +3,9 @@ from __future__ import annotations
 import pathlib
 from . import binaries, transcript
 from .base import AgentEvent, TurnOptions, add_flag, try_json
+# Parsing lives in claudeparse (F4: this file was 194/200 and a stream parser does not
+# fit). Re-exported so `from backend.claude import parse_events` keeps working.
+from .claudeparse import StreamParser, parse_events  # noqa: F401
 from .caps import Capabilities
 from .cli import CliBackend
 
@@ -51,73 +54,14 @@ def _session_item(path: pathlib.Path) -> dict:
             "preview": preview, "model": model, "context_used": used}
 
 
-def _last_json_object(stdout: str) -> dict | None:
-    """claude -p --output-format json prints one result object; scan from the end for it."""
-    lines = stdout.splitlines()
-    found: dict | None = None
-    for line in reversed(lines):
-        stripped = line.strip()
-        if stripped.startswith("{"):
-            found = try_json(stripped)
-        if found is not None:
-            break
-    return found
-
-
-def _model_of(obj: dict) -> str | None:
-    """claude reports the model as the key of `modelUsage` (e.g. claude-sonnet-5)."""
-    usage = obj.get("modelUsage") or {}
-    keys = list(usage)
-    result = keys[0] if keys else None
-    return result
-
-
-def _context_of(obj: dict, model: str | None) -> tuple[int | None, int | None]:
-    """Only the WINDOW comes from the result object; occupancy does not (b3).
-
-    `modelUsage[model]` aggregates every API request the invocation made, and a turn that used
-    tools re-read the whole context from cache on each one — so summing its token fields
-    measures SPEND, not how full the window is. Measured over real transcripts, those sums reach
-    6190% and 32533% of the window, and even a modest 4-8 request turn lands at the 100-200%
-    Lucas reported. `ocstore.py` already carried this exact warning for opencode's `tokens_*`
-    columns; the claude path walked into it anyway.
-
-    Occupancy is a property of the LAST request alone, and the transcript records it per
-    message — so it is read there, via `ClaudeBackend.occupancy`. The window is static metadata
-    and stays safe to take from here."""
-    usage = obj.get("modelUsage") or {}
-    entry = usage.get(model or "") or {}
-    window = entry.get("contextWindow")
-    return None, window
-
-
-def _object_to_events(obj: dict) -> list[AgentEvent]:
-    sid = obj.get("session_id")
-    is_error = obj.get("is_error")
-    events: list[AgentEvent] = []
-    if is_error:
-        text = obj.get("result", "")
-        events.append(AgentEvent(kind="error", text=text, session_id=sid))
-    else:
-        text = obj.get("result", "")
-        cost = obj.get("total_cost_usd")
-        model = _model_of(obj)
-        used, window = _context_of(obj, model)
-        events.append(AgentEvent(kind="text", text=text, session_id=sid))
-        events.append(AgentEvent(kind="result", session_id=sid, cost_usd=cost, model=model,
-                                 context_used=used, context_window=window))
-    return events
-
-
-def parse_events(stdout: str) -> list[AgentEvent]:
-    """Pure normalizer (free to unit-test): claude result object -> AgentEvents."""
-    obj = _last_json_object(stdout)
-    events: list[AgentEvent] = []
-    if obj is None:
-        events.append(AgentEvent(kind="error", text="no JSON result in claude output"))
-    else:
-        events = _object_to_events(obj)
-    return events
+def _output_args(stream: bool) -> list[str]:
+    """How the CLI should talk back. Streaming needs all three flags together: `stream-json`
+    alone only emits a line per COMPLETED message, so a single-message answer would still show
+    nothing until the end — `--include-partial-messages` is what carries the token deltas, and
+    `--verbose` is required by the CLI alongside stream-json (measured 2026-07-27)."""
+    if stream:
+        return ["--output-format", "stream-json", "--verbose", "--include-partial-messages"]
+    return ["--output-format", "json"]
 
 
 class ClaudeBackend(CliBackend):
@@ -129,7 +73,8 @@ class ClaudeBackend(CliBackend):
         mode=plan -> --permission-mode plan (agent plans, no edits); build -> bypassPermissions."""
         binary = binaries.resolve("claude")
         perm = "plan" if options.mode == "plan" else "bypassPermissions"
-        args = [binary, "-p", "--output-format", "json", "--permission-mode", perm]
+        args = [binary, "-p", "--permission-mode", perm]
+        args.extend(_output_args(options.stream))
         add_flag(args, "--model", options.model)
         add_flag(args, "--effort", options.effort)
         if session_id:
@@ -178,6 +123,9 @@ class ClaudeBackend(CliBackend):
         comes from this env var, not from the flags — setting it makes bot-created sessions
         show up in the VSCode/terminal picker like any other. Verified live 2026-07-23."""
         return {"CLAUDE_CODE_ENTRYPOINT": _ENTRYPOINT}
+
+    def stream_parser(self) -> StreamParser:
+        return StreamParser()
 
     def parse(self, stdout: str) -> list[AgentEvent]:
         return parse_events(stdout)

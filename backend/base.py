@@ -19,6 +19,11 @@ class AgentEvent:
     # Context-window occupancy after this turn. Providers that don't report it leave both None.
     context_used: int | None = None
     context_window: int | None = None
+    # Is this text a DELTA or a whole segment? Whole segments (the default, and every non-streaming
+    # backend's behaviour) are joined with "\n"; deltas are concatenated with "", because a delta
+    # boundary falls mid-word and a newline there would corrupt the answer. Defaulting to False is
+    # what keeps every existing fixture and pure-parser test correct without touching them.
+    partial: bool = False
 
 
 @dataclass
@@ -32,6 +37,10 @@ class TurnOptions:
     title: str | None = None
     model: str | None = None
     effort: str | None = None
+    # Ask the CLI to stream, so text can be painted as it arrives instead of after the turn.
+    # Default off: it changes the CLI's invocation, so the rollback Lucas needs from his phone is
+    # one line in config.json plus a restart, never a code change (F4).
+    stream: bool = False
 
 
 def add_flag(args: list[str], name: str, value: str | None) -> None:
@@ -85,6 +94,20 @@ def try_json(text: str) -> dict | None:
     if isinstance(parsed, dict):
         result = parsed
     return result
+
+
+@runtime_checkable
+class LineParser(Protocol):
+    """Turns one line of a CLI's streaming output into events, as it arrives. Stateful on
+    purpose — a stream carries facts (the session id, whether any delta was seen) that only
+    make sense across lines. `finish()` is the last call and is where a parser emits whatever
+    it could only decide once the stream ended."""
+
+    def feed(self, line: str) -> list[AgentEvent]:
+        ...
+
+    def finish(self) -> list[AgentEvent]:
+        ...
 
 
 def check_contract(events: list[AgentEvent]) -> tuple[bool, str]:
