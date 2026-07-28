@@ -4,6 +4,11 @@ import html
 from .format import SESSION_ID_LABEL_LEN, format_body, meta_bits, title_words
 
 SEPARATOR = "· · ·"
+# The footer names the session, and three words was too terse to recognise a turn by (Lucas,
+# 2026-07-27). Its own char budget too: unlike the /resume picker, a footer line has no bubble
+# width to keep stable, so it can afford the whole five words.
+TITLE_WORDS = 5
+TITLE_CHARS = 48
 
 
 def _meta_line(provider: str | None, model: str | None, cost_usd: float | None,
@@ -19,7 +24,7 @@ def _session_label(sid: str | None, title: str | None) -> str | None:
     result = None
     if sid:
         short = sid[:SESSION_ID_LABEL_LEN].upper()
-        words = title_words(title)
+        words = title_words(title, TITLE_WORDS, TITLE_CHARS)
         result = f"[{short}] {words}"
     return result
 

@@ -2,8 +2,13 @@
 from __future__ import annotations
 import asyncio
 import os
-from typing import Callable
+from typing import AsyncIterator, Callable
 from .base import AgentEvent
+
+# asyncio's stream reader defaults to a 64 KB line limit and raises once a line exceeds it. One
+# stream-json line carrying a big tool result blows past that, so the limit is raised to 1 MB —
+# a failure that only ever appears live, on exactly the long turns streaming exists to serve.
+_STREAM_LIMIT = 1 << 20
 
 
 async def run_capture(args: list[str], cwd: str, extra_env: dict | None = None) -> tuple[str, str, int]:
@@ -22,9 +27,55 @@ async def run_capture(args: list[str], cwd: str, extra_env: dict | None = None) 
     return out, err, code
 
 
+def _child_env(extra_env: dict | None) -> dict | None:
+    env = None
+    if extra_env:
+        env = dict(os.environ)
+        env.update(extra_env)
+    return env
+
+
+async def _drain(stream) -> str:
+    """Read a pipe to EOF. stderr MUST be drained by its own task while stdout is being read:
+    a child whose stderr pipe fills simply blocks forever, and it would do so only on long
+    turns — the ones streaming exists for."""
+    data = await stream.read()
+    return data.decode(errors="replace")
+
+
+async def stream_lines(args: list[str], cwd: str, extra_env: dict | None = None
+                       ) -> AsyncIterator[tuple[str, str, int]]:
+    """Run args and yield `("line", text, 0)` as each stdout line arrives, then exactly one
+    `("end", stderr, returncode)` after the process has EXITED.
+
+    The terminal tuple is not decoration: occupancy is read from the provider's store, which is
+    only written when the CLI exits, so a caller that emits its result event before the "end"
+    would silently regress b3/AD-24."""
+    env = _child_env(extra_env)
+    pipe = asyncio.subprocess.PIPE
+    proc = await asyncio.create_subprocess_exec(*args, cwd=cwd, stdout=pipe, stderr=pipe,
+                                                env=env, limit=_STREAM_LIMIT)
+    errors = asyncio.create_task(_drain(proc.stderr))
+    async for raw in proc.stdout:
+        text = raw.decode(errors="replace").strip()
+        if text:
+            yield ("line", text, 0)
+    await proc.wait()
+    err = await errors
+    code = proc.returncode or 0
+    yield ("end", err, code)
+
+
 _TAIL_CHARS = 500
 _SILENT = ("the CLI exited {code} and produced output this backend does not recognize. "
            "Raw tail:\n{tail}")
+
+
+def silent_run(err: str, code: int) -> str:
+    """The message for a run that produced nothing a parser recognized. Shared by both paths so
+    a streaming failure reads exactly like the batch one it replaced."""
+    tail = _tail("", err)
+    return _SILENT.format(code=code, tail=tail)
 
 
 def _tail(out: str, err: str) -> str:

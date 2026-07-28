@@ -49,7 +49,8 @@ def turn_options(scope: str, title: str | None) -> TurnOptions:
     mode_name = registry.mode_for(scope)
     model = registry.setting_for(scope, "model")
     effort = registry.setting_for(scope, "effort")
-    return TurnOptions(mode=mode_name, title=title, model=model, effort=effort)
+    streaming = registry.streams(scope)
+    return TurnOptions(mode=mode_name, title=title, model=model, effort=effort, stream=streaming)
 
 
 def persist_turn(session_id: str, backend_name: str, title: str | None, result, options: TurnOptions) -> None:

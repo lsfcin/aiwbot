@@ -1,9 +1,9 @@
 # cli.py — CliBackend: the single subprocess-driven send() loop; subclasses supply build_args + parse.
 from __future__ import annotations
 from typing import AsyncIterator
-from .base import AgentEvent, TurnOptions
+from .base import AgentEvent, LineParser, TurnOptions
 from .caps import Capabilities
-from .proc import run_capture, events_from_run
+from .proc import run_capture, events_from_run, silent_run, stream_lines
 
 
 class CliBackend:
@@ -29,6 +29,11 @@ class CliBackend:
         the page it renders rather than for every session it lists."""
         return {}
 
+    def stream_parser(self) -> LineParser | None:
+        """A parser that consumes the CLI's output line by line. Default: none, so a backend
+        that has not opted in simply never streams and keeps the batch path verbatim."""
+        return None
+
     def occupancy(self, session_id: str, cwd: str) -> int | None:
         """Context-window occupancy after the turn, read from the provider's own store.
         Default: unknown. Backends that record per-message token usage override this."""
@@ -50,8 +55,37 @@ class CliBackend:
                    options: TurnOptions = TurnOptions()) -> AsyncIterator[AgentEvent]:
         args = self.build_args(prompt, session_id, options)
         extra_env = self.env()
-        out, err, code = await run_capture(args, cwd, extra_env)
-        events = events_from_run(out, err, code, self.parse)
+        parser = self.stream_parser() if options.stream else None
+        if parser is None:
+            out, err, code = await run_capture(args, cwd, extra_env)
+            events = events_from_run(out, err, code, self.parse)
+            self._attach_occupancy(events, cwd)
+            for event in events:
+                yield event
+            return
+        async for event in self._stream(args, cwd, extra_env, parser):
+            yield event
+
+    async def _stream(self, args: list[str], cwd: str, extra_env: dict | None,
+                      parser: LineParser) -> AsyncIterator[AgentEvent]:
+        """Yield events as their lines arrive, then the terminal ones.
+
+        Order is load-bearing: `stream_lines` only emits its ("end", …) tuple after the process
+        has EXITED, and the terminal events are held until then, because occupancy is read from
+        the provider's store and the store is written on exit. Emitting the result event any
+        earlier reintroduces b3 (AD-24) as a silent wrong percentage."""
+        seen = 0
+        err, code = "", 0
+        async for kind, payload, status in stream_lines(args, cwd, extra_env):
+            if kind == "line":
+                for event in parser.feed(payload):
+                    seen += 1
+                    yield event
+                continue
+            err, code = payload, status
+        events = list(parser.finish())
+        if not events and not seen:
+            events = [AgentEvent(kind="error", text=silent_run(err, code))]
         self._attach_occupancy(events, cwd)
         for event in events:
             yield event

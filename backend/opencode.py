@@ -78,6 +78,24 @@ def parse_events(stdout: str) -> list[AgentEvent]:
     return events
 
 
+class LineStream:
+    """opencode's output is already JSONL and `_line_to_event` is already per-line, so streaming
+    it needs no new parser — only the loop turned inside out. Its `text` events stay
+    `partial=False`: they are whole segments, not deltas, so they still join with newlines."""
+
+    def feed(self, line: str) -> list[AgentEvent]:
+        obj = try_json(line)
+        events: list[AgentEvent] = []
+        if obj is not None:
+            event = _line_to_event(obj)
+            if event is not None:
+                events.append(event)
+        return events
+
+    def finish(self) -> list[AgentEvent]:
+        return []
+
+
 class OpencodeBackend(CliBackend):
     name = "opencode"
 
@@ -100,6 +118,9 @@ class OpencodeBackend(CliBackend):
 
     def parse(self, stdout: str) -> list[AgentEvent]:
         return parse_events(stdout)
+
+    def stream_parser(self) -> LineStream:
+        return LineStream()
 
     def capabilities(self) -> Capabilities:
         """478 configured models: `favourites` is the cheap-first shortlist and `groups` is the
