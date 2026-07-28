@@ -209,6 +209,26 @@ cannot quietly re-fuse.
       back into the running turn. (linuz90's `ask_user` MCP pattern — see [[reference_linuz90_bot]].)
       Depends on the live-feedback plumbing above.
 
+### Telegram's rich text editor — assessed 2026-07-27, mostly NOT actionable
+Lucas asked whether the new editor
+([blog](https://telegram.org/blog/communities-editor-invisible-messages/pt-br)) lets us format
+better: *"pelo visto tem headers. será que tabelas?"*. It announces "um editor de texto avançado
+com suporte para títulos, tabelas, listas, citações e blocos de código".
+
+**Checked against the API rather than the blog.** PTB 22.8 implements **Bot API 10.0**, whose
+entity list is `BOLD, ITALIC, CODE, PRE, BLOCKQUOTE, EXPANDABLE_BLOCKQUOTE, SPOILER, UNDERLINE,
+STRIKETHROUGH, TEXT_LINK, …` — **no `HEADING`, no `TABLE`.** The editor is a *client-side
+composer* for humans typing in the app; it is not new surface a bot can send. So headings stay
+bold-caps (AD-14) and **AD-18's pipe-tables-as-row-blocks remains correct, not a workaround**.
+Nothing to do. Re-check if a future Bot API adds the entities.
+
+- [ ] **Worth taking, and available today: `<blockquote expandable>`** (`EXPANDABLE_BLOCKQUOTE`).
+      Collapses a long passage behind a "show more" the reader opens on demand. It is the one
+      genuinely new-to-us lever the assessment turned up, and it fits the long-answer problem F5
+      attacked from the other side — candidate for the *tail* of a long answer, or for the
+      transcript echo of a long voice note. Not scheduled; it interacts with AD-23's splitting,
+      so decide it after F4 lands rather than tangling two shape changes at once.
+
 ### Past the finish line — parked, not scheduled (Lucas 2026-07-26)
 Both survive here because they are real gaps, not because they are queued. Promote one only when a
 concrete session's cost makes it worth more than it costs.

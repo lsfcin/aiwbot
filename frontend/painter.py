@@ -3,9 +3,15 @@ from __future__ import annotations
 import time
 from . import answer, markdown, reply
 
-# Telegram tolerates roughly one edit per second per message. 1.5 s leaves headroom and, at
-# typical token rates, adds ~100 visible characters per tick — alive to read, without flicker.
-MIN_INTERVAL = 1.5
+# Telegram tolerates roughly one edit per second per message, so this is a UX number rather than
+# a rate-limit one. Lucas, 2026-07-27: a repaint should land no faster than every ~5 s, so the
+# answer arrives like someone typing rather than like a progress bar. The chunky bursts claude
+# actually streams in suit this: fewer, more substantial updates read better than a twitchy one.
+MIN_INTERVAL = 5.0
+# Telegram's typing indicator lasts about five seconds, so it has to be re-sent to stay lit. Sent
+# slightly ahead of that, it reads as continuous. This is the signal that carries the gap BETWEEN
+# repaints — without it a 5 s pause looks like the bot died (Lucas's ask, 2026-07-27).
+TYPING_EVERY = 4.0
 # Below this a repaint spends a ~200 ms round trip (AD-20) to move almost nothing.
 MIN_GROWTH = 40
 # A failed paint widens the gap rather than retrying, so a rate-limited stream backs off instead
@@ -34,6 +40,7 @@ class Painter:
         self.busy = False
         self.frozen = False
         self.paints = 0
+        self.typing_at = 0.0
 
     def _due(self) -> bool:
         """Is a repaint worth a round trip right now?
@@ -59,8 +66,19 @@ class Painter:
             self.frozen = True
         return chunks[0]
 
+    async def _keep_typing(self) -> None:
+        """Re-light Telegram's own "typing…" indicator. Independent of the repaint gate on
+        purpose: it starts on the FIRST delta, long before enough text has accumulated to be
+        worth a repaint, so the gap before the first visible words is never silent."""
+        now = self.clock()
+        if now - self.typing_at < TYPING_EVERY:
+            return
+        self.typing_at = now
+        await reply.send_typing(self.working)
+
     async def paint(self, delta: str) -> None:
         self.text += delta
+        await self._keep_typing()
         if not self._due():
             return
         self.busy = True

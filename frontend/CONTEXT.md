@@ -29,7 +29,7 @@
 | [`panelmenu.py`](panelmenu.py) | — | `root_markup`, `menu_markup`, `values_markup`, `all_button`, `providers_markup` | panelmenu.py — the panel's states drawn as keyboards: mode row, dimension menu, value pickers. |
 | [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |
 | [`registry.py`](registry.py) | — | `remember`, `adopt`, `defaults`, `setting_for`, `set_setting` | registry.py — bot-owned per-session state in config.json: knobs, titles, message maps. |
-| [`reply.py`](reply.py) | — | `safe_reply`, `edit_text`, `send_voice`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |
+| [`reply.py`](reply.py) | — | `safe_reply`, `send_typing`, `edit_text`, `send_voice`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |
 | [`resume.py`](resume.py) | — | `cmd_resume`, `handle_callback` | resume.py — /resume picker (Claude-Code-style): list recent sessions, tap to re-anchor + continue. |
 | [`sessions.py`](sessions.py) | — | `recent`, `count`, `last_response` | sessions.py — cross-backend session listing: the /resume picker aggregates each backend's own |
 | [`speech.py`](speech.py) | — | `to_speech` | speech.py — an agent's markdown answer -> prose a TTS voice can actually read aloud. |

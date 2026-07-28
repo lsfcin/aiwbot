@@ -1,5 +1,6 @@
 # reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery.
 from __future__ import annotations
+from telegram.constants import ChatAction
 from telegram.error import TelegramError
 from .htmlsplit import split_html, strip_tags
 
@@ -53,6 +54,16 @@ async def safe_reply(msg, html_text: str, reply_markup=None) -> "telegram.Messag
             if attempt == 1:
                 print(f"reply_text failed after retry: {e}")
     return result
+
+
+async def send_typing(message) -> None:
+    """Light Telegram's native "typing…" indicator in the chat header. Best-effort: it is a
+    decoration on top of an answer that is arriving anyway, so a failure is dropped rather than
+    allowed to interrupt the turn. It expires after ~5s and must be re-sent to stay lit."""
+    try:
+        await message.chat.send_action(ChatAction.TYPING)
+    except TelegramError as e:
+        print(f"send_typing failed: {e}")
 
 
 async def edit_text(message, html_text: str) -> bool:
