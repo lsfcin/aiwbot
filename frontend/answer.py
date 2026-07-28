@@ -69,7 +69,9 @@ def frames(settled: str, unsettled: str = "", pin: str | None = None,
     room = limit - len(pin or "") - _PIN_MARGIN
     chunks = split_html(text, room, soft)
     if pin:
-        chunks[-1] = chunks[-1] + "\n" + pin
+        # A blank line of distance, so the pin reads as a status hanging under the answer rather
+        # than as the answer's next line (Lucas, 2026-07-27).
+        chunks[-1] = chunks[-1] + "\n\n" + pin
     return chunks
 
 

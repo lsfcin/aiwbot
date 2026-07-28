@@ -19,8 +19,7 @@ def _painter(working, streaming: bool):
     between wordings while Lucas is reading."""
     result = None
     if streaming and working is not None:
-        phrase = phrases.pick(phrases.WORKING_PHRASES)
-        result = painter.Painter(working, phrase)
+        result = painter.Painter(working, phrases.pin())
     return result
 
 

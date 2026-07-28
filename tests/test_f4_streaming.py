@@ -137,10 +137,11 @@ def test_typing_is_relit_but_not_spammed():
     assert len(msg.chat.actions) == 11
 
 
-def test_no_two_repaints_land_within_five_seconds_of_each_other():
-    """Lucas: the answer should land like someone typing, not like a progress bar. The
-    invariant is the SPACING between paints, not how many a long stream produces."""
-    assert painter.MIN_INTERVAL >= 5.0
+def test_no_two_repaints_land_closer_than_the_configured_floor():
+    """Lucas: the answer should land like someone typing, not like a progress bar. The number
+    itself is a knob he tunes by reading real turns (5 s, then 3 s on 2026-07-27), so this pins
+    the SPACING invariant against whatever the knob currently says — never a literal, which
+    would have to be edited every time the feel is adjusted."""
     msg, clock = _LiveMsg(), Clock()
     p = _painter(msg, clock)
     at = []
@@ -155,3 +156,13 @@ def test_no_two_repaints_land_within_five_seconds_of_each_other():
     assert len(at) > 1, "a 12-second stream should repaint more than once"
     gaps = [b - a for a, b in zip(at, at[1:])]
     assert min(gaps) >= painter.MIN_INTERVAL
+
+
+def test_the_pin_hangs_a_blank_line_below_the_answer_and_carries_no_glyph():
+    """Lucas, 2026-07-27: the `·` reads as a stray bullet under an answer, and the line needs
+    distance so it looks like a status rather than the answer's next sentence."""
+    from frontend import phrases
+    frame = answer.frames("Pronto aqui.", "", pin="pensando…")[0]
+    assert frame.endswith("\n\npensando…")
+    for _ in range(20):
+        assert not phrases.pin().startswith("·")

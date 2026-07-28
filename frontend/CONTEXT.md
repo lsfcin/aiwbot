@@ -27,7 +27,7 @@
 | [`painter.py`](painter.py) | — | `Painter`, `frame`, `paint` | painter.py — keep the chat showing the answer as it arrives, throttled. One object per turn. |
 | [`panel.py`](panel.py) | — | `apply`, `handle_callback` | panel.py — panel routing: which grid a tap opens, and which scope it writes to. |
 | [`panelmenu.py`](panelmenu.py) | — | `root_markup`, `menu_markup`, `values_markup`, `all_button`, `providers_markup` | panelmenu.py — the panel's states drawn as keyboards: mode row, dimension menu, value pickers. |
-| [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |
+| [`phrases.py`](phrases.py) | [`phrases.pyi`](phrases.pyi) | `pick`, `pin` | phrases.py — phrase banks (natural-language variants, picked at random per message) + help text. |
 | [`registry.py`](registry.py) | — | `remember`, `adopt`, `defaults`, `setting_for`, `set_setting` | registry.py — bot-owned per-session state in config.json: knobs, titles, message maps. |
 | [`reply.py`](reply.py) | — | `safe_reply`, `send_typing`, `edit_text`, `send_voice`, `deliver` | reply.py — Telegram send primitives: safe reply, chunking, edit-in-place delivery. |
 | [`resume.py`](resume.py) | — | `cmd_resume`, `handle_callback` | resume.py — /resume picker (Claude-Code-style): list recent sessions, tap to re-anchor + continue. |

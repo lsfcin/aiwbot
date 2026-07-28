@@ -4,10 +4,10 @@ import time
 from . import answer, markdown, reply
 
 # Telegram tolerates roughly one edit per second per message, so this is a UX number rather than
-# a rate-limit one. Lucas, 2026-07-27: a repaint should land no faster than every ~5 s, so the
-# answer arrives like someone typing rather than like a progress bar. The chunky bursts claude
-# actually streams in suit this: fewer, more substantial updates read better than a twitchy one.
-MIN_INTERVAL = 5.0
+# a rate-limit one: the answer should arrive like someone typing, not like a progress bar. Set to
+# 5 s and then to 3 s by Lucas on 2026-07-27, reading real turns in the chat — tune it there, not
+# from theory. The chunky bursts claude actually streams in suit a slower cadence anyway.
+MIN_INTERVAL = 3.0
 # Telegram's typing indicator lasts about five seconds, so it has to be re-sent to stay lit. Sent
 # slightly ahead of that, it reads as continuous. This is the signal that carries the gap BETWEEN
 # repaints — without it a 5 s pause looks like the bot died (Lucas's ask, 2026-07-27).
