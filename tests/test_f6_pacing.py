@@ -3,6 +3,7 @@
 # to the live bubble, BUBBLE_GAP paces the conversation. Confusing the two is why the cadence
 # looked like it did nothing — "o tempo entre bubbles não funcionou".
 import asyncio
+from telegram.constants import ChatAction
 from frontend import cadence, painter
 from .chatkit import Bubble, Origin
 from .streamkit import Clock
@@ -64,6 +65,31 @@ def test_the_first_bubble_is_never_held_back():
     bubble one immediately, so a turn never opens on a silent gap."""
     live, born = _paced(gap=0.5, deltas=6)
     assert live.sent, "the answer never reached the chat"
+
+
+def test_the_pause_is_never_silent():
+    """A 6 s gap is only tolerable because it is not dead air: Telegram's own typing indicator is
+    re-lit right through it. It is deliberately checked BEFORE the pacing gate in `paint`, so the
+    wait for the next bubble shows the same signal as a human writing one."""
+    live, born = _paced(gap=1.0)
+    actions = live.sent[0].chat.actions
+    assert len(actions) > len(born), "the gaps went unlit"
+    assert set(actions) == {ChatAction.TYPING}
+
+
+def test_the_wait_is_shown_natively_and_never_as_a_bubble():
+    """Lucas asked for the native indicator rather than a placeholder message (2026-07-28). Every
+    bubble in the chat is answer text; none of them is a status."""
+    live, born = _paced(gap=1.0)
+    assert len(live.sent) == len(born)
+    for bubble in live.sent:
+        assert "paragrafo" in bubble.text
+
+
+def test_the_indicator_outlives_a_whole_gap():
+    """Telegram's indicator expires after about five seconds, so the re-light interval has to stay
+    under the pause — otherwise a longer gap grows a dead patch in the middle of it."""
+    assert cadence.TYPING_EVERY < cadence.BUBBLE_GAP
 
 
 def test_a_slow_stream_is_not_slowed_further():

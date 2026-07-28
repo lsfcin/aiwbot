@@ -14,7 +14,10 @@ MIN_INTERVAL = 3.0
 # CONVERSATION: MIN_INTERVAL only paces repaints of the live bubble, which is why the cadence
 # looked like it did nothing (Lucas, 2026-07-28: "o tempo entre bubbles não funcionou"). A stream
 # that outruns it waits — the text is not lost, it lands whole as the next bubble.
-BUBBLE_GAP = 4.0
+# 4 s → 6 s once Lucas saw that the wait is not silent (2026-07-28): Telegram's own typing
+# indicator is re-lit throughout it, so a longer pause reads as someone writing rather than as a
+# stall. Keep TYPING_EVERY below this, or the gap gets a dead patch in the middle.
+BUBBLE_GAP = 6.0
 # Telegram's typing indicator lasts about five seconds, so it has to be re-sent to stay lit. Sent
 # slightly ahead of that, it reads as continuous. This is the signal that carries the gap BETWEEN
 # repaints — without it a 3 s pause looks like the bot died (Lucas's ask, 2026-07-27).
