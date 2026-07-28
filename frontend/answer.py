@@ -2,8 +2,14 @@
 from __future__ import annotations
 import html
 from .format import SESSION_ID_LABEL_LEN, format_body, meta_bits, title_words
+from .htmlsplit import split_html
 
 SEPARATOR = "· · ·"
+# Slack so a chunk sized with the pin still fits once the pin is swapped for the footer.
+_PIN_MARGIN = 16
+# `block` wants the whole answer as one string and lets reply.deliver do the splitting, so it
+# calls `frames` with a limit nothing can reach.
+_UNBOUNDED = 10 ** 9
 # The footer names the session, and three words was too terse to recognise a turn by (Lucas,
 # 2026-07-27). Its own char budget too: unlike the /resume picker, a footer line has no bubble
 # width to keep stable, so it can afford the whole five words.
@@ -39,6 +45,34 @@ def _footer(sid: str | None, title: str | None, provider: str | None, model: str
     return [bit for bit in (label, meta) if bit]
 
 
+def frames(settled: str, unsettled: str = "", pin: str | None = None,
+           footer: list[str] | None = None, limit: int = 4096, soft: int | None = None
+           ) -> list[str]:
+    """The bubbles an answer occupies right now — mid-stream or finished.
+
+    `settled` is markdown that can no longer change and so is rendered; `unsettled` is the
+    tail still arriving, appended as escaped plain text because rendering it would make it
+    flicker between literal and formatted as the closing markers land. `pin` (the ⏳ line) rides
+    at the very END of the last bubble so it reads as "still going", and the split budget is
+    reduced by it so a finished frame can never overflow when the pin is later removed.
+
+    Finished delivery is the degenerate case — no pin, footer present — which is why `block`
+    delegates here: the streamed frames and the shipped answer are the same code path, and that
+    is what makes the AD-23 non-regression test meaningful rather than a coincidence."""
+    rendered = format_body(settled) if settled.strip() else ""
+    parts = [rendered]
+    if unsettled.strip():
+        parts.append(html.escape(unsettled))
+    for line in footer or []:
+        parts.append(html.escape(line))
+    text = "\n".join(part for part in parts if part)
+    room = limit - len(pin or "") - _PIN_MARGIN
+    chunks = split_html(text, room, soft)
+    if pin:
+        chunks[-1] = chunks[-1] + "\n" + pin
+    return chunks
+
+
 def block(body: str, sid: str | None, title: str | None, provider: str | None = None,
           model: str | None = None, cost_usd: float | None = None,
           mode: str | None = None, context_used: int | None = None,
@@ -52,12 +86,13 @@ def block(body: str, sid: str | None, title: str | None, provider: str | None = 
     mostra que é uma resposta, acho que pode deixar assim"*, and *"o título pode ficar no
     rodapé, fica melhor"*. The anchor line is deleted rather than demoted — the id and title
     survive in the footer, which is where he wanted them."""
-    lines = []
-    formatted = format_body(body)
-    lines.append(formatted)
-    lines.append(SEPARATOR)
     footer = _footer(sid, title, provider, model, cost_usd, mode, context_used, context_window)
-    for line in footer:
-        escaped = html.escape(line)
-        lines.append(escaped)
-    return "\n".join(lines)
+    tail = [SEPARATOR] + footer
+    # Delegates to `frames` at an unbounded limit, so it comes back as exactly one chunk and
+    # `reply.deliver` still does the splitting. The point is that the finished answer and a
+    # streamed frame are then literally the same code path, which is what makes the AD-23
+    # non-regression check meaningful instead of two implementations that merely agree today.
+    whole = frames(body, footer=tail, limit=_UNBOUNDED)
+    return whole[0]
+
+

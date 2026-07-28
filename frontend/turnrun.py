@@ -4,13 +4,24 @@
 # then deliver" into "paint as it arrives, then seal", and everything that changes is in here, so
 # bot.py's PTB wiring and routing stay untouched by it.
 from __future__ import annotations
-from . import answer, dispatch, msgmap, panelmenu, phrases, registry, reply, speech, tts, turnhelpers
+from . import answer, dispatch, msgmap, painter, panelmenu, phrases, registry, reply, speech, tts, turnhelpers
 from . import config, format
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 # The voice reply is synthesized from the answer, and a whole answer can be far longer than anyone
 # wants read aloud, so the spoken copy is capped where the text one is not.
 SPOKEN_CHARS = 2000
+
+
+def _painter(working, streaming: bool):
+    """The live bubble, or None when this turn is not streaming. The pin phrase is drawn ONCE
+    here rather than per frame: re-rolling it every 1.5 s would make the line visibly flicker
+    between wordings while Lucas is reading."""
+    result = None
+    if streaming and working is not None:
+        phrase = phrases.pick(phrases.WORKING_PHRASES)
+        result = painter.Painter(working, phrase)
+    return result
 
 
 async def _speak(msg, text: str) -> None:
@@ -32,9 +43,11 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     and the anchor keyboard. `spoken` (C5) additionally replies with a voice note synthesized from
     the same answer — text-triggered turns leave it False and are unaffected."""
     options = turnhelpers.turn_options(scope, title)
+    live = _painter(working, options.stream)
+    on_text = live.paint if live is not None else None
     try:
         result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name,
-                                     cwd=WORKSPACE_DIR, options=options)
+                                     cwd=WORKSPACE_DIR, options=options, on_text=on_text)
     except dispatch.DispatchError as e:
         await reply.deliver(working, msg, turnhelpers.friendly_error(e))
         return

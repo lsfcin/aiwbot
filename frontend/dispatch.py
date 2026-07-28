@@ -52,10 +52,18 @@ def events_to_result(events: list) -> TurnResult:
 
 
 async def turn(prompt: str, *, session_id: str | None, backend_name: str, cwd: str,
-               options: TurnOptions = TurnOptions()) -> TurnResult:
+               options: TurnOptions = TurnOptions(), on_text=None) -> TurnResult:
+    """`on_text` is called with each text event's payload as it arrives — the DELTA, not the
+    accumulation, so the caller owns its own buffer and this stays one append per event. The
+    authoritative text is still joined here at the end, so a painter is a side channel that
+    cannot corrupt the delivered answer."""
     backend = get_backend(backend_name)
     stream = backend.send(prompt, session_id=session_id, cwd=cwd, options=options)
-    events = [event async for event in stream]
+    events = []
+    async for event in stream:
+        events.append(event)
+        if on_text is not None and event.kind == "text":
+            await on_text(event.text)
     if options.stream:
         _log_stream(events)
     return events_to_result(events)

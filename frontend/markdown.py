@@ -98,6 +98,34 @@ def _format_text_chunk(text: str) -> str:
     return "\n".join(out)
 
 
+_FENCE = "```"
+
+
+def stable_prefix(text: str) -> tuple[str, str]:
+    """Split a partially-arrived answer into (settled, unsettled).
+
+    Rendering a prefix never produces BROKEN html — `format_body`'s fence regex needs both
+    fences and `inline.convert` only emits balanced tags — but it does produce html that can
+    still CHANGE: a half-typed `**bold` renders literal now and flips to bold once the closing
+    stars land. So a chunk may only be sealed once nothing in it can change again, which is
+    everything up to the last blank line that is not inside an open code fence.
+
+    The fence test is a parity count, not a regex, because an unclosed fence means every
+    paragraph break after it is inside a code block and none of them are safe seams (F4)."""
+    lines = text.split("\n")
+    cut = 0
+    fences = 0
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith(_FENCE):
+            fences += 1
+        blank = not line.strip()
+        if blank and fences % 2 == 0:
+            cut = i + 1
+    settled = "\n".join(lines[:cut])
+    unsettled = "\n".join(lines[cut:])
+    return settled, unsettled
+
+
 def format_body(text: str) -> str:
     # Telegram has no table syntax at all — pipe-tables become row blocks (see table.py).
     out, last = [], 0

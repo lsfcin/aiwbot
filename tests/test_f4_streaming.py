@@ -1,0 +1,151 @@
+# test_f4_streaming.py — F4 Stage 2: the live bubble. Throttle mechanics, the pin, and the
+# guarantee that a streamed turn still ends as byte-for-byte today's answer.
+import asyncio
+from frontend import answer, markdown, painter, reply
+from frontend.htmlsplit import split_html
+from .streamkit import Clock
+
+
+class _LiveMsg:
+    """A Telegram message that records every repaint, and can be told to start failing."""
+
+    def __init__(self):
+        self.edits = []
+        self.fail = False
+        self.concurrent = 0
+        self.overlapped = False
+
+    async def edit_text(self, text, parse_mode=None, reply_markup=None):
+        self.concurrent += 1
+        if self.concurrent > 1:
+            self.overlapped = True
+        await asyncio.sleep(0)
+        self.concurrent -= 1
+        if self.fail:
+            from telegram.error import TelegramError
+            raise TelegramError("flood control exceeded")
+        self.edits.append(text)
+
+
+def _painter(msg, clock):
+    return painter.Painter(msg, "· pensando…", clock=clock)
+
+
+def _feed(p, chunks, clock, gap=2.0):
+    async def run():
+        for chunk in chunks:
+            clock.advance(gap)
+            await p.paint(chunk)
+    asyncio.run(run())
+
+
+def test_a_trickle_of_deltas_does_not_spend_a_round_trip_each():
+    """MIN_GROWTH: below it a repaint moves almost nothing and costs ~200 ms (AD-20)."""
+    msg, clock = _LiveMsg(), Clock()
+    p = _painter(msg, clock)
+    _feed(p, ["a"] * 20, clock)
+    assert msg.edits == []
+
+
+def test_paints_are_spaced_by_the_throttle_interval():
+    msg, clock = _LiveMsg(), Clock()
+    p = _painter(msg, clock)
+    big = "palavra " * 20
+    _feed(p, [big] * 4, clock, gap=painter.MIN_INTERVAL)
+    assert len(msg.edits) == 4
+    _feed(p, [big] * 4, clock, gap=0.1)
+    assert len(msg.edits) == 4
+
+
+def test_a_paint_in_flight_is_dropped_never_queued():
+    """Dropping is lossless — every frame is recomputed from the whole accumulated text — and
+    it is what stops a fast stream from piling requests up behind a slow round trip."""
+    msg, clock = _LiveMsg(), Clock()
+    p = _painter(msg, clock)
+
+    async def run():
+        clock.advance(10)
+        await asyncio.gather(*[p.paint("palavra " * 20) for _ in range(6)])
+
+    asyncio.run(run())
+    assert not msg.overlapped
+    assert len(msg.edits) == 1
+
+
+def test_a_failed_paint_widens_the_gap_and_a_good_one_narrows_it():
+    msg, clock = _LiveMsg(), Clock()
+    p = _painter(msg, clock)
+    msg.fail = True
+    _feed(p, ["palavra " * 20] * 3, clock, gap=painter.MAX_INTERVAL)
+    assert p.interval > painter.MIN_INTERVAL
+    msg.fail = False
+    _feed(p, ["palavra " * 20] * 4, clock, gap=painter.MAX_INTERVAL)
+    assert p.interval == painter.MIN_INTERVAL
+
+
+def test_the_interval_never_runs_away():
+    msg, clock = _LiveMsg(), Clock()
+    p = _painter(msg, clock)
+    msg.fail = True
+    _feed(p, ["palavra " * 20] * 30, clock, gap=painter.MAX_INTERVAL)
+    assert p.interval <= painter.MAX_INTERVAL
+
+
+def test_the_pin_sits_at_the_end_of_the_live_bubble():
+    msg, clock = _LiveMsg(), Clock()
+    p = _painter(msg, clock)
+    _feed(p, ["primeiro paragrafo aqui.\n\nsegundo em andamento " * 3], clock, gap=10)
+    assert msg.edits[-1].endswith("· pensando…")
+
+
+def test_the_finished_answer_carries_no_pin():
+    """The pin is a streaming artefact; `answer.block` is the finished shape and must not have
+    absorbed it."""
+    block = answer.block("corpo", "abc12345", "titulo", provider="claude")
+    assert "pensando" not in block
+
+
+# --- what may be rendered mid-stream ---------------------------------------------------------
+
+def test_only_text_that_can_no_longer_change_is_rendered():
+    """A half-typed `**bold` renders literal now and flips once the closing stars land, so it
+    stays in the unsettled tail until a paragraph break proves it finished."""
+    settled, tail = markdown.stable_prefix("pronto aqui.\n\nmeio de uma frase **negr")
+    assert settled.strip() == "pronto aqui."
+    assert "**negr" in tail
+
+
+def test_an_unclosed_code_fence_makes_every_later_break_unsafe():
+    """Inside a fence a blank line is not a paragraph boundary, it is part of the code."""
+    text = "intro.\n\n```python\nx = 1\n\ny = 2\n"
+    settled, tail = markdown.stable_prefix(text)
+    assert settled.strip() == "intro."
+    assert "```" in tail
+
+
+def test_a_closed_fence_is_settled_again():
+    text = "intro.\n\n```\nx = 1\n```\n\ndepois"
+    settled, tail = markdown.stable_prefix(text)
+    assert "```" in settled
+    assert tail.strip() == "depois"
+
+
+def test_a_frame_never_exceeds_telegram_even_with_the_pin():
+    chunks = answer.frames("x " * 4000, "", pin="· pensando…")
+    for chunk in chunks:
+        assert len(chunk) <= reply.TELEGRAM_MSG_LIMIT
+
+
+# --- the AD-23 non-regression ---------------------------------------------------------------
+
+def test_a_streamed_turn_still_ends_as_exactly_todays_answer():
+    """`block` delegates to `frames`, so the finished answer and a streamed frame are the same
+    code path. This pins that they agree, byte for byte, through the real delivery split."""
+    body = "\n\n".join(f"Paragrafo {i} com algum conteudo real." for i in range(12))
+    block = answer.block(body, "abc12345", "titulo da sessao", provider="claude",
+                         model="claude-sonnet-5", cost_usd=0.02, mode="build")
+    delivered = split_html(block, reply.TELEGRAM_MSG_LIMIT, reply.SOFT_CHARS)
+    footer = [answer.SEPARATOR, "[ABC] TITULO DA SESSAO", "claude · sonnet · build · $0.020"]
+    streamed = answer.frames(body, "", pin=None, footer=footer,
+                             limit=reply.TELEGRAM_MSG_LIMIT, soft=reply.SOFT_CHARS)
+    assert streamed == delivered

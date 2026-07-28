@@ -55,6 +55,24 @@ async def safe_reply(msg, html_text: str, reply_markup=None) -> "telegram.Messag
     return result
 
 
+async def edit_text(message, html_text: str) -> bool:
+    """Repaint one live message. Returns whether Telegram accepted it.
+
+    "Message is not modified" is not an error here — it means the throttle let through a paint
+    whose content had not actually changed — so it is reported as success and never retried,
+    while a real failure (rate limit, network) is left for the caller's backoff to widen."""
+    ok = False
+    try:
+        await message.edit_text(html_text, parse_mode="HTML")
+        ok = True
+    except TelegramError as e:
+        if "not modified" in str(e).lower():
+            ok = True
+        else:
+            print(f"stream edit failed: {e}")
+    return ok
+
+
 async def _edit_or_send(working_msg, msg, html_text: str, reply_markup=None) -> "telegram.Message | None":
     """Morph the ⏳ working message into the final text (feels like a substitution);
     fall back to a fresh reply if the edit is rejected (too old, identical, unparseable)."""
