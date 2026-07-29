@@ -5,6 +5,11 @@ from backend import TurnOptions, get_backend
 from . import ask, askserver, directives, format, panel, phrases, registry
 
 _BUSY_MARKERS = ("no conversation found", "currently running as a background agent")
+# Failures that are about the moment rather than about the request: the provider was overloaded,
+# rate-limited, or the connection timed out. Worth retrying exactly because Lucas is usually not
+# watching — a 529 that killed his turn cost him the whole task, not a few seconds (2026-07-29).
+_TRANSIENT_MARKERS = ("529", "overloaded", "rate limit", "rate_limit", "timed out", "timeout",
+                      "502", "503", "504", "connection reset", "temporarily")
 
 
 def friendly_error(e: Exception) -> str:
@@ -15,6 +20,18 @@ def friendly_error(e: Exception) -> str:
     else:
         result = format.plain(phrases.pick(phrases.ERROR_PHRASES, e=e))
     return result
+
+
+def transient(e: Exception) -> bool:
+    """Is this failure worth trying again as-is? Only server-side/transport ones — a bad prompt or
+    a missing session would fail identically on every attempt, so retrying it just spends time."""
+    text = str(e).lower()
+    hit = False
+    for marker in _TRANSIENT_MARKERS:
+        if marker in text:
+            hit = True
+            break
+    return hit
 
 
 def parse_new_arg(arg: str) -> tuple[str | None, str]:

@@ -67,7 +67,8 @@ def test_handle_reply_continue_dispatches_with_passed_text_not_msg_text(store, m
     async def fake_safe_reply(msg, html, reply_markup=None):
         return None
 
-    async def fake_run_and_deliver(msg, working, prompt, *, session_id, backend_name, title, scope, spoken=False):
+    async def fake_run_and_deliver(msg, working, prompt, *, session_id, backend_name, title,
+                                   scope, spoken=False, lead=""):
         prompts.append(prompt)
 
     monkeypatch.setattr(turnrun.reply, "safe_reply", fake_safe_reply)
