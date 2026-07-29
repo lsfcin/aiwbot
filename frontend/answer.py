@@ -2,7 +2,7 @@
 from __future__ import annotations
 import html
 from .format import SESSION_ID_LABEL_LEN, clip_chars, format_body, meta_bits, title_words
-from .htmlsplit import split_html
+from .htmlsplit import split_html, strip_tags
 
 SEPARATOR = "· · ·"
 # Slack so a chunk sized with the pin still fits once the pin is swapped for the footer.
@@ -72,16 +72,31 @@ def _counter(index: int, total: int | None) -> str:
     return label
 
 
-def decorate(chunks: list[str], lead: str = "", total: int | None = None) -> list[str]:
+def _with_counter(body: str, counter: str) -> str:
+    """The counter closes the ANSWER, so it lands on the last line of the text — before the footer
+    when this chunk carries one, and hard against the final word rather than adrift on a line of
+    its own (Lucas, 2026-07-29: it had drifted below `· · ·` and onto the next line)."""
+    head, sep, tail = body.rpartition("\n" + SEPARATOR)
+    if sep:
+        placed = f"{head.rstrip()} {counter}{sep}{tail}"
+    else:
+        placed = f"{body.rstrip()} {counter}"
+    return placed
+
+
+def decorate(chunks: list[str], lead: str = "", total: int | None = None,
+             start: int = 1) -> list[str]:
     """Put the per-bubble furniture on chunks that are already split: the quoted transcript at
     the top, the position at the end. Both are omitted when they would say nothing — no lead
-    without a voice note, no count for an answer that is one bubble."""
-    counted = len(chunks) > 1
+    without a voice note, no count for an answer that is one bubble. `start` numbers a chunk that
+    is being restamped on its own, out of the list it originally came from."""
+    counted = max(total or 0, len(chunks)) > 1
     out = []
-    for index, chunk in enumerate(chunks, start=1):
+    for index, chunk in enumerate(chunks, start=start):
         body = f"{lead}{chunk}" if lead else chunk
         if counted:
-            body = f"{body} {_counter(index, total)}"
+            counter = _counter(index, total)
+            body = _with_counter(body, counter)
         out.append(body)
     return out
 
@@ -93,9 +108,39 @@ def room(limit: int, lead: str = "", pin: str | None = None) -> int:
     return limit - len(pin or "") - len(lead) - _PIN_MARGIN - _COUNT_MARGIN
 
 
+def _drop_blank_tail(chunks: list[str]) -> list[str]:
+    """A text that ends on a paragraph break splits with a whitespace-only chunk at the end, and
+    mid-stream that becomes a BUBBLE holding nothing but its counter and the pin (seen 2026-07-29).
+    Only the last one is dropped, and only when something else survives: it is the chunk still
+    growing, so removing it cannot disturb a bubble already on screen."""
+    kept = chunks
+    if len(chunks) > 1:
+        bare = strip_tags(chunks[-1])
+        if not bare.strip():
+            kept = chunks[:-1]
+    return kept
+
+
+def bare_frames(settled: str, unsettled: str = "", pin: str | None = None,
+                footer: list[str] | None = None, limit: int = 4096,
+                soft: int | None = None, lead: str = "") -> list[str]:
+    """The split, WITHOUT the per-bubble furniture. Kept separate because a bubble has to be
+    recorded undecorated: restamping a chunk that already carries `(1)` produces `(1) (1/10)`
+    (seen 2026-07-29), so the counter can only ever be applied to this."""
+    rendered = format_body(settled) if settled.strip() else ""
+    parts = [rendered]
+    if unsettled.strip():
+        parts.append(html.escape(unsettled))
+    for line in footer or []:
+        parts.append(html.escape(line))
+    text = "\n".join(part for part in parts if part)
+    chunks = split_html(text, room(limit, lead, pin), soft)
+    return _drop_blank_tail(chunks)
+
+
 def frames(settled: str, unsettled: str = "", pin: str | None = None,
            footer: list[str] | None = None, limit: int = 4096, soft: int | None = None,
-           lead: str = "") -> list[str]:
+           lead: str = "", start: int = 1) -> list[str]:
     """The bubbles an answer occupies right now — mid-stream or finished.
 
     `settled` is markdown that can no longer change and so is rendered; `unsettled` is the
@@ -107,15 +152,8 @@ def frames(settled: str, unsettled: str = "", pin: str | None = None,
     Finished delivery is the degenerate case — no pin, footer present — which is why `block`
     delegates here: the streamed frames and the shipped answer are the same code path, and that
     is what makes the AD-23 non-regression test meaningful rather than a coincidence."""
-    rendered = format_body(settled) if settled.strip() else ""
-    parts = [rendered]
-    if unsettled.strip():
-        parts.append(html.escape(unsettled))
-    for line in footer or []:
-        parts.append(html.escape(line))
-    text = "\n".join(part for part in parts if part)
-    chunks = split_html(text, room(limit, lead, pin), soft)
-    chunks = decorate(chunks, lead)
+    bare = bare_frames(settled, unsettled, pin, footer, limit, soft, lead)
+    chunks = decorate(bare, lead, start=start)
     if pin:
         # A blank line of distance, so the pin reads as a status hanging under the answer rather
         # than as the answer's next line (Lucas, 2026-07-27).
@@ -138,6 +176,10 @@ def block(body: str, sid: str | None, title: str | None, provider: str | None = 
     survive in the footer, which is where he wanted them."""
     footer = _footer(sid, title, provider, model, cost_usd, mode, context_used, context_window)
     tail = [SEPARATOR] + footer
+    # An answer that ends on a paragraph break would put a blank line between its last words and
+    # the separator, which the splitter reads as a place to break — leaving the footer alone in a
+    # bubble of its own (seen 2026-07-29). The footer belongs to the last bubble that has text.
+    body = body.rstrip()
     # Delegates to `frames` at an unbounded limit, so it comes back as exactly one chunk and
     # `reply.deliver` still does the splitting. The point is that the finished answer and a
     # streamed frame are then literally the same code path, which is what makes the AD-23

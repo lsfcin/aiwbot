@@ -35,10 +35,10 @@ class _Question:
     bubble: object | None = None
 
 
-# token -> the message a question is sent as a reply to. One entry per LIVE turn: registered in
-# turnrun before the backend is called and dropped in its `finally`, so a token can never outlive
-# the turn that owns it.
-_TURNS: dict[str, object] = {}
+# token -> (the message a question is sent as a reply to, the turn's painter or None). One entry
+# per LIVE turn: registered in turnrun before the backend is called and dropped in its `finally`,
+# so a token can never outlive the turn that owns it.
+_TURNS: dict[str, tuple] = {}
 # question id -> the question still waiting for an answer.
 _QUESTIONS: dict[str, _Question] = {}
 
@@ -48,8 +48,11 @@ def new_token() -> str:
     return secrets.token_hex(4)
 
 
-def register(token: str, msg) -> None:
-    _TURNS[token] = msg
+def register(token: str, msg, live=None) -> None:
+    """`live` is the turn's painter, when it has one: a question has to close the bubble above it
+    before it is posted, or text written after the question would keep growing that bubble and end
+    up ABOVE the thing it answers (Lucas, 2026-07-29)."""
+    _TURNS[token] = (msg, live)
 
 
 def unregister(token: str) -> None:
@@ -162,8 +165,13 @@ async def ask(token: str, question: str, options: list[str] | None = None) -> st
 
     Every exit is a string, including the ones nobody answered: this return value goes straight
     back into the running turn, where an exception would end it instead."""
-    origin = _TURNS.get(token)
+    turn = _TURNS.get(token)
     answered = EXPIRED_TEXT
-    if origin is not None:
+    if turn is not None:
+        origin, live = turn
+        if live is not None:
+            # Seal what is on screen and drop the pin: the answer so far is complete as far as
+            # Lucas is concerned, and the status line must not claim work that is blocked on him.
+            await live.cut()
         answered = await _hold(origin, token, question, list(options or []))
     return answered

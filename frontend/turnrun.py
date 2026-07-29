@@ -108,7 +108,7 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     # would leave a question waiting on a future nobody can resolve (F4 Stage 4).
     token = turnhelpers.enable_ask(scope, backend_name, options)
     if token:
-        ask.register(token, msg)
+        ask.register(token, msg, live)
     try:
         result = await _dispatch(msg, working, prompt, session_id=session_id, live=live,
                                  backend_name=backend_name, options=options, lead=lead)
@@ -118,7 +118,9 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     if result is None:
         return
     turnhelpers.persist_turn(result.session_id, backend_name, title, result, options)
-    block = answer.block(result.text, result.session_id, title, provider=backend_name,
+    # Only the text the painter has not already sealed above a question (AD-30).
+    body = live.tail_of(result.text) if live is not None else result.text
+    block = answer.block(body, result.session_id, title, provider=backend_name,
                          model=result.model, cost_usd=result.cost_usd, mode=options.mode,
                          context_used=result.context_used, context_window=result.context_window)
     markup = panelmenu.root_markup(result.session_id)

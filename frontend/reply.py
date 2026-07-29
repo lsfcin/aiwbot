@@ -110,6 +110,18 @@ async def send_voice(msg, ogg_bytes: bytes) -> "telegram.Message | None":
     return result
 
 
+async def drop(message) -> bool:
+    """Remove one of the bot's own messages. Best-effort: a status bubble that cannot be deleted
+    is a cosmetic problem, never a reason to fail a turn."""
+    ok = False
+    try:
+        await message.delete()
+        ok = True
+    except TelegramError as e:
+        print(f"delete failed: {e}")
+    return ok
+
+
 async def deliver(working_msg, msg, html_text: str, reply_markup=None, lead: str = "") -> list:
     """Returns EVERY message sent, not just the last. A long answer arrives as several bubbles
     and Lucas replies to whichever one he happens to be reading — so the caller has to be able

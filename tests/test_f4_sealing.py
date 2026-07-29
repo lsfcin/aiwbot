@@ -122,7 +122,7 @@ def test_a_session_id_that_arrives_late_still_anchors_everything():
 
     asyncio.run(go())
     assert anchored == [], "nothing may be anchored before the session id is known"
-    assert len(p.pending) == len(p.sent)
+    assert len(p.anchors.pending) == len(p.sent)
     asyncio.run(p.note_session("s1"))
     assert len(anchored) == len(p.sent)
 
@@ -134,9 +134,9 @@ def test_a_painter_with_nobody_listening_does_not_requeue_forever():
     snapshotted and cleared before the drain, and "nobody is listening" no longer re-queues."""
     origin = Origin()
     p = painter.Painter(Bubble(origin.chat), "pensando…", origin=origin)
-    p.pending = [Bubble(origin.chat), Bubble(origin.chat)]
+    p.anchors.pending = [Bubble(origin.chat), Bubble(origin.chat)]
     asyncio.run(p.note_session("s1"))
-    assert p.pending == []
+    assert p.anchors.pending == []
 
 
 def test_sealing_can_be_turned_off_without_touching_the_streaming_knob():

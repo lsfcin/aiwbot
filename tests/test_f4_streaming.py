@@ -24,6 +24,7 @@ class _LiveMsg:
         self.concurrent = 0
         self.overlapped = False
         self.chat = _Chat()
+        self.message_id = 1
 
     async def edit_text(self, text, parse_mode=None, reply_markup=None):
         self.concurrent += 1

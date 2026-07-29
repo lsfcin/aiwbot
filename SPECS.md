@@ -577,6 +577,39 @@ The furniture is budgeted BEFORE the split, not appended after: a chunk sized to
 and then given a lead and a counter is a message Telegram rejects — and only ever on the long
 voice answers this exists to serve.
 
+### AD-30 — A question ends the segment above it (2026-07-29, from the first real interview)
+
+An `ask_user` question is its own message, so the live bubble stops being the last thing in the
+chat the moment one is posted. Everything the agent writes afterwards is an answer to that
+question and must appear BELOW it — a live bubble that kept growing put the answer above the
+question that prompted it.
+
+So an answer is delivered in **segments**: a contiguous run of bubbles at the bottom of the chat.
+`painter.cut()` ends one — repainting the closing bubble **without the pin** (with a question
+pending, a status line claims work that is actually blocked on Lucas) and deleting it outright
+when nothing but the status ever reached it. The next paint opens a fresh bubble below the
+question. Three consequences, each of which broke once before it was pinned:
+
+- **The closing delivery renders only the current segment** (`painter.tail_of`). Handing it the
+  whole answer reposted everything written before the question underneath it.
+- **Bubbles are numbered across the answer, not per segment**, so an interview does not restart at
+  `(1)` after every question. Questions are not counted — they are not answer text.
+- **A bubble is recorded undecorated** (`bubbles.bare`). Restamping a chunk that already carried
+  `(1)` produced `(1) (1/10)`. Telegram hands back the plain rendering of a message, never the HTML
+  that was sent, so the record is the only way to restamp at all.
+
+Every counter, split and stamp here is **string formatting in `answer.py` — zero tokens, no model
+involved.** That is why it can be relied on: the shape of a reply is never something the agent
+chose or could get wrong.
+
+Two shape rules from the same session: the counter closes the ANSWER (before the footer, hard
+against the final word, never adrift on its own line), and the footer never gets a bubble of its
+own — an answer ending on a paragraph break used to leave a blank line before `· · ·` that the
+splitter read as a place to break.
+
+**Both of the last two bugs passed every assertion in the file** and were caught by printing the
+bubbles and reading them. Eyeball the output when the shape changes.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.
