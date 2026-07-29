@@ -40,6 +40,6 @@
 | [`stt.py`](stt.py) | — | `confident`, `run`, `transcribe` | stt.py — STT wrapper: faster-whisper large-v3-turbo, lazy-loaded; fails safe to "" (C1, C3). |
 | [`table.py`](table.py) | — | `is_row`, `is_separator`, `render` | table.py — pipe-tables -> Telegram row blocks: rows become labelled text, never a <pre> box. |
 | [`tts.py`](tts.py) | — | `encode_ogg`, `synthesize` | tts.py — TTS wrapper: Kokoro-82M pf_dora voice, lazy-loaded; local OGG/Opus encode (C5, C6). |
-| [`turnhelpers.py`](turnhelpers.py) | — | `friendly_error`, `parse_new_arg`, `apply_directives`, `turn_options`, `enable_ask` | turnhelpers.py — turn plumbing: friendly errors, /new arg parsing, sticky options, persistence. |
+| [`turnhelpers.py`](turnhelpers.py) | — | `friendly_error`, `transient`, `parse_new_arg`, `apply_directives`, `turn_options` | turnhelpers.py — turn plumbing: friendly errors, /new arg parsing, sticky options, persistence. |
 | [`turnrun.py`](turnrun.py) | — | `guarded`, `run_and_deliver`, `start_new`, `handle_reply_continue` | turnrun.py — run one turn and put its answer on screen: dispatch, deliver, anchor, speak. |
 <!-- routing:end -->

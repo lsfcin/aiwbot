@@ -67,6 +67,14 @@ LISTENING_PHRASES = [
     "escutando o recado…",
     "passando o áudio pra texto…",
 ]
+# The provider was overloaded or the connection dropped, and the turn is being tried again by
+# itself (2026-07-29). Names the reason, because a silent retry looks like a stall — and Lucas is
+# usually not at the screen when it happens.
+RETRY_PHRASES = [
+    "a API tá sobrecarregada — tentando de novo…",
+    "deu sobrecarga do lado deles. nova tentativa…",
+    "falhou por sobrecarga, repetindo…",
+]
 TRANSCRIBE_FAIL_PHRASES = [
     "não consegui transcrever o áudio — guardei em brain/INBOX.md",
     "esse áudio não rolou de transcrever, mas já tá salvo no INBOX.md",
