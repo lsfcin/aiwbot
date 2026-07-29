@@ -58,3 +58,86 @@ def test_the_status_bubble_becomes_the_turns_working_message(store, monkeypatch)
     result = asyncio.run(turnrun._working(FakeMsg(), existing))
     assert result is existing
     assert edited, "the status was left saying it was still transcribing"
+
+
+# --- a transient failure is retried, not reported (Lucas, 2026-07-29) -------------------------
+
+def _turn(monkeypatch, failures, streamed_text=""):
+    """Run one turn whose dispatch fails `failures` times, then succeeds. Returns (attempts, said)."""
+    said = []
+    attempts = []
+
+    class _Result:
+        text = "pronto"
+        session_id = "s1"
+        cost_usd = None
+        model = "sonnet"
+        context_used = None
+        context_window = None
+
+    async def fake_turn(prompt, **kw):
+        attempts.append(prompt)
+        if len(attempts) <= len(failures):
+            raise turnrun.dispatch.DispatchError(failures[len(attempts) - 1])
+        return _Result()
+
+    async def fake_edit(message, text, markup=None):
+        said.append(text)
+        return True
+
+    async def fake_deliver(working, msg, text, reply_markup=None, lead=""):
+        said.append(text)
+        return []
+
+    async def no_sleep(seconds):
+        return None
+
+    monkeypatch.setattr(turnrun.dispatch, "turn", fake_turn)
+    monkeypatch.setattr(turnrun.reply, "edit_text", fake_edit)
+    monkeypatch.setattr(turnrun.reply, "deliver", fake_deliver)
+    monkeypatch.setattr(turnrun.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(turnrun.turnhelpers, "persist_turn", lambda *a, **kw: None)
+    monkeypatch.setattr(turnrun.msgmap, "remember_reply", lambda *a: None)
+    asyncio.run(turnrun.run_and_deliver(FakeMsg(), FakeReplyAnchor(7), "faz isso", session_id=None,
+                                        backend_name="claude", title=None, scope="s1"))
+    return attempts, said
+
+
+def test_an_overloaded_provider_is_retried_by_itself(store, monkeypatch):
+    """A 529 is about the moment, not the request. Lucas is usually not watching, so letting one
+    through costs him the whole task rather than a few seconds."""
+    attempts, said = _turn(monkeypatch, ["API Error: 529 Overloaded"])
+    assert len(attempts) == 2, "the turn was not tried again"
+    assert any("sobrecarga" in text or "sobrecarregada" in text for text in said)
+
+
+def test_a_failure_about_the_request_itself_is_not_retried(store, monkeypatch):
+    """No session, a bad prompt: it would fail identically every time, so retrying only delays
+    telling him."""
+    attempts, said = _turn(monkeypatch, ["no conversation found"] * 3)
+    assert len(attempts) == 1
+
+
+def test_retrying_gives_up_and_says_so(store, monkeypatch):
+    attempts, said = _turn(monkeypatch, ["529 overloaded"] * 9)
+    assert len(attempts) == turnrun.RETRIES + 1
+    assert any("erro" in text or "falhou" in text or "quebrou" in text for text in said)
+
+
+def test_the_status_bubble_shows_the_transcript_before_the_answer_exists(store, monkeypatch):
+    """Lucas, 2026-07-29: once the transcription is done it can already be shown — seeing what was
+    heard should not wait for the reply. So the bubble that said "transcrevendo…" becomes the
+    quoted transcript plus "trabalhando…", and the painter keeps writing into that same bubble."""
+    from frontend import answer
+    edited = []
+
+    async def fake_edit(message, text, markup=None):
+        edited.append(text)
+        return True
+
+    monkeypatch.setattr(turnrun.reply, "edit_text", fake_edit)
+    lead = answer.quote("me explica o ciclo da água")
+    asyncio.run(turnrun._working(FakeMsg(), FakeReplyAnchor(7), lead))
+    assert edited, "the status never changed"
+    assert edited[0].startswith(lead)
+    assert "ciclo da água" in edited[0]

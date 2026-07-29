@@ -4,6 +4,7 @@
 # then deliver" into "paint as it arrives, then seal", and everything that changes is in here, so
 # bot.py's PTB wiring and routing stay untouched by it.
 from __future__ import annotations
+import asyncio
 from . import answer, ask, dispatch, msgmap, painter, panelmenu, phrases, registry, reply, speech, tts, turnhelpers
 from . import config, format
 
@@ -11,6 +12,11 @@ WORKSPACE_DIR = config.WORKSPACE_DIR
 # The voice reply is synthesized from the answer, and a whole answer can be far longer than anyone
 # wants read aloud, so the spoken copy is capped where the text one is not.
 SPOKEN_CHARS = 2000
+# How many times a transient failure is retried before Lucas is told, and how long the wait grows
+# per attempt. Two attempts over ~24 s covers the overload blips seen in practice without leaving
+# a turn apparently hung.
+RETRIES = 2
+RETRY_BACKOFF = 8.0
 
 
 def _painter(msg, working, streaming: bool, lead: str = ""):
@@ -57,19 +63,46 @@ async def _speak(msg, text: str) -> None:
         print(f"voice reply failed: {e}")
 
 
+async def _dispatch(msg, working, prompt: str, *, session_id, backend_name, options, live, lead):
+    """One turn, retried while the failure is transient AND nothing has reached the chat yet.
+
+    Both halves matter. A 529 or a dropped connection is about the moment, not the request, and
+    Lucas is usually not watching — letting one kill the turn costs him the whole task rather than
+    a few seconds (2026-07-29). But once text has been painted, a retry would replay the answer on
+    top of what he is already reading, so a mid-stream failure is reported instead of repeated."""
+    on_text = live.paint if live is not None else None
+    attempt = 0
+    result = None
+    while result is None:
+        try:
+            result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name,
+                                         cwd=WORKSPACE_DIR, options=options, on_text=on_text)
+        except dispatch.DispatchError as e:
+            shown = live is not None and bool(live.text)
+            again = turnhelpers.transient(e) and attempt < RETRIES and not shown
+            if not again:
+                await reply.deliver(working, msg, turnhelpers.friendly_error(e), lead=lead)
+                break
+            attempt += 1
+            note = lead + format.plain(phrases.pick(phrases.RETRY_PHRASES))
+            await reply.edit_text(working, note)
+            await asyncio.sleep(RETRY_BACKOFF * attempt)
+    return result
+
+
 async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
                           backend_name: str, title: str | None, scope: str,
-                          spoken: bool = False) -> None:
+                          spoken: bool = False, lead: str = "") -> None:
     """Dispatch one turn with the scope's sticky knobs, then deliver the answer with its footer
     and the anchor keyboard. `spoken` (C5) additionally replies with a voice note synthesized from
-    the same answer — text-triggered turns leave it False and are unaffected."""
+    the same answer — text-triggered turns leave it False and are unaffected. `lead` is the quoted
+    transcript a voice turn already showed, carried on so every bubble keeps it (AD-29) — and
+    derived here when a caller did not pass it, so "a spoken turn quotes what was heard" holds for
+    every entry point rather than for the two that remember."""
+    if spoken and not lead:
+        lead = answer.quote(prompt)
     options = turnhelpers.turn_options(scope, title)
-    # A voice turn quotes what was heard at the top of every bubble it produces, instead of
-    # spending a bubble of its own on the echo (Lucas, 2026-07-28). `prompt` is exactly the
-    # string that reached the session, which is what the echo existed to show.
-    lead = answer.quote(prompt) if spoken else ""
     live = _painter(msg, working, options.stream, lead)
-    on_text = live.paint if live is not None else None
     # The token is registered BEFORE the backend starts and released in the `finally` whatever
     # happens: an agent can call ask_user in its first second, and a token that outlived its turn
     # would leave a question waiting on a future nobody can resolve (F4 Stage 4).
@@ -77,14 +110,13 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
     if token:
         ask.register(token, msg)
     try:
-        result = await dispatch.turn(prompt, session_id=session_id, backend_name=backend_name,
-                                     cwd=WORKSPACE_DIR, options=options, on_text=on_text)
-    except dispatch.DispatchError as e:
-        await reply.deliver(working, msg, turnhelpers.friendly_error(e), lead=lead)
-        return
+        result = await _dispatch(msg, working, prompt, session_id=session_id, live=live,
+                                 backend_name=backend_name, options=options, lead=lead)
     finally:
         if token:
             ask.unregister(token)
+    if result is None:
+        return
     turnhelpers.persist_turn(result.session_id, backend_name, title, result, options)
     block = answer.block(result.text, result.session_id, title, provider=backend_name,
                          model=result.model, cost_usd=result.cost_usd, mode=options.mode,
@@ -105,25 +137,31 @@ async def run_and_deliver(msg, working, prompt: str, *, session_id: str | None,
         await _speak(msg, result.text)
 
 
-async def _working(msg, working):
-    """The bubble the answer will be written into. A voice turn already put one on screen while
-    it was transcribing, so it is morphed rather than joined by a second status message."""
+async def _working(msg, working, lead: str = ""):
+    """The bubble the answer will be written into.
+
+    A voice turn already put one on screen while it was transcribing, so it is morphed rather than
+    joined by a second status message — and it is morphed to carry the TRANSCRIPT, which exists by
+    now even though the answer does not (Lucas, 2026-07-29: seeing what was heard should not wait
+    for the reply). The painter then keeps writing into this same bubble, lead included."""
+    text = lead + format.plain(phrases.pick(phrases.WORKING_PHRASES))
     result = working
     if result is None:
-        result = await reply.safe_reply(msg, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
+        result = await reply.safe_reply(msg, text)
     else:
-        await reply.edit_text(result, format.plain(phrases.pick(phrases.WORKING_PHRASES)))
+        await reply.edit_text(result, text)
     return result
 
 
 async def start_new(msg, prompt: str, *, spoken: bool = False, working=None) -> None:
     """A new session runs on the NEW scope: whatever the last interaction used, minus anything
     the /new config bubble changed since."""
-    working = await _working(msg, working)
+    lead = answer.quote(prompt) if spoken else ""
+    working = await _working(msg, working, lead)
     title = format.title_from_prompt(prompt)
     harness = registry.harness_for(registry.NEW)
     await run_and_deliver(msg, working, prompt, session_id=None, backend_name=harness,
-                          title=title, scope=registry.NEW, spoken=spoken)
+                          title=title, scope=registry.NEW, spoken=spoken, lead=lead)
 
 
 async def handle_reply_continue(msg, sid: str, text: str, *, spoken: bool = False,
@@ -132,7 +170,8 @@ async def handle_reply_continue(msg, sid: str, text: str, *, spoken: bool = Fals
     voice turn) — read from the caller's arg, never re-derived from `msg.text`, since a voice
     message replying to a prior session anchor has no `.text` at all."""
     harness = registry.backend_for(sid) or registry.DEFAULT_BACKEND
-    working = await _working(msg, working)
+    lead = answer.quote(text) if spoken else ""
+    working = await _working(msg, working, lead)
     title = registry.title_for(sid)
     await run_and_deliver(msg, working, text, session_id=sid, backend_name=harness,
-                          title=title, scope=sid, spoken=spoken)
+                          title=title, scope=sid, spoken=spoken, lead=lead)
