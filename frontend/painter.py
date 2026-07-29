@@ -2,8 +2,10 @@
 from __future__ import annotations
 import time
 from . import answer, markdown, reply
+from .anchor import Anchors
+from .bubbles import Bubbles
 from .cadence import Cadence
-from .htmlsplit import split_html
+from . import landing
 
 # Stage 3's rollback: off, a streamed answer stays in one bubble that freezes when it outgrows a
 # message, exactly as Stage 2 shipped. Independent of the `stream` knob on purpose, so sealing
@@ -26,41 +28,34 @@ class Painter:
         self.lead = lead
         self.clock = Cadence(clock)
         self.origin = origin
-        self.on_bubble = on_bubble
         self.seal = seal and origin is not None
-        self.sent = [working] if working is not None else []
-        self.pending = list(self.sent)
-        self.session_id: str | None = None
+        self.anchors = Anchors(on_bubble)
+        self.bubbles = Bubbles(working, origin, self.anchors, self.clock)
+        # Where the current segment starts in `text`. Everything before it is on screen, sealed
+        # above a question, and must never be repainted.
+        self.base = 0
+        # The undecorated chunks behind the frame most recently computed, so what a bubble is
+        # given can be recorded without its counter.
+        self.bare_now: list[str] = []
         self.text = ""
         self.busy = False
         self.frozen = False
 
+    @property
+    def sent(self) -> list:
+        """The bubbles still being written into — the current segment."""
+        return self.bubbles.live
+
+    @property
+    def answers(self) -> list:
+        """Every bubble of this answer, across segments."""
+        return self.bubbles.all
+
     # --- anchoring ---------------------------------------------------------------------------
 
     async def note_session(self, session_id: str | None) -> None:
-        """AD-23: a bubble is repliable only once it is mapped to its session. The id usually
-        arrives before any text (claude's `system:init`), but nothing here DEPENDS on that —
-        bubbles born earlier queue up and are anchored retroactively the moment it is known."""
-        if not session_id or self.session_id:
-            return
-        self.session_id = session_id
-        # Drained into a snapshot and emptied BEFORE anchoring, never iterated in place: an
-        # `_anchor` that re-queued while this loop walked the same list would append forever and
-        # eat the machine's memory. Structural, so the loop is impossible rather than merely
-        # unlikely (found 2026-07-28 by a Painter built without `on_bubble`).
-        queued = self.pending
-        self.pending = []
-        for bubble in queued:
-            self._anchor(bubble)
-
-    def _anchor(self, bubble) -> None:
-        """Queue only for the reason queuing exists — the session id is not known yet. A painter
-        with no `on_bubble` has nowhere to anchor TO, which is a different condition and must not
-        re-queue: conflating the two is what made the drain above unbounded."""
-        if not self.session_id:
-            self.pending.append(bubble)
-        elif self.on_bubble is not None:
-            self.on_bubble(bubble, self.session_id)
+        """AD-23: a bubble is repliable only once it is mapped to its session."""
+        self.anchors.note_session(session_id)
 
     # --- throttle ----------------------------------------------------------------------------
 
@@ -72,7 +67,7 @@ class Painter:
         from the whole accumulated text, so a skipped one is simply superseded by the next. That
         is what stops a fast stream from piling up requests behind a slow round trip."""
         result = False
-        if self.sent and not self.frozen and not self.busy:
+        if not self.frozen and not self.busy and (self.sent or self.text[self.base:].strip()):
             result = self.clock.due(len(self.text))
         return result
 
@@ -80,18 +75,32 @@ class Painter:
         """Re-light Telegram's own "typing…" indicator while the gate above says nothing else
         should move."""
         lit = self.clock.typing_due()
-        if lit:
-            await reply.send_typing(self.sent[0])
+        if lit and self.answers:
+            await reply.send_typing(self.answers[0])
 
     # --- painting ----------------------------------------------------------------------------
 
-    def frames(self) -> list[str]:
-        """The bubbles this answer occupies right now: settled markdown rendered, the still
-        arriving tail as plain text, pin on the last one."""
-        settled, unsettled = markdown.stable_prefix(self.text)
+    def frames(self, pinned: bool = True) -> list[str]:
+        """The bubbles the CURRENT segment occupies right now: settled markdown rendered, the still
+        arriving tail as plain text, pin on the last one.
+
+        Only the current segment: text written before a question was posted is already sealed above
+        it, and repainting it would put the answer to a question above the question (Lucas,
+        2026-07-29). `pinned=False` drops the status line, which is what a bubble being closed
+        wants — the pin belongs on whatever is now last."""
+        self.bare_now: list[str] = []
+        settled, unsettled = markdown.stable_prefix(self.text[self.base:])
         soft = reply.SOFT_CHARS if self.seal else None
-        chunks = answer.frames(settled, unsettled, pin=self.pin,
-                               limit=reply.TELEGRAM_MSG_LIMIT, soft=soft, lead=self.lead)
+        pin = self.pin if pinned else None
+        # Numbered from where earlier segments left off, so an interview does not restart the
+        # count at 1 after every question.
+        opening = self.bubbles.sealed() + 1
+        bare = answer.bare_frames(settled, unsettled, pin, limit=reply.TELEGRAM_MSG_LIMIT,
+                                  soft=soft, lead=self.lead)
+        chunks = answer.decorate(bare, self.lead, start=opening)
+        if pin:
+            chunks[-1] = chunks[-1] + "\n\n" + pin
+        self.bare_now = bare
         if not self.seal and len(chunks) > 1:
             # Stage 2 behaviour: one bubble that stops updating once the answer outgrows a
             # message, leaving the finished delivery to do the splitting.
@@ -106,59 +115,50 @@ class Painter:
         arrival, which makes AD-23 continuous — Lucas can reply to bubble 1 while bubble 3 is
         still being written."""
         closing = len(self.sent) - 1
-        await reply.edit_text(self.sent[closing], chunks[closing])
+        await self.bubbles.write(self.sent[closing], chunks[closing],
+                                 bare=self.bare_now[closing])
         # Exactly ONE bubble per paint, however far the stream has run ahead. Posting every chunk
         # that fits would land three bubbles in the same second and undo the pause entirely — the
         # rest wait for their own gap, and `finish` ships whatever is still owed at the end.
-        chunk = chunks[len(self.sent)]
-        bubble = await reply.safe_reply(self.origin, chunk)
-        if bubble is not None:
-            self.sent.append(bubble)
-            self._anchor(bubble)
-            self.clock.mark_bubble()
+        await self.bubbles.open(chunks[len(self.sent)], bare=self.bare_now[len(self.sent)])
+
+    async def cut(self) -> None:
+        """Close the live bubble because something else is about to be posted below it.
+
+        A question asked mid-turn is its own message, so anything the agent writes AFTER it must
+        appear BELOW it — and a live bubble that kept growing would put the answer to a question
+        above the question (Lucas, 2026-07-29). The pin goes too: while a question is waiting, the
+        status line would be claiming work that is actually blocked on him."""
+        if self.sent:
+            chunks = self.frames(pinned=False)
+            written = chunks[-1].strip()
+            if written:
+                await self.bubbles.write(self.sent[-1], chunks[-1], bare=self.bare_now[-1])
+            else:
+                # Nothing but the status ever reached this bubble — the agent asked before it wrote
+                # anything — so it is removed rather than left above the question claiming to be
+                # working on something that is actually waiting on Lucas.
+                await self.bubbles.discard(self.sent[-1])
+        self.base = len(self.text)
+        self.bubbles.cut()
+
+    def tail_of(self, text: str) -> str:
+        """The part of the answer that still belongs to the CURRENT segment.
+
+        Everything before `base` is already on screen above a question and final. Re-rendering the
+        whole answer at the end would post it a second time below the questions (seen 2026-07-29),
+        so the closing delivery is given only the tail."""
+        cut = min(self.base, len(text))
+        return text[cut:]
 
     async def finish(self, block: str, markup=None) -> list:
-        """Land the finished answer on the bubbles already on screen.
-
-        Only the live bubble and anything after it is written: prefix-stability means the sealed
-        ones already hold exactly their final text, so re-sending them would duplicate the answer
-        and re-editing them would spend round trips to change nothing. The footer and keyboard
-        only ever affect the last chunk, and the pin disappears because `block` has none."""
-        budget = answer.room(reply.TELEGRAM_MSG_LIMIT, self.lead)
-        chunks = split_html(block, budget, reply.SOFT_CHARS)
-        chunks = answer.decorate(chunks, self.lead, total=len(chunks))
-        live = len(self.sent) - 1
-        for i in range(live, len(chunks)):
-            last = i == len(chunks) - 1
-            tail_markup = markup if last else None
-            if i < len(self.sent):
-                await reply.edit_text(self.sent[i], chunks[i], tail_markup)
-            else:
-                bubble = await reply.safe_reply(self.origin, chunks[i], reply_markup=tail_markup)
-                if bubble is None:
-                    break
-                self.sent.append(bubble)
-                self._anchor(bubble)
-        await self._stamp(chunks, live)
-        return list(self.sent)
-
-    async def _stamp(self, chunks: list[str], live: int) -> None:
-        """One closing pass over the bubbles already sealed, so each ends `(2/3)` instead of the
-        `(2)` it was born with. Lucas asked for exact positions everywhere (2026-07-28).
-
-        This is the ONE moment a sealed bubble is rewritten, and it is why the rule is "sealed
-        bubbles are not rewritten *while the answer is streaming*" rather than "never": the total
-        cannot exist before the end, and prefix-stability guarantees the only difference is the
-        counter — nothing Lucas has read changes under him. It runs AFTER the live bubble is
-        finished, so the answer completes first and the stamping trails it."""
-        for i in range(min(live, len(chunks))):
-            await reply.edit_text(self.sent[i], chunks[i])
+        """Hand the finished answer to `landing`, which owns everything that happens once the text
+        has stopped arriving. Kept as a method because callers think in terms of the painter."""
+        return await landing.land(self, block, markup)
 
     async def paint(self, delta: str, session_id: str | None = None) -> None:
         self.text += delta
         await self.note_session(session_id)
-        if not self.sent:
-            return
         await self._keep_typing()
         if not self._due():
             return
@@ -169,10 +169,16 @@ class Painter:
             # it meanwhile: the held text lands whole as the next bubble once the gap has passed.
             return
         self.busy = True
-        if growing:
+        if not self.sent:
+            # First bubble of a segment that opened after a question: it has to be a new message,
+            # below that question, rather than an edit of anything already on screen.
+            await self.bubbles.open(chunks[0], bare=self.bare_now[0])
+            ok = True
+        elif growing:
             await self._grow(chunks)
             ok = True
         else:
-            ok = await reply.edit_text(self.sent[-1], chunks[len(self.sent) - 1])
+            index = len(self.sent) - 1
+            ok = await self.bubbles.write(self.sent[-1], chunks[index], bare=self.bare_now[index])
         self.busy = False
         self.clock.mark_paint(len(self.text), ok)

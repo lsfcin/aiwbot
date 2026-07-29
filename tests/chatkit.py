@@ -14,12 +14,17 @@ class Bubble:
         self.message_id = chat.next_id()
         self.edits = 0
         self.markup = None
+        self.deleted = False
 
     async def edit_text(self, text, parse_mode=None, reply_markup=None):
         self.text = text
         self.markup = reply_markup
         self.edits += 1
         self.chat.log.append(("edit", self.message_id))
+
+    async def delete(self):
+        self.deleted = True
+        self.chat.log.append(("delete", self.message_id))
 
     async def edit_reply_markup(self, reply_markup=None):
         self.markup = reply_markup
