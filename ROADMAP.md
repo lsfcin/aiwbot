@@ -164,22 +164,71 @@ the panel, `guarded`, the voice feedback. What does not:
 
 - [ ] **`ask_user` is claude-only.** `OpencodeBackend` never overrides `supports_ask`, so it
       inherits `False` and `enable_ask` returns `None` — an opencode turn simply has no ask tool.
-      Closing it is small but wants Stage 4's treatment, not a guess: `opencode mcp` takes a
-      **config file**, not claude's inline JSON string, so `build_args` likely needs a temp file
-      (the fallback already noted for claude). The daemon's `askserver` + broker serve it unchanged
-      — the server is provider-agnostic by construction, only the flag differs. **Probe first:**
-      stand the server up, point `opencode` at it, confirm the tool is listed and that a blocked
-      tool call really does hold the turn open.
+      **Probed live 2026-07-29 (opencode 1.18.7, ~$0.004 on three flash turns) — the transport is
+      real and the design is now measured rather than guessed; see SPECS AD-31.** What the probe
+      settled, against the audit's own guesses: there is **no `--mcp-config` flag at all** (so no
+      temp file either), the config rides in `OPENCODE_CONFIG_CONTENT`, the default ceiling is
+      **60 s with no env var to lift it** — the per-server `timeout` field does — and `askserver`
+      needs no behaviour change, only that its URL be exposed apart from claude's JSON wrapper.
+      The seam is what has to move (`env()` has no options; `TurnOptions.mcp_config` is
+      claude-shaped).
 - [ ] **The retry set is claude-shaped.** `turnhelpers.transient` matches `529` / `overloaded` /
       `rate limit` / `timed out`. opencode's real overload text, captured live for b2, is
       `ResourceExhausted: Worker local total request limit reached (48/48)` — which matches **none**
       of them, so an opencode turn still dies where a claude turn retries. Add its vocabulary
-      (`resourceexhausted`, `request limit reached`) once confirmed against a live failure.
+      (`resourceexhausted`, `request limit reached`). Confirmed reachable: an `error` event's text
+      becomes the `DispatchError` message (`dispatch.events_to_result`), which is exactly what
+      `transient` reads — so the markers are the only thing missing.
 - [ ] **opencode streaming has never run live.** The adapter is thin (its output was already JSONL)
       and the smoke test covers the batch path only. Cheap to settle: one streamed opencode turn.
-- [~] **Its `plan` agent is now unreachable from the bot** — AD-28 coerces every turn to build for
-      claude's sake (MCP is blocked in claude's plan mode), and the coercion is global. If opencode's
-      plan agent matters, the coercion should become per-backend rather than per-bot.
+      The three probe turns confirm the batch shape unchanged in 1.18.7 (`text` / `step_finish`),
+      so this is about `LineStream` under `stream_lines`, not about the parser.
+- [~] **Its `plan` agent is reachable from the CLI but not from the bot** — AD-28 coerces every turn
+      to build for claude's sake (MCP is blocked in claude's plan mode), and the coercion is global.
+      **Measured 2026-07-29: `opencode run --agent plan` called the ask tool and completed the round
+      trip**, so the block is claude's alone and per-backend coercion is a real option, not a
+      hypothesis. Still Lucas's call — it changes what `mode` means per provider.
+
+#### Proposed close — the seam moves, then four tests (awaiting Lucas's go-ahead 2026-07-29)
+Design, in the order the probe forced it:
+
+1. **`TurnOptions.mcp_config` → `ask_url`.** Today the frontend builds *claude's* JSON
+   (`{"mcpServers": …}`) and hands it over an "opaque" field, which is only opaque as long as one
+   provider exists: opencode wants `{"mcp": {"aiwbot": {…, "timeout": ms}}}` in an env var. A URL
+   is genuinely provider-agnostic, so the seam carries the URL and each backend formats its own
+   config. `askserver` keeps hosting and gains `url(token, port)`; claude's wrapper moves into
+   `claude.py`, opencode's into `opencode.py`.
+2. **`CliBackend.env()` → `env(options)`.** opencode's config has no flag to ride on, so it must be
+   per-turn environment — and `env()` cannot see the turn. Stashing the options on the backend
+   instead would break the moment two turns run concurrently (they do; turns are PTB tasks).
+   claude's override ignores the argument, exactly as `efforts(model)` already does.
+3. **`OpencodeBackend.supports_ask` returns True**, with `timeout` set above `ask.WAIT_SECONDS` so
+   the wait that ends first stays ours (AD-27's invariant, kept by config instead of by env).
+
+Tests, and what each one buys — three free, one paid:
+
+- **`test_the_ask_url_becomes_each_cli_s_own_config`** (free, new
+  `tests/test_f7_opencode_ask.py`) — one URL in, both providers' real shapes out: claude's argv
+  carries `--mcp-config` + `--strict-mcp-config`, opencode's `env(options)` carries
+  `OPENCODE_CONFIG_CONTENT` whose `mcp.aiwbot.url` is that URL. Buys the rename: it is the only
+  assertion that would fail if a later change quietly re-coupled the seam to claude's JSON.
+- **`test_the_opencode_tool_call_outlives_the_wait_the_bot_promises`** (free) — the sibling of the
+  existing claude test, reading the injected `timeout` instead of `MCP_TOOL_TIMEOUT`. Buys the
+  60 s ceiling: without it, a plausible-looking config change silently reinstates the failure the
+  probe just measured, where the CLI's timeout beats the bot's and the agent answers "the tool
+  timed out" instead of asking.
+- **`test_opencodes_own_overload_text_is_transient`** (free, same file) — the b2-captured string
+  `ResourceExhausted: Worker local total request limit reached (48/48)` is retried, and a
+  request-shaped failure still is not. Buys the retry claim honestly: today's markers are
+  claude-only *in practice*, and this is the fixture that says otherwise.
+- **One paid live check** (~$0.05): `make smoke` (unchanged batch contract, both providers) plus
+  **one streamed opencode turn** and **one interviewed opencode turn** through the real bot. Buys
+  gap 3 outright, and is the only way to see the shape — per AD-30, two bugs passed every
+  assertion in their own file this session, so the interviewed turn wants Lucas's eyeball on the
+  chat, not just a green run.
+
+Not in scope until Lucas decides: per-backend mode coercion (AD-28). Independent of the three
+gaps above, and it changes what `mode` means per provider.
 
 ### Past the finish line — parked, not scheduled (Lucas 2026-07-26)
 Both survive here because they are real gaps, not because they are queued. Promote one only when a

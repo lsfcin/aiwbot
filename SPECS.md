@@ -610,6 +610,43 @@ splitter read as a place to break.
 **Both of the last two bugs passed every assertion in the file** and were caught by printing the
 bubbles and reading them. Eyeball the output when the shape changes.
 
+### AD-31 — opencode asks through its config, not through a flag (2026-07-29, probed live)
+
+Measured against opencode 1.18.7 before any code was written, the same way AD-27 was measured, and
+it contradicted three of the audit's guesses. Everything below is from the binary and from three
+`--format json` turns (~$0.004 on `deepseek-v4-flash`), not from documentation:
+
+- **There is no `--mcp-config` flag.** `opencode run --help` has none, and `opencode mcp` only
+  *manages* servers. So the per-turn config cannot ride on the argv at all — the asymmetry with
+  claude is not "a file instead of a string", it is **env instead of argv**.
+- **`OPENCODE_CONFIG_CONTENT` carries the whole config inline**, as JSON, so no temp file and
+  nothing to clean up. Shape: `{"mcp": {"aiwbot": {"type": "remote", "url": …, "timeout": ms}}}`.
+- **`opencode mcp add` writes the GLOBAL config and ignores `OPENCODE_CONFIG_DIR`** (verified by
+  running it: it edited `~/.config/opencode/opencode.jsonc`, which had to be restored by hand).
+  The bot must never call it — a per-turn server written to the user's own config would outlive the
+  turn and point at a dead port from his interactive sessions.
+- **The tool reaches the model as `aiwbot_ask_user`**, not claude's `mcp__aiwbot__ask_user`. Nothing
+  in the bot depends on the name, but an error text quoting it will differ per provider.
+- **The tool call dies at ~60 s by default** — measured 62 s, announced as `notifications/cancelled`
+  and then reported by the agent as *"a ferramenta retornou timeout"*, which ends the turn on an
+  apology instead of a question. **No env var lifts it** (the binary has no MCP timeout variable;
+  `MCP_TOOL_TIMEOUT` is claude's alone). What does is the **per-server `timeout` field** in the
+  config — resolution order in the binary is `mcp[name].timeout ?? experimental.mcp_timeout ??
+  default`. Verified: with `timeout` set, a 120 s hold survived, the answer was delivered, and the
+  turn's final text was the answer Lucas would have tapped.
+  So AD-27's invariant — *the wait that ends first is always the bot's* — holds for opencode too,
+  but it is bought with config where claude buys it with env.
+- **`--agent plan` calls the tool and completes the round trip.** The MCP block that AD-28 was
+  built around is claude's alone.
+- `OPENCODE_ENABLE_QUESTION_TOOL` exists (opencode's own native question tool, off by default) and
+  must stay off: its question goes to the TUI, which for a headless bot turn is nowhere.
+
+Two seam consequences, both of which are why this is a decision and not a patch. `CliBackend.env()`
+takes no options, so a **per-turn** env value has nowhere to come from — it becomes `env(options)`,
+because stashing the turn on the backend breaks as soon as two turns overlap, and they do.
+And `TurnOptions.mcp_config` is claude's JSON under a provider-agnostic name; the honest field is
+the **URL** (`ask_url`), with each backend wrapping it in its own config shape.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.
