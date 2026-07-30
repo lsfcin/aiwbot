@@ -156,6 +156,31 @@ Nothing to do. Re-check if a future Bot API adds the entities.
       transcript echo of a long voice note. Not scheduled; it interacts with AD-23's splitting,
       so decide it after F4 lands rather than tangling two shape changes at once.
 
+### opencode parity — audited 2026-07-29, three real gaps
+Asked directly ("is it properly wired to opencode, including the interview part?"), so this is what
+the code says rather than what the seam promises. Everything frontend-side is genuinely
+provider-agnostic and works today: the painter, segments, counters, the transcript lead, pacing,
+the panel, `guarded`, the voice feedback. What does not:
+
+- [ ] **`ask_user` is claude-only.** `OpencodeBackend` never overrides `supports_ask`, so it
+      inherits `False` and `enable_ask` returns `None` — an opencode turn simply has no ask tool.
+      Closing it is small but wants Stage 4's treatment, not a guess: `opencode mcp` takes a
+      **config file**, not claude's inline JSON string, so `build_args` likely needs a temp file
+      (the fallback already noted for claude). The daemon's `askserver` + broker serve it unchanged
+      — the server is provider-agnostic by construction, only the flag differs. **Probe first:**
+      stand the server up, point `opencode` at it, confirm the tool is listed and that a blocked
+      tool call really does hold the turn open.
+- [ ] **The retry set is claude-shaped.** `turnhelpers.transient` matches `529` / `overloaded` /
+      `rate limit` / `timed out`. opencode's real overload text, captured live for b2, is
+      `ResourceExhausted: Worker local total request limit reached (48/48)` — which matches **none**
+      of them, so an opencode turn still dies where a claude turn retries. Add its vocabulary
+      (`resourceexhausted`, `request limit reached`) once confirmed against a live failure.
+- [ ] **opencode streaming has never run live.** The adapter is thin (its output was already JSONL)
+      and the smoke test covers the batch path only. Cheap to settle: one streamed opencode turn.
+- [~] **Its `plan` agent is now unreachable from the bot** — AD-28 coerces every turn to build for
+      claude's sake (MCP is blocked in claude's plan mode), and the coercion is global. If opencode's
+      plan agent matters, the coercion should become per-backend rather than per-bot.
+
 ### Past the finish line — parked, not scheduled (Lucas 2026-07-26)
 Both survive here because they are real gaps, not because they are queued. Promote one only when a
 concrete session's cost makes it worth more than it costs.
