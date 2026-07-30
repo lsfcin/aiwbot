@@ -243,6 +243,12 @@ first, then move to KNOWN-BUGS.md with a `bN` id if they survive the round they 
       layout, not relief — and each package costs a facade plus a CONTEXT.md — so it is churn with
       no behaviour change. Worth doing when the audio work or a third picker makes the flat
       directory genuinely hard to read, not before.
+- [~] **`backend/opencode.py` is at 188/200** after the ask config landed, and `claude.py` at 176.
+      Both warn, neither blocks. The seam the next touch should cut along is already visible: the
+      **config/env** half (`_ask_config`, `env`, `supports_ask`, the timeout) is a different
+      responsibility from the **parsing** half (`parse_events`, `LineStream`, `_line_to_event`), and
+      claude already splits exactly that way (`claudeparse.py`). Do it when something needs adding,
+      not now — an empty split is churn.
 - [x] **`bot.py`'s size** — resolved: F4 split it into `turnrun.py`, and `painter.py`'s three later
       breaches went to `cadence.py` / `anchor.py` / `bubbles.py` / `landing.py`. Original note:
       **`bot.py` was at 198 LOC** (200 is the hard gate) after F3c's startup warm and the voice
