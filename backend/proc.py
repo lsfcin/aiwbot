@@ -15,10 +15,7 @@ async def run_capture(args: list[str], cwd: str, extra_env: dict | None = None) 
     """Run args in cwd, wait, return (stdout, stderr, returncode). communicate() drains pipes safely.
     extra_env overlays the daemon's environment (backends use it for provider-specific knobs)."""
     pipe = asyncio.subprocess.PIPE
-    env = None
-    if extra_env:
-        env = dict(os.environ)
-        env.update(extra_env)
+    env = child_env(extra_env, cwd)
     proc = await asyncio.create_subprocess_exec(*args, cwd=cwd, stdout=pipe, stderr=pipe, env=env)
     out_bytes, err_bytes = await proc.communicate()
     code = proc.returncode
@@ -27,11 +24,19 @@ async def run_capture(args: list[str], cwd: str, extra_env: dict | None = None) 
     return out, err, code
 
 
-def _child_env(extra_env: dict | None) -> dict | None:
-    env = None
+def child_env(extra_env: dict | None, cwd: str) -> dict:
+    """The child's environment: the daemon's, plus the backend's knobs, plus `PWD` forced to the
+    directory the turn was actually given (b4).
+
+    PWD is not decoration. Measured 2026-07-29: opencode reads it in preference to its real
+    working directory, so a daemon launched from `/home/lucas` ran every opencode turn's tools —
+    and FILED every opencode session — in his home directory while the seam, and the `/resume`
+    picker, believed `/mnt/workspace`. `cwd=` on the subprocess is necessary and was never
+    sufficient, because a shell exports PWD and children trust it over `getcwd()`."""
+    env = dict(os.environ)
     if extra_env:
-        env = dict(os.environ)
         env.update(extra_env)
+    env["PWD"] = cwd
     return env
 
 
@@ -51,7 +56,7 @@ async def stream_lines(args: list[str], cwd: str, extra_env: dict | None = None
     The terminal tuple is not decoration: occupancy is read from the provider's store, which is
     only written when the CLI exits, so a caller that emits its result event before the "end"
     would silently regress b3/AD-24."""
-    env = _child_env(extra_env)
+    env = child_env(extra_env, cwd)
     pipe = asyncio.subprocess.PIPE
     proc = await asyncio.create_subprocess_exec(*args, cwd=cwd, stdout=pipe, stderr=pipe,
                                                 env=env, limit=_STREAM_LIMIT)

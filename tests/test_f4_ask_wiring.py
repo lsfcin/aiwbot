@@ -56,8 +56,8 @@ def test_the_cli_is_pointed_at_the_daemons_own_server_only_when_one_is_listening
     plain = backend.build_args("oi", None, TurnOptions())
     assert "--mcp-config" not in plain
 
-    config = askserver.mcp_config(_TOKEN, 8787)
-    args = backend.build_args("oi", None, TurnOptions(mcp_config=config))
+    at = askserver.url(_TOKEN, 8787)
+    args = backend.build_args("oi", None, TurnOptions(ask_url=at))
     assert "--strict-mcp-config" in args, "other MCP servers must not leak into a bot turn"
     payload = json.loads(args[args.index("--mcp-config") + 1])
     url = payload["mcpServers"][askserver.SERVER_NAME]["url"]
@@ -68,8 +68,8 @@ def test_the_cli_is_pointed_at_the_daemons_own_server_only_when_one_is_listening
 def test_the_prompt_stays_last_on_the_argv():
     """`claude -p … <prompt>` takes the prompt positionally: measured, a flag appended after it
     makes the CLI exit with "Input must be provided either through stdin or as a prompt"."""
-    config = askserver.mcp_config(_TOKEN, 8787)
-    args = ClaudeBackend().build_args("faz isso", "s1", TurnOptions(mcp_config=config))
+    at = askserver.url(_TOKEN, 8787)
+    args = ClaudeBackend().build_args("faz isso", "s1", TurnOptions(ask_url=at))
     assert args[-1] == "faz isso"
 
 
@@ -92,19 +92,19 @@ def test_the_tool_can_be_taken_away_from_the_phone(store, monkeypatch):
 
     allowed = TurnOptions(mode="build")
     assert turnhelpers.enable_ask("s1", "claude", allowed) is not None
-    assert allowed.mcp_config
+    assert allowed.ask_url
 
     registry.set_setting("s1", "ask", "false")
     refused = TurnOptions(mode="build")
     assert turnhelpers.enable_ask("s1", "claude", refused) is None
-    assert refused.mcp_config is None
+    assert refused.ask_url is None
 
 
 def test_the_cli_tool_timeout_outlives_the_wait_the_bot_promises():
     """The CLI kills a tool call at 60 s by default — far under the hour Lucas asked to have to
     answer. The env var lifts it, and the bot's own wait must end FIRST, so an unanswered
     question comes back as the bot's text and never as the CLI's timeout."""
-    env = ClaudeBackend().env()
+    env = ClaudeBackend().env(TurnOptions())
     budget = int(env["MCP_TOOL_TIMEOUT"])
     assert budget > ask.WAIT_SECONDS * 1000
     assert ask.WAIT_SECONDS >= 45 * 60, "Lucas asked for about an hour to answer"

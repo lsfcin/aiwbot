@@ -143,5 +143,5 @@ def test_the_result_object_gives_the_window_but_never_the_occupancy():
 def test_env_sets_entrypoint_so_sessions_are_natively_listed():
     # AD-8 (revised): the native picker hides sessions whose originating entrypoint is
     # sdk-cli; the value comes from this env var, not from the -p flag.
-    env = ClaudeBackend().env()
+    env = ClaudeBackend().env(TurnOptions())
     assert env["CLAUDE_CODE_ENTRYPOINT"] == "claude-vscode"

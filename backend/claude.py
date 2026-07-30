@@ -1,8 +1,9 @@
 # claude.py — ClaudeBackend: normalizes `claude -p --output-format json` (single result object).
 from __future__ import annotations
+import json
 import pathlib
 from . import binaries, transcript
-from .base import AgentEvent, TurnOptions, add_flag, try_json
+from .base import ASK_SERVER_NAME, AgentEvent, TurnOptions, add_flag, try_json
 # Parsing lives in claudeparse (F4: this file was 194/200 and a stream parser does not
 # fit). Re-exported so `from backend.claude import parse_events` keeps working.
 from .claudeparse import StreamParser, parse_events  # noqa: F401
@@ -59,6 +60,14 @@ def _session_item(path: pathlib.Path) -> dict:
             "preview": preview, "model": model, "context_used": used}
 
 
+def _mcp_config(ask_url: str) -> str:
+    """The `--mcp-config` payload: the bot's own ask server, at this turn's own path. claude takes
+    its MCP config as JSON on the argv — opencode cannot, which is why the shape lives here rather
+    than in the frontend that hosts the server (AD-31)."""
+    server = {"type": "http", "url": ask_url}
+    return json.dumps({"mcpServers": {ASK_SERVER_NAME: server}})
+
+
 def _output_args(stream: bool) -> list[str]:
     """How the CLI should talk back. Streaming needs all three flags together: `stream-json`
     alone only emits a line per COMPLETED message, so a single-message answer would still show
@@ -82,8 +91,9 @@ class ClaudeBackend(CliBackend):
         args.extend(_output_args(options.stream))
         add_flag(args, "--model", options.model)
         add_flag(args, "--effort", options.effort)
-        add_flag(args, "--mcp-config", options.mcp_config)
-        if options.mcp_config:
+        if options.ask_url:
+            config = _mcp_config(options.ask_url)
+            add_flag(args, "--mcp-config", config)
             # Only the bot's own ask server: without this the turn would also load whatever MCP
             # servers Lucas has configured for interactive Claude Code, which is a different
             # tool surface than the one this turn was costed and reasoned about with.
@@ -128,8 +138,11 @@ class ClaudeBackend(CliBackend):
             used = transcript.last_context_used(lines)
         return used
 
-    def env(self) -> dict | None:
-        """AD-8 (revised): Claude Code's native picker hides sessions whose ORIGINATING
+    def env(self, options: TurnOptions) -> dict | None:
+        """The options are accepted and ignored: claude's ask config rides on the argv, so nothing
+        here is per-turn (AD-31 — opencode is the provider that needs them).
+
+        AD-8 (revised): Claude Code's native picker hides sessions whose ORIGINATING
         entrypoint is `sdk-cli`, which is what a bare headless `-p` records. The entrypoint
         comes from this env var, not from the flags — setting it makes bot-created sessions
         show up in the VSCode/terminal picker like any other. Verified live 2026-07-23.

@@ -6,6 +6,11 @@ from typing import AsyncIterator, Literal, Protocol, runtime_checkable
 from .caps import Capabilities
 
 EventKind = Literal["text", "thinking", "tool", "result", "error"]
+# What the daemon's ask server calls itself in a CLI's config. It lives here rather than in the
+# frontend that hosts the server, because both backends have to write it into their own config shape
+# and a backend may not import the frontend — and because the model SEES it: claude exposes the tool
+# as `mcp__aiwbot__ask_user`, opencode as `aiwbot_ask_user` (AD-31).
+ASK_SERVER_NAME = "aiwbot"
 
 
 @dataclass
@@ -41,11 +46,11 @@ class TurnOptions:
     # Default off: it changes the CLI's invocation, so the rollback Lucas needs from his phone is
     # one line in config.json plus a restart, never a code change (F4).
     stream: bool = False
-    # MCP servers this turn may call, as the JSON its CLI's own config flag takes. Set only when
-    # the frontend has an ask broker listening for this turn; None leaves the invocation exactly
-    # as it was. Opaque here on purpose — the seam carries provider-agnostic knobs, and which
-    # flag (if any) this maps to is each backend's business (F4 Stage 4).
-    mcp_config: str | None = None
+    # Where this turn may reach the daemon's own ask server, or None to leave the invocation exactly
+    # as it was. A URL is the whole provider-agnostic fact; the CONFIG that carries it is not — it is
+    # a different shape per provider and does not even travel the same road (claude takes JSON on the
+    # argv, opencode takes it in the environment, AD-31). So each backend wraps this itself.
+    ask_url: str | None = None
 
 
 def add_flag(args: list[str], name: str, value: str | None) -> None:

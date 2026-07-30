@@ -8,8 +8,12 @@ _BUSY_MARKERS = ("no conversation found", "currently running as a background age
 # Failures that are about the moment rather than about the request: the provider was overloaded,
 # rate-limited, or the connection timed out. Worth retrying exactly because Lucas is usually not
 # watching — a 529 that killed his turn cost him the whole task, not a few seconds (2026-07-29).
+# The list is per-provider VOCABULARY, not per-provider logic: opencode says the same thing in
+# words claude never uses ("ResourceExhausted: Worker local total request limit reached (48/48)",
+# captured live for b2), and until those were here the retry above was claude-only in practice.
 _TRANSIENT_MARKERS = ("529", "overloaded", "rate limit", "rate_limit", "timed out", "timeout",
-                      "502", "503", "504", "connection reset", "temporarily")
+                      "502", "503", "504", "connection reset", "temporarily",
+                      "resourceexhausted", "request limit reached")
 
 
 def friendly_error(e: Exception) -> str:
@@ -81,7 +85,7 @@ def enable_ask(scope: str, backend_name: str, options: TurnOptions) -> str | Non
     listening = askserver.port() if registry.asks(scope) else 0
     if listening and backend.supports_ask(options):
         token = ask.new_token()
-        options.mcp_config = askserver.mcp_config(token, listening)
+        options.ask_url = askserver.url(token, listening)
     return token
 
 

@@ -5,14 +5,15 @@
 # the tool handler runs where the chat already lives. Plain JSON-RPC over aiohttp — the `mcp` SDK
 # would be a new dependency for the ~40 lines below (measured against the real CLI, 2026-07-27).
 from __future__ import annotations
-import json
 from aiohttp import web
+from backend import ASK_SERVER_NAME
 from . import ask
 
 # What the CLI negotiated in the probe. Echoed back rather than dictated: the client sends the
 # version it wants, and it re-sends `initialize` several times per invocation.
 PROTOCOL = "2025-06-18"
-SERVER_NAME = "aiwbot"
+# The name is the seam's, not this server's: every backend writes it into its own config (AD-31).
+SERVER_NAME = ASK_SERVER_NAME
 TOOL_NAME = "ask_user"
 # Loopback only. The turn token in the path is what tells two concurrent turns apart — an MCP
 # request carries no turn id of its own, so correlation cannot come from the payload.
@@ -51,11 +52,11 @@ _runner = None
 _port = 0
 
 
-def mcp_config(token: str, at_port: int) -> str:
-    """The `--mcp-config` payload for one turn: this server, at that turn's own path."""
-    url = f"http://{HOST}:{at_port}/mcp/{token}"
-    server = {"type": "http", "url": url}
-    return json.dumps({"mcpServers": {SERVER_NAME: server}})
+def url(token: str, at_port: int) -> str:
+    """Where one turn reaches this server: its own path, on loopback. This is all the seam carries —
+    the config that names it is per-provider, in shape AND in road, so it belongs to each backend
+    (AD-31: claude takes JSON on the argv, opencode takes it in the environment)."""
+    return f"http://{HOST}:{at_port}/mcp/{token}"
 
 
 def port() -> int:

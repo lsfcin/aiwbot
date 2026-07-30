@@ -16,6 +16,6 @@
 | [`cli.py`](cli.py) | — | `CliBackend`, `build_args`, `parse`, `list_sessions`, `last_response` | cli.py — CliBackend: the single subprocess-driven send() loop; subclasses supply build_args + parse. |
 | [`ocstore.py`](ocstore.py) | — | `session_rows`, `recent_models`, `model_of`, `context_used`, `last_turn` | ocstore.py — read-only reads of opencode's sqlite store: session rows + last assistant answer. |
 | [`opencode.py`](opencode.py) | — | `parse_events`, `LineStream`, `OpencodeBackend`, `feed`, `finish` | opencode.py — OpencodeBackend: normalizes `opencode run --format json` (JSONL stream). |
-| [`proc.py`](proc.py) | — | `run_capture`, `stream_lines`, `silent_run`, `events_from_run` | proc.py — subprocess driver + run-result → events handling (shared by all CLI backends). |
+| [`proc.py`](proc.py) | — | `run_capture`, `child_env`, `stream_lines`, `silent_run`, `events_from_run` | proc.py — subprocess driver + run-result → events handling (shared by all CLI backends). |
 | [`transcript.py`](transcript.py) | — | `tail_lines`, `latest_ai_title`, `last_response_text`, `last_context_used`, `last_model` | transcript.py — read a claude .jsonl transcript from the tail for title/preview/context %. |
 <!-- routing:end -->

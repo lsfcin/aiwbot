@@ -39,8 +39,12 @@ class CliBackend:
         Default: unknown. Backends that record per-message token usage override this."""
         return None
 
-    def env(self) -> dict | None:
-        """Extra environment for the subprocess. Default: none — backends override."""
+    def env(self, options: TurnOptions) -> dict | None:
+        """Extra environment for the subprocess. Default: none — backends override.
+
+        Takes the turn's options because for some providers the per-turn config has no flag to ride
+        on and must arrive as environment (AD-31). Stashing the options on the backend instead would
+        break the moment two turns overlap, and they do — every turn is its own PTB task."""
         return None
 
     def supports_ask(self, options: TurnOptions) -> bool:
@@ -59,7 +63,7 @@ class CliBackend:
     async def send(self, prompt: str, *, session_id: str | None, cwd: str,
                    options: TurnOptions = TurnOptions()) -> AsyncIterator[AgentEvent]:
         args = self.build_args(prompt, session_id, options)
-        extra_env = self.env()
+        extra_env = self.env(options)
         parser = self.stream_parser() if options.stream else None
         if parser is None:
             out, err, code = await run_capture(args, cwd, extra_env)

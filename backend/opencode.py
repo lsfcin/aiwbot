@@ -2,11 +2,16 @@
 from __future__ import annotations
 import json
 from . import binaries, catalog, ocstore
-from .base import AgentEvent, TurnOptions, add_flag, try_json
+from .base import ASK_SERVER_NAME, AgentEvent, TurnOptions, add_flag, try_json
 from .caps import Capabilities
 from .cli import CliBackend
 
 _MODES = ("build", "plan")
+# Measured 2026-07-29 (AD-31): the CLI cancels an MCP tool call at ~60 s, and unlike claude it has
+# NO env var that lifts it — the per-server `timeout` in its own config is the only lever
+# (`mcp[name].timeout ?? experimental.mcp_timeout ?? default`). An hour, in ms, so the bot's own
+# 55-minute wait is still the one that ends first and an unanswered question stays OUR text.
+_TOOL_TIMEOUT_MS = 3_600_000
 # How much of an unrecognized error line to quote back. Enough to identify the shape when a
 # provider invents a new one, short enough not to dump a payload into a chat bubble.
 _ERROR_CHARS = 300
@@ -40,6 +45,15 @@ def _error_text(obj: dict) -> str:
         dumped = json.dumps(obj)
         text = dumped[:_ERROR_CHARS]
     return text
+
+
+def _ask_config(ask_url: str) -> str:
+    """opencode's whole config, inline, naming the bot's ask server for this turn. `opencode run`
+    has no MCP flag at all, so this travels in OPENCODE_CONFIG_CONTENT rather than on the argv —
+    and `opencode mcp add` is not an option: it writes the USER's global config, which would outlive
+    the turn and leave his interactive sessions pointed at a dead port (AD-31)."""
+    server = {"type": "remote", "url": ask_url, "timeout": _TOOL_TIMEOUT_MS}
+    return json.dumps({"mcp": {ASK_SERVER_NAME: server}})
 
 
 def _line_to_event(obj: dict) -> AgentEvent | None:
@@ -115,6 +129,20 @@ class OpencodeBackend(CliBackend):
         else:
             add_flag(args, "--title", options.title)
         return args
+
+    def env(self, options: TurnOptions) -> dict | None:
+        """Nothing at all unless this turn may ask, so a turn without the tool is invoked exactly as
+        it was before — an env var naming a server the daemon is not hosting would cost every turn a
+        failed connect for a tool it was never going to use."""
+        values = {}
+        if options.ask_url:
+            values["OPENCODE_CONFIG_CONTENT"] = _ask_config(options.ask_url)
+        return values
+
+    def supports_ask(self, options: TurnOptions) -> bool:
+        """Both agents, unlike claude: measured 2026-07-29, `--agent plan` called the tool and
+        finished the round trip, so the plan-mode block AD-27 found is claude's alone (AD-31)."""
+        return True
 
     def parse(self, stdout: str) -> list[AgentEvent]:
         return parse_events(stdout)
