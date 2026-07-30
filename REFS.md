@@ -58,3 +58,7 @@ These are observed behaviors of a closed CLI — re-verify if `claude` upgrades.
   managed by `claude agents`. This is what `--bg` background agents registered in — the reason bot
   sessions once appeared in VSCode, and the reason each turn spawned an extra session (AD-3).
 - **`history.jsonl`** is the up-arrow prompt history, NOT the picker index.
+
+## Voice alternatives (2026-07-29)
+- **Fish Audio S2.1 Pro** — [reel](https://www.instagram.com/reel/DbXVmc4hIxH/), [src: web:instagram.com]: open-weight TTS pitched as ~5x cheaper than ElevenLabs, demoed holding multiple speakers and interruptions. Lucas asked whether it helps aiwbot's STT/TTS. **Assessed: no, not for the voice reply.** aiwbot's TTS is Kokoro-82M running locally (C5/C6) — cost per character is already zero and nothing leaves the machine, so "cheaper than ElevenLabs" is not a lever here. It becomes interesting only if Kokoro's pt-BR quality is the complaint, which it has not been; keep as the first thing to try if it ever is.
+
