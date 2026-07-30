@@ -98,18 +98,19 @@ version — **no Phase D rewrite**, and `opencode mcp` exists so provider-agnost
 tool timeout · streaming behind `TurnOptions.stream`, default off until Stage 3 passes ·
 token-level granularity · a mid-stream error **appends** a bubble, never deletes read text.
 
-**Live now:** `"stream": "true"` is set in `~/.config/aiwbot/config.json` defaults. Rollbacks, least
-drastic first: `painter.STREAM_SEAL = False` (back to one freezing bubble, keeping live text) →
-`"stream": "false"` + restart (back to Stage 1, no code change).
+**Live now:** `"stream": "true"` in `~/.config/aiwbot/config.json` defaults; ask is on by default.
+Rollbacks, least drastic first: `"ask": "false"` + restart (turns invoked exactly as in Stage 3) →
+`painter.STREAM_SEAL = False` (one freezing bubble, live text kept) → `"stream": "false"` + restart
+(back to Stage 1). None of them is a code change.
 
 | Stage | Goal | Checkpoint |
 |---|---|---|
 | **0** ✔ | split `bot.py` → `turnrun.py`, zero behaviour change | everything looks exactly as before |
 | **1** ✔ | streaming seam in the backend, still batch-delivered | log shows frames ticking; Telegram identical |
 | **2** ✔ | live bubble: throttled painter, pin held below | text grows ~every 3 s, footer+keyboard at the end |
-| **3** ✔ code | seal bubbles mid-stream (full AD-23 under streaming) | **UNCONFIRMED** — reply to bubble 1 *while bubble 2 writes* |
-| **4** ✔ code | `ask_user` MCP transport, probe-gated | **UNCONFIRMED in chat** — question bubble → tap → the same turn names the choice |
-| **5** | `ask_user` in anger, close F4 | a real task away from the PC — **blocked on the plan-mode decision below** |
+| **3** ✔ | seal bubbles mid-stream (full AD-23 under streaming) | confirmed in chat 2026-07-28 |
+| **4** ✔ | `ask_user` MCP transport, probe-gated | confirmed in chat 2026-07-29 — a real interview ran |
+| **5** | `ask_user` in anger, close F4 | a task that matters, away from the PC (below) |
 
 Key risks pre-empted: 64 KB subprocess stream limit (`limit=1<<20`); stderr pipe fills and hangs the
 child (sibling drain task); occupancy read before the transcript flushes would silently regress b3
@@ -117,80 +118,23 @@ child (sibling drain task); occupancy read before the transcript flushes would s
 rather than queues, plus self-tuning backoff); `bot.py` 198/200 and `claude.py` 194/200 both split
 **before** gaining code.
 
-#### Lucas's 2026-07-28 batch ✔ — decisions taken, papercuts fixed
-Stage 3 **confirmed in chat** ("funciona"). Then his list, with what each turned into:
-- **AD-27 decision: option A.** Build only. Mode coerced + panel opens on the knobs (AD-28).
-- **`·` never opens a line** — it is a divider (AD-29), enforced by a phrase-bank test.
-- **The voice transcript moved inside the answer**, quoted at the top of every bubble, and the
-  standalone echo bubble is deleted along with the `TRANSCRIPT_ECHO` phrase (AD-29).
-- **Bubbles say where they sit** — `(2/3)` finished, `(2)` mid-stream (AD-29).
-- **A turn can no longer fail silently.** Every turn runs as a detached PTB task, so an exception
-  reached stderr and nothing else — which is why one voice note simply vanished. `turnrun.guarded`
-  now replies with the error instead.
-- **Latent RAM bug, found and fixed:** `painter.note_session` iterated the very list `_anchor`
-  appends to, so a Painter built without `on_bubble` grew it without bound — RAM until the OOM
-  killer took the editor with it. Two independent fixes (snapshot-then-drain, and "nobody
-  listening" no longer re-queues) plus a regression test. Never fired in the live bot, where
-  `on_bubble` is always set, but it was one call site away.
+#### F4 Stages 0–4 + the 2026-07-28/29 UX batches ✔ **SHIPPED** — archived in [HISTORY.md](HISTORY.md)
+Streaming, sealing, the ask_user transport, and the batch of shape/resilience fixes that came out of
+Lucas using it. The measured CLI facts Stage 5 still needs (60 s tool timeout lifted by
+`MCP_TOOL_TIMEOUT`, a repeated `initialize`, plan mode refusing MCP) are in HISTORY under
+2026-07-29, and the design is SPECS AD-26…AD-30.
 
-Second round, same day (Stage 4 confirmed live in his chat — the interview ran):
-- **Exact `(n/N)` everywhere** — one closing pass stamps the sealed bubbles (AD-29). The single
-  sanctioned exception to AD-25.
-- **A real pause between bubbles** — `cadence.BUBBLE_GAP`, 4 s, one bubble per paint. The 3 s he
-  remembered was `MIN_INTERVAL`, which paces repaints of the live bubble and nothing else; the
-  confusion is now impossible to repeat, since timing lives in `cadence.py` with both constants
-  named for what they pace.
-- **`ask_user` interviewed him without buttons** — the tool description read `options` as optional
-  and the model skipped it. Rewritten so offering 2–4 options is the rule and free text the
-  exception. Behavioural, so it wants one live look.
-- Left as is, on his "podemos ignorar": **bubble balance** — the split is greedy at ~900 chars
-  because sealing forbids lookahead; a bubble ships before the text that would balance it exists,
-  so rebalancing means giving up sealing.
+**Plan mode: settled as option A** (2026-07-29) — ask works in build mode only, the bot coerces every
+turn to build, and the panel no longer offers the choice (AD-28). Option B, re-implementing
+`mode=plan` as `bypassPermissions --tools "Read,Grep,Glob"`, is verified to work and deliberately not
+taken: it changes what a mode Lucas uses daily means. Revisit only if a future CLI lifts the block.
 
-#### F4 Stage 4 ✔ **code done 2026-07-28** — gate passed, live round trip proven off-Telegram
-The probe the stage was gated on passed: a stub HTTP MCP server + `claude -p --mcp-config
-'<json>' --strict-mcp-config` really does expose `mcp__aiwbot__ask_user` to the agent, with the
-turn token surviving in the URL path. Then the real thing, end to end with Telegram faked and the
-real `askserver` + broker + `CliBackend.send`: **question → buttons → tap → the same turn resumed
-and named the choice, 15 s wall.** Shape and rationale are in SPECS AD-26/AD-27.
-
-**Measured, do not re-derive:**
-- A tool call is killed at **~60 s** by default. `MCP_TOOL_TIMEOUT` (ms, subprocess env) lifts it;
-  the bot waits 55 min *under* a 60 min ceiling so the timeout path is always ours and always text.
-- The CLI sends **`initialize` three times** per invocation → the handshake must be stateless.
-- **Plan mode refuses every MCP tool** — see the decision below.
-- `aiohttp` was already installed; the `mcp` SDK is still not a dependency.
-
-Rollbacks, least drastic first: `"ask": "false"` in `config.json` + restart (turn invoked exactly
-as in Stage 3) → the server failing to bind, which disables ask by itself and leaves the daemon up.
-
-**⛔ Decision Lucas owes before Stage 5 — ask_user cannot run in plan mode.**
-`claude -p --permission-mode plan` answers the call with *"Cannot call mcp__aiwbot__ask_user while
-in plan mode"*; `--allowedTools` does not lift it (both measured). Plan mode is exactly where
-interviewing pays off, so this is the stage's one real dent. Options:
-- **A — leave it.** Ask works in build mode only; a plan-mode turn behaves as it does today. Zero
-  risk, and Stage 5's "real task" has to be a build-mode one.
-- **B — re-implement `mode=plan` as read-only build.** `--permission-mode bypassPermissions
-  --tools "Read,Grep,Glob"` keeps the MCP tool callable and still touches nothing — verified live.
-  It trades away plan mode's own system prompt (no ExitPlanMode, no plan formatting), so the
-  answers will read differently. It changes what a mode Lucas uses daily *means*, which is why it
-  is not taken unilaterally.
-
-#### F4 Stages 0–3 ✔ **SHIPPED 2026-07-27** — archived in [HISTORY.md](HISTORY.md)
-Stage 0 split `bot.py` → `turnrun.py` (the cut chosen by F4's seam, not by line counting);
-Stage 1 made the backend stream; Stage 2 painted the live bubble; Stage 3 sealed bubbles as they
-are born and anchored them on arrival. **Stage 3's live checkpoint is still unconfirmed by
-Lucas** — see the table above for what to look for.
-
-### F4 — original sketch (superseded by the staged plan above)
-- [ ] **Live feedback** (Phase C, linuz90 mold) — `stream-json`: edit the message as the agent's chat
-      text arrives, appending in chunks, keeping "⏳ pensando…" pinned at the END until the turn
-      finishes. Builds on the ⏳-morph already shipped. Changes the reply/dispatch mechanics other
-      niceties touch — hence late.
-- [ ] **Interview / ask_user** (Phase C) — let the bot interview Lucas mid-task (essential for plan
-      mode, useful elsewhere): agent questions surface as Telegram prompts/inline buttons, answers flow
-      back into the running turn. (linuz90's `ask_user` MCP pattern — see [[reference_linuz90_bot]].)
-      Depends on the live-feedback plumbing above.
+### F4 Stage 5 — the last one: `ask_user` in anger
+Not a demo. A genuinely underspecified task handed over while away from the PC, letting the agent
+interview its way to something usable. What it tests is judgement rather than plumbing: whether the
+agent asks at the *right* moments, whether it asks too much or too little, whether a 55-minute wait
+behaves when the answer takes twenty, and whether a long interview leaves the chat readable. Closing
+this closes F4.
 
 ### Telegram's rich text editor — assessed 2026-07-27, mostly NOT actionable
 Lucas asked whether the new editor
@@ -247,7 +191,9 @@ first, then move to KNOWN-BUGS.md with a `bN` id if they survive the round they 
       layout, not relief — and each package costs a facade plus a CONTEXT.md — so it is churn with
       no behaviour change. Worth doing when the audio work or a third picker makes the flat
       directory genuinely hard to read, not before.
-- [ ] **`bot.py` is at 198 LOC** (200 is the hard gate) after F3c's startup warm and the voice
+- [x] **`bot.py`'s size** — resolved: F4 split it into `turnrun.py`, and `painter.py`'s three later
+      breaches went to `cadence.py` / `anchor.py` / `bubbles.py` / `landing.py`. Original note:
+      **`bot.py` was at 198 LOC** (200 is the hard gate) after F3c's startup warm and the voice
       echo change — two lines of headroom left, so the next touch pays for the split. F4 puts
       streaming into exactly this file, so it *will* breach. Split when F4 starts, not now — the
       seam F4 introduces is what should decide where the cut goes.

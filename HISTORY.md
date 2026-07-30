@@ -1,3 +1,84 @@
+## Completed — 2026-07-29
+
+**F4 is done bar its last stage: the bot can interview Lucas mid-turn.** The arc that started with
+streaming ended with a real interview running in his chat — three questions, three taps, no typing.
+Method, again: the probe before the plan, and the eyeball after the tests.
+
+### F4 Stage 4 ✔ **SHIPPED 2026-07-28** — `ask_user` over MCP the daemon hosts itself
+Gated on a ~5-minute probe, which changed the design twice before a line of Telegram code existed.
+The daemon hosts an HTTP MCP server in its own event loop and points each turn's CLI at
+`/mcp/<turn token>`; the handler blocks the agent's turn from inside the process that owns the
+chat, so no Phase D rewrite was needed. Plain JSON-RPC over `aiohttp` — the `mcp` SDK never became
+a dependency. Shape and rationale: SPECS **AD-26** (transport, URL-as-correlation) and **AD-27**
+(text-not-error, plan mode).
+
+**Measured against the real binary, kept because Stage 5 will need it:**
+- A tool call is killed at **~60 s**; `MCP_TOOL_TIMEOUT` (ms, subprocess env) lifts it. The bot
+  waits 55 min *under* a 60 min ceiling, so the timeout path is always ours and always text.
+- `claude -p` sends **`initialize` three times** per invocation → the handshake must be stateless.
+- **Plan mode refuses the whole MCP surface** ("Cannot call mcp__aiwbot__ask_user while in plan
+  mode"), and `--allowedTools` does not lift it.
+
+**The plan-mode decision, settled: option A.** Ask works in build mode only. Lucas took the
+trade rather than re-implementing `mode=plan` as read-only build (`bypassPermissions --tools
+"Read,Grep,Glob"`, verified live but it changes what a mode he uses daily *means*). Two things
+followed, both in **AD-28**: `registry.mode_for` coerces to build whatever is stored — a session
+started on the PC in plan mode becomes a build turn when continued from the phone — and the panel
+lost its BUILD/PLAN row and the `+` that existed to get past it, so it opens on the knobs and costs
+one tap instead of two.
+
+### The UX batches ✔ **SHIPPED 2026-07-28/29** — from Lucas reading real turns
+Everything here came from him using the bot and saying what was wrong, then being re-tested in it.
+Shape rules live in SPECS **AD-29** (bubble furniture) and **AD-30** (segments).
+
+- **The voice transcript moved inside the answer** — quoted at the top of every bubble instead of a
+  bubble of its own, which cost a message and scrolled out of reach exactly when the answer was long
+  enough to need it. `TRANSCRIPT_ECHO` deleted with its last caller. Later the same quote was made
+  to appear the moment whisper finishes, rather than waiting for the reply.
+- **Bubbles say where they sit** — `(2/3)`, with one closing pass stamping the totals that cannot
+  exist mid-stream. The single sanctioned exception to AD-25.
+- **A real pause between bubbles** — `cadence.BUBBLE_GAP` (6 s), one bubble per paint. The 3 s Lucas
+  remembered was `MIN_INTERVAL`, which paces repaints of the live bubble and nothing else; timing
+  now lives in `cadence.py` with both constants named for what they pace.
+- **A question ends the segment above it** (AD-30) — the answer to a question was appearing *above*
+  the question. The live bubble is now closed before a question goes out, without its pin, and
+  deleted outright when nothing but the status ever reached it.
+- **`·` is a divider, never an opener**; enforced by a phrase-bank test.
+- **A turn can no longer fail silently** — turns run as detached PTB tasks, so an exception reached
+  stderr and nothing else, which is why one voice note simply vanished. `turnrun.guarded` answers
+  with the error instead. A `TimedOut` in the journal confirmed it working the same day.
+- **A transient failure retries itself** — a 529 killed an interview Lucas was trying to run. Two
+  attempts with growing backoff, only for failures whose text is transient, and only while nothing
+  has reached the chat yet (replaying a stream over text he is reading is worse than the error).
+- **Buttons are sized to their labels** — `ask_user` options are phrases, not model ids, and four
+  across truncated them to "Coding loca…". `keyboard.per_row` picks the widest row that holds the
+  longest label; the tool description also asks for options under ~25 characters.
+- **An audio turn answers immediately** — "ouvindo o áudio…" goes out before the download and the
+  seconds of whisper, then morphs into the working message and then into the answer. One bubble
+  from arrival to reply.
+
+### Bugs fixed on the way — none of which the bot had reported
+- **A latent memory bomb.** `painter.note_session` iterated the very list `_anchor` appends to, so a
+  Painter built without `on_bubble` grew it without bound — RAM until the OOM killer took VS Code
+  with it, three times, while it was blamed on nested CLI probes. Two independent fixes
+  (snapshot-then-drain; "nobody listening" no longer re-queues) plus a regression test. It never
+  fired in the live bot, where `on_bubble` is always set, but it was one call site away.
+- **The closing pass reposted the whole answer** below the questions, and **restamping produced
+  `(1) (1/10)`** — Telegram returns a message's plain rendering, never the HTML we sent, so bubbles
+  now record what they hold undecorated. **Both passed every assertion in their file** and were
+  caught by printing the bubbles and reading them; AD-30 records the eyeball step as the rule.
+- **A text ending on a paragraph break** split with a whitespace-only chunk, which mid-stream became
+  a bubble holding nothing but its counter and the pin — and the footer could land alone in a bubble
+  of its own.
+- **`per_row` picked the narrowest fitting row** instead of the widest, caught in review before it
+  shipped.
+
+### Housekeeping
+`painter.py` hit its 200-line gate three times, and each time the cut was taken along the seam the
+change had just exposed rather than by counting lines: `anchor.py` (what a reply MEANS),
+`bubbles.py` (WHERE the text went), `landing.py` (what happens once the text stops arriving),
+`cadence.py` (WHEN anything may move), `painter.py` (WHAT to write while it does). 369 tests green.
+
 ## Completed — 2026-07-27
 
 Method throughout: every decision measured, not reasoned about. Three separate times the
