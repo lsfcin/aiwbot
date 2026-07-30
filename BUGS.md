@@ -19,8 +19,8 @@ regression test (see code/VERIFY.md).
       **The running daemon keeps the old behaviour until it is restarted.**
 
 Earlier: b1, b2 fixed 2026-07-26; **b3 fixed 2026-07-27** (context % over 100%: the
-numerator summed every API request in the turn, so it measured spend, not occupancy). All
-archived in [HISTORY.md](HISTORY.md) § Resolved Bugs with their regression specs.
+numerator summed every API request in the turn, so it measured spend, not occupancy). Each has
+its regression spec under `tests/test_b<N>_*.py`.
 
 
 ## Residual (by design)

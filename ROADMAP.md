@@ -7,15 +7,8 @@ sync but lock us 100% into Claude Code — against the provider-agnostic princip
 single-lineage, with a swappable backend seam (linuz90's architecture, rebuilt in Python). Providers
 become interchangeable data. Full design + research: brain/goals/workspace-os.md.
 
-Phase A (seam proven live) complete — archived in [HISTORY.md](HISTORY.md).
-
-Phase B (Telegram frontend + single-lineage fix + ⏳-morph UX) — done, live-confirmed by Lucas.
-Archived in [HISTORY.md](HISTORY.md).
-
-## Shipped — archived in [HISTORY.md](HISTORY.md)
-Phases A/B, Tiers 1-3, P3, **P2 + P2.1 + panel rounds 3-4**, **audio in+out**, and the finish
-plan's **F0–F2 + F3a + F3b** all shipped and live-tested. Design lives in [SPECS.md](SPECS.md)
-(AD-1…AD-17); plans in [ROADMAP-p2.md](ROADMAP-p2.md) / [ROADMAP-p3.md](ROADMAP-p3.md).
+Design of everything already shipped lives in [SPECS.md](SPECS.md) (AD-1…AD-31); the P2/P3 plans
+in [ROADMAP-p2.md](ROADMAP-p2.md) / [ROADMAP-p3.md](ROADMAP-p3.md).
 
 ### Known limits (won't chase)
 - **VSCode picker needs a window reload** to pick up newly created sessions (the extension caches its
@@ -48,21 +41,7 @@ capability.
 | **F3** | NL harness+model parse, audio cadence, button latency | features; F3b needs F2's echo to tune against |
 | **F4** | live streaming (`stream-json`) → `ask_user` | heavy, strict order: ask_user needs streaming plumbing |
 
-Earlier P-numbers keep their names so old notes resolve. **P3, P2, panel rounds 2-4 (2026-07-23) and
-audio in+out (2026-07-24) all shipped** — see [HISTORY.md](HISTORY.md) and SPECS AD-10…AD-17.
-
-### F0–F2, F3a, F3b ✔ **SHIPPED 2026-07-26** — archived in [HISTORY.md](HISTORY.md)
-Bookkeeping, both F1 bugs (b1 tables/bold, b2 opencode errors), the F2 papercut batch (phrase
-tone, flat glyphs, reply anchor, transcript echo, `bote`→`bot`), F3a inline harness/model
-selection, and F3b token-free punctuation/cadence + hallucination guard. 6 commits, 239 tests
-green, all live-confirmed after the daemon restart. Method throughout: decide on measured data
-(4000 answers, 412 tables, Lucas's 15 voice notes, live prototypes), not hunches.
-
-### F3c, voice + picker fixes, F5 ✔ **SHIPPED 2026-07-27** — archived in [HISTORY.md](HISTORY.md)
-Button-tap latency cut to one round trip (AD-20); the STT prompt corrected to prose end-to-end
-plus model names primed, the transcript echo restyled, and the picker stopped reshuffling
-(AD-21/AD-22); the F5 answer shape — paragraph splitting, every bubble repliable, footer instead
-of the `continua` anchor (AD-23).
+Earlier P-numbers keep their names so old notes resolve; their design is SPECS AD-10…AD-17.
 
 ### F4 — staged plan, settled 2026-07-27
 
@@ -118,11 +97,8 @@ child (sibling drain task); occupancy read before the transcript flushes would s
 rather than queues, plus self-tuning backoff); `bot.py` 198/200 and `claude.py` 194/200 both split
 **before** gaining code.
 
-#### F4 Stages 0–4 + the 2026-07-28/29 UX batches ✔ **SHIPPED** — archived in [HISTORY.md](HISTORY.md)
-Streaming, sealing, the ask_user transport, and the batch of shape/resilience fixes that came out of
-Lucas using it. The measured CLI facts Stage 5 still needs (60 s tool timeout lifted by
-`MCP_TOOL_TIMEOUT`, a repeated `initialize`, plan mode refusing MCP) are in HISTORY under
-2026-07-29, and the design is SPECS AD-26…AD-30.
+The measured CLI facts Stage 5 still needs: the 60 s tool timeout is lifted by `MCP_TOOL_TIMEOUT`,
+`initialize` repeats, and plan mode refuses MCP. Design: SPECS AD-26…AD-30.
 
 **Plan mode: settled as option A** (2026-07-29) — ask works in build mode only, the bot coerces every
 turn to build, and the panel no longer offers the choice (AD-28). Option B, re-implementing
@@ -226,7 +202,7 @@ concrete session's cost makes it worth more than it costs.
       bot to INBOX-only capture. Biggest structural rewrite — last on purpose.
 
 ## Usability bugs found in the live bot (audit 2026-07-23)
-All three closed by P3 — see [HISTORY.md](HISTORY.md). Kept as the record of what the audit found:
+All three closed by P3. Kept as the record of what the audit found:
 long answers could vanish entirely (blind HTML chunking), `/resume N` made one numeral name two
 different sessions across pages, and anchor messages carried no mode toggle. Future audits log here
 first, then move to BUGS.md with a `bN` id if they survive the round they were found in.
@@ -255,6 +231,22 @@ first, then move to BUGS.md with a `bN` id if they survive the round they were f
       echo change — two lines of headroom left, so the next touch pays for the split. F4 puts
       streaming into exactly this file, so it *will* breach. Split when F4 starts, not now — the
       seam F4 introduces is what should decide where the cut goes.
+
+## Rejected
+Tried or measured, then dropped — recorded so a dead idea does not resurface looking new.
+- **`concurrent_updates(True)`** — overlaps separate taps but does nothing for a single tap's
+  latency (the actual complaint), while widening the race on `config.json`'s non-atomic write.
+  The floor is one round trip (~222 ms); no trick beats it, because a Telegram client renders an
+  inline keyboard purely from server state — no optimistic update, no local echo.
+- **Forcing IPv4 to Telegram** — measured *slower* than the IPv6 default (203 vs 191 ms median).
+- **A fixed 5-column panel grid** (padded with invisible cells for squareness) — 5 columns meant
+  ~8-char labels and model ids stopped being distinguishable. Positional grid ≤4/row instead (AD-13).
+- **Scrolling/marquee button text** — a label is static; animating costs one
+  `editMessageReplyMarkup` per frame at ~1.5 s each → sub-1 fps, and flood control. The only richer
+  Telegram component is a Web App webview needing an HTTPS page — revisit only if buttons stop
+  being enough.
+- **Telegram's rich text editor as new bot surface** — see the assessment above: client-side
+  composer only, no `HEADING`/`TABLE` entity in Bot API 10.0.
 
 ## Verification
 - Free (every change): `make test`. Live milestone (~$0.20): `make smoke`.

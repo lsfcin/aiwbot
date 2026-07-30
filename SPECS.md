@@ -313,7 +313,7 @@ on both axes a table has: `<pre>` escapes its contents, so cell markdown freezes
 **95% carried inline markdown** and **0 of 412** fit a phone-width monospace bubble (median widest
 row 151 chars) — so there is no narrow case worth a second code path. `frontend/table.py` renders
 each row as a labelled block (`<b>name</b>` then `header: value` lines), labelling values only when
-a row has siblings to tell apart. See BUGS b1 (archived in HISTORY 2026-07-26).
+a row has siblings to tell apart. See BUGS b1, fixed 2026-07-26.
 
 ### AD-19 — STT: one punctuated carrier prompt, plus a confidence hallucination guard (2026-07-26)
 Whisper imitates the style of what it is primed with, so punctuation is bought by a punctuated
