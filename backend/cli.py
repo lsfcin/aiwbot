@@ -39,6 +39,11 @@ class CliBackend:
         Default: unknown. Backends that record per-message token usage override this."""
         return None
 
+    def model_used(self, session_id: str, cwd: str) -> str | None:
+        """Which model actually ran, for providers whose output never says. Default: unknown, so
+        the footer prints whatever the stream reported and invents nothing."""
+        return None
+
     def env(self, options: TurnOptions) -> dict | None:
         """Extra environment for the subprocess. Default: none — backends override.
 
@@ -68,7 +73,7 @@ class CliBackend:
         if parser is None:
             out, err, code = await run_capture(args, cwd, extra_env)
             events = events_from_run(out, err, code, self.parse)
-            self._attach_occupancy(events, cwd)
+            self._attach_measured(events, cwd)
             for event in events:
                 yield event
             return
@@ -95,18 +100,23 @@ class CliBackend:
         events = list(parser.finish())
         if not events and not seen:
             events = [AgentEvent(kind="error", text=silent_run(err, code))]
-        self._attach_occupancy(events, cwd)
+        self._attach_measured(events, cwd)
         for event in events:
             yield event
 
-    def _attach_occupancy(self, events: list[AgentEvent], cwd: str) -> None:
-        """Occupancy is a property of the turn's LAST request, never of its total spend — a
-        turn that used tools made several requests and each re-read the whole context, so any
-        sum over them measures money, not how full the window is (b3). Every CLI's own store
-        records the per-message breakdown, so it is read from there rather than from whatever
-        the run's summary object happened to aggregate."""
+    def _attach_measured(self, events: list[AgentEvent], cwd: str) -> None:
+        """Facts the stream did not carry, read from the provider's own store once the turn ended.
+
+        Occupancy is a property of the turn's LAST request, never of its total spend — a turn that
+        used tools made several requests and each re-read the whole context, so any sum over them
+        measures money, not how full the window is (b3). The MODEL is the same shape of gap for
+        opencode, whose JSONL names one nowhere, which is why its answers arrived with a nameless
+        footer (Lucas, live 2026-07-29). Both are read here rather than guessed, and neither
+        overwrites something the stream did report."""
         for event in events:
             if event.kind == "result" and event.session_id:
                 measured = self.occupancy(event.session_id, cwd)
                 if measured is not None:
                     event.context_used = measured
+                if not event.model:
+                    event.model = self.model_used(event.session_id, cwd)

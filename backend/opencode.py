@@ -181,6 +181,11 @@ class OpencodeBackend(CliBackend):
         _text, used = ocstore.last_turn(session_id)
         return used
 
+    def model_used(self, session_id: str, cwd: str) -> str | None:
+        """From the store, because the stream never says: no line of `opencode run --format json`
+        names a model, so a bot answer's footer had nothing to print (Lucas, live 2026-07-29)."""
+        return ocstore.last_model(session_id)
+
     def session_detail(self, session_id: str, cwd: str) -> dict:
         """The bits that cost a query: answer preview + context occupancy. Called for the
         page being rendered, not for all 59 listed sessions."""

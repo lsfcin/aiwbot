@@ -140,9 +140,10 @@ def test_a_row_holds_only_as_many_buttons_as_fit_uncut():
     assert keyboard.per_row([]) == keyboard.MAX_PER_ROW
 
 
-def test_a_long_option_is_clipped_on_the_button_but_not_in_the_answer():
-    """The tap carries an index, so what the agent hears back is the option it wrote — however
-    much of it the button had room to show."""
+def test_a_long_option_stays_whole_in_the_message_and_in_the_answer():
+    """Revised 2026-07-29: clipping the label was the wrong half to give up — Lucas could not read
+    the option at all. The button is now its NUMBER, the sentence is written out in the message,
+    and the tap still carries an index, so the agent hears back exactly what it wrote."""
     from frontend import ask, askserver
     origin = Origin()
     ask.register("tok", origin)
@@ -156,13 +157,16 @@ def test_a_long_option_is_clipped_on_the_button_but_not_in_the_answer():
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         bubble = origin.sent[0]
-        label = bubble.markup.inline_keyboard[0][0].text
-        ask.answer_tap(bubble.markup.inline_keyboard[0][0].callback_data)
+        keys = bubble.markup.inline_keyboard[0]
+        label = keys[0].text
+        sent = bubble.text
+        ask.answer_tap(keys[0].callback_data)
         answered = await pending
-        return label, answered["result"]["content"][0]["text"]
+        return label, sent, answered["result"]["content"][0]["text"]
 
-    label, answered = asyncio.run(go())
-    assert len(label) <= ask.LABEL_CHARS + 1
+    label, sent, answered = asyncio.run(go())
+    assert label == "1", "a number is the only label that never truncates"
+    assert spelled in sent, "the option Lucas has to choose between must be readable in full"
     assert answered == spelled
     ask.unregister("tok")
 

@@ -20,8 +20,8 @@ before any Telegram wiring.
 
 | File | Interface | API | Description |
 |------|-----------|-----|-------------|
-| [`HISTORY.md`](HISTORY.md) | — | — | # Completed — 2026-07-29 |
 | [`BUGS.md`](BUGS.md) | — | — | aiwbot — Known Bugs |
+| [`HISTORY.md`](HISTORY.md) | — | — | # Completed — 2026-07-29 |
 | [`README.md`](README.md) | — | — | aiwbot |
 | [`REFS.md`](REFS.md) | — | — | aiwbot — References |
 | [`ROADMAP-p2.md`](ROADMAP-p2.md) | — | — | aiwbot — P2: backend + model + effort selection |

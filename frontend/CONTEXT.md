@@ -13,6 +13,7 @@
 | [`answer.py`](answer.py) | — | `quote`, `decorate`, `room`, `bare_frames`, `frames` | answer.py — the shape of one answer message: the agent's text, then the footer that names it. |
 | [`ask.py`](ask.py) | — | `new_token`, `register`, `unregister`, `question_of`, `answer` | ask.py — the bot side of ask_user: hold a running turn open on a question until Lucas answers. |
 | [`askserver.py`](askserver.py) | — | `url`, `port`, `handle_rpc`, `start` | askserver.py — the daemon's own MCP server: one HTTP endpoint per live turn, JSON-RPC by hand. |
+| [`askshape.py`](askshape.py) | — | `markup`, `bubble_text`, `answer_note`, `close` | askshape.py — what a question LOOKS like in the chat: its bubble, its keys, and how it closes. |
 | [`bot.py`](bot.py) | — | `main` | bot.py — PTB wiring: allowlist, /new + reply-to-continue dispatch, plain text/media -> INBOX. |
 | [`bubbles.py`](bubbles.py) | — | `Bubbles`, `write`, `open`, `cut`, `discard` | bubbles.py — the messages one answer is written into: which are live, which are sealed, and what |
 | [`cadence.py`](cadence.py) | — | `Cadence`, `due`, `spaced`, `typing_due`, `mark_paint` | cadence.py — when a streamed answer is allowed to move: repaint rate, typing, bubble spacing. |

@@ -37,7 +37,7 @@ def test_occupancy_comes_from_the_last_request_not_the_sum():
             return _REQUESTS[-1]
 
     events = [AgentEvent(kind="result", session_id="s1", context_window=_WINDOW)]
-    _Backend()._attach_occupancy(events, "/tmp")
+    _Backend()._attach_measured(events, "/tmp")
     assert events[0].context_used == _REQUESTS[-1]
     assert context_pct(events[0].context_used, _WINDOW) == "20%"
 
@@ -45,7 +45,7 @@ def test_occupancy_comes_from_the_last_request_not_the_sum():
 def test_a_backend_that_cannot_measure_leaves_the_number_alone():
     """The default hook returns None, which must not erase a window a backend did report."""
     events = [AgentEvent(kind="result", session_id="s1", context_used=42, context_window=_WINDOW)]
-    CliBackend()._attach_occupancy(events, "/tmp")
+    CliBackend()._attach_measured(events, "/tmp")
     assert events[0].context_used == 42
 
 
@@ -57,7 +57,7 @@ def test_only_the_result_event_is_touched():
         def occupancy(self, session_id, cwd):
             return 123
 
-    _Backend()._attach_occupancy(events, "/tmp")
+    _Backend()._attach_measured(events, "/tmp")
     assert events[0].context_used is None
     assert events[1].context_used == 123
 

@@ -51,18 +51,24 @@ def test_a_question_reaches_the_chat_and_its_answer_reaches_the_agent():
 
 
 def test_the_options_the_agent_offers_become_buttons():
+    """Revised 2026-07-29: the keys are the options' NUMBERS and the options themselves are listed
+    in the message (a label truncates, a message wraps — AD-5). What is tested is unchanged: every
+    option the agent offered is tappable, and no tap outgrows callback_data."""
     origin = _register()
 
     async def go():
         pending = await _asked(_TOKEN, options=["verde", "azul", "vermelho"])
         bubble = origin.sent[0]
         buttons = [b for row in bubble.markup.inline_keyboard for b in row]
+        sent = bubble.text
         ask.answer(ask.question_of(bubble.message_id), "azul")
         await pending
-        return buttons
+        return buttons, sent
 
-    buttons = asyncio.run(go())
-    assert [b.text for b in buttons] == ["verde", "azul", "vermelho"]
+    buttons, sent = asyncio.run(go())
+    assert [b.text for b in buttons] == ["1", "2", "3"]
+    for i, option in enumerate(["verde", "azul", "vermelho"]):
+        assert f"{i + 1}. {option}" in sent
     for button in buttons:
         assert len(button.callback_data.encode()) <= 64, "callback_data has 64 bytes, no more"
     ask.unregister(_TOKEN)

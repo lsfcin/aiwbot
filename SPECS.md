@@ -647,6 +647,50 @@ because stashing the turn on the backend breaks as soon as two turns overlap, an
 And `TurnOptions.mcp_config` is claude's JSON under a provider-agnostic name; the honest field is
 the **URL** (`ask_url`), with each backend wrapping it in its own config shape.
 
+### AD-32 — A question carries its choices, and keeps its answer (2026-07-29, from the first opencode interview)
+
+Three shape rules, all from Lucas reading a real interview on his phone. The interview itself
+worked; what it looked like did not.
+
+**The choices are written in the MESSAGE; the buttons are their numbers.** Options came back cut —
+*"Cada mensagem vira sessão nov…"* — because a label is clipped to what a full-width button holds
+and Telegram truncates rather than wraps (AD-5). Clipping was the wrong half to give up: it saved
+the layout by making the choice unreadable. So the option is listed in full where newlines work,
+and the key under it is `1`, `2`, `3` — a number never truncates on any phone, and `/resume` had
+already settled this exact trade the same way. The tap still carries an INDEX, so the agent
+receives the whole sentence it wrote, however it was displayed.
+
+**An answered question shows its answer.** Nothing in the chat said what had been chosen: scrolling
+back, Lucas could see what was asked and never what was decided. The answer is written into the
+same bubble, in italic, under the question — one message, not a new one, because a separate bubble
+would scroll away from what it answers exactly as the standalone voice echo did (AD-29). The
+keyboard goes at the same time, so a stale tap cannot pretend the question is still open, and the
+"reply to this message" hint goes with it — an instruction to do something already done.
+
+**What the chat shows is not what the agent gets.** The three unanswered exits (timeout, ended,
+expired) are instructions *to the model* — "siga com a hipótese mais razoável" — so quoting them
+into the chat would put words in Lucas's mouth. They collapse to `sem resposta`; the agent still
+receives its full sentence. The bubble is rebuilt from the text the bot SENT, never from
+`message.text`, for the same reason AD-30 records: Telegram hands back a plain rendering.
+
+`ask.py` hit the 200-line gate during this change and split along the line the gate exposed:
+`ask.py` is the **broker** (tokens, futures, who is waiting) and `askshape.py` is the **view**
+(what Lucas reads and taps). Nothing in the view knows about a future.
+
+### AD-33 — A provider that never names its model is asked for it afterwards (2026-07-29)
+
+An opencode answer's footer named no model. Not a parsing miss: **no line of
+`opencode run --format json` names a model anywhere** — not the text parts, not `step_finish`,
+which carries cost and tokens but nothing about who produced them. The store does, on the
+assistant message (`providerID` + `modelID`).
+
+So the model joins occupancy as a fact read from the provider's own store after the turn, in the
+same place and under the same rule (`_attach_measured`, renamed from `_attach_occupancy` now that
+it attaches two things): **the store is a fallback, never an override.** claude names its model in
+the stream and keeps it. A backend that cannot say leaves the footer to print nothing rather than
+invent a name. The pattern generalizes — a third provider that omits a field the footer wants adds
+one hook here, not a special case in the frontend.
+
 ## Conventions
 - Style R1–R6 (see code/CONTEXT.md). Files <200 LOC. Facade imports only via `backend/__init__.py`.
 - Free tests must stay green to commit; live smoke (`make smoke`) is manual and costs money.

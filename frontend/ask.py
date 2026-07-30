@@ -5,26 +5,16 @@ from __future__ import annotations
 import asyncio
 import secrets
 from dataclasses import dataclass, field
-from telegram import InlineKeyboardMarkup
-from . import format, keyboard, msgmap, phrases, reply
+from . import askshape, msgmap, phrases, reply
+# The chat shape lives in askshape (size gate). Re-exported so `ask.TAP` / `ask.TIMEOUT_TEXT` keep
+# resolving: the broker is what the rest of the bot talks to, and the split is internal to it.
+from .askshape import (EXPIRED_TEXT, ENDED_TEXT, NO_ANSWER_NOTE, TAP,  # noqa: F401
+                       TIMEOUT_TEXT)
 
 # Lucas asked for about an hour to answer, away from the PC (2026-07-27). The CLI's own ceiling
 # on a tool call is raised past this in ClaudeBackend.env(), so this wait is the one that ends
 # first and an unanswered question comes back as OUR text rather than as the CLI's timeout.
 WAIT_SECONDS = 55 * 60
-# Tap payload: `a:<question id>:<index>`. The option TEXT never travels in it — callback_data has
-# 64 bytes and an option is written by the agent, so only the index rides along and the text is
-# read back from the question the broker is still holding.
-TAP = "a:"
-# A full-width Telegram button holds about this much before it is truncated with an ellipsis.
-LABEL_CHARS = 30
-# These three go to the AGENT, not to the chat: they are what the tool call returns when nobody
-# answered. Text, never an MCP error — an error aborts the turn and throws away everything the
-# agent had already worked out (Lucas's decision, 2026-07-27).
-TIMEOUT_TEXT = ("sem resposta do usuário dentro do tempo de espera. siga com a hipótese mais "
-                "razoável e diga explicitamente qual assumiu.")
-ENDED_TEXT = "a conversa foi encerrada antes da resposta. siga sem ela."
-EXPIRED_TEXT = "essa pergunta não pôde ser entregue ao usuário. siga sem ela."
 
 
 @dataclass
@@ -33,6 +23,9 @@ class _Question:
     future: asyncio.Future
     options: list[str] = field(default_factory=list)
     bubble: object | None = None
+    # What was SENT, kept because Telegram hands back the plain rendering of a message and never
+    # the HTML it was sent as (AD-30). Rewriting the bubble from its echo would drop the markup.
+    text: str = ""
 
 
 # token -> (the message a question is sent as a reply to, the turn's painter or None). One entry
@@ -104,38 +97,6 @@ async def handle_callback(update, context) -> None:
     await query.answer(text=note)
 
 
-def _markup(question_id: str, options: list[str]):
-    """Buttons only when the agent offered choices; a free-text reply always works as well.
-
-    The row width is chosen from the labels rather than fixed at four: an option is a phrase the
-    agent wrote, not a model id, and four across truncated them to "Coding loca…" (Lucas,
-    2026-07-28). A label longer than even a full-width button is clipped HERE, while the answer
-    sent back to the agent stays whole — the tap carries an index, never the text."""
-    markup = None
-    if options:
-        labels = [format.clip_chars(text, LABEL_CHARS) for text in options]
-        cells = [keyboard.cell(label, f"{TAP}{question_id}:{i}") for i, label in enumerate(labels)]
-        rows = keyboard.chunk(cells, keyboard.per_row(labels))
-        markup = InlineKeyboardMarkup(rows)
-    return markup
-
-
-def _bubble_text(question: str, options: list[str]) -> str:
-    """The question, then how to answer it. The hint is dropped when there are buttons: they say
-    it themselves, and a hint under every question would read like boilerplate."""
-    body = format.plain(question)
-    line = f"▸ {body}"
-    if not options:
-        line = f"{line}\n\n{phrases.ASK_HINT}"
-    return line
-
-
-async def _close(item: _Question) -> None:
-    """The question is settled: drop its keyboard so a later tap cannot pretend otherwise."""
-    if item.bubble is not None and item.options:
-        await reply.edit_text(item.bubble, item.bubble.text, None)
-
-
 async def _wait(item: _Question) -> str:
     try:
         answered = await asyncio.wait_for(item.future, WAIT_SECONDS)
@@ -149,14 +110,15 @@ async def _hold(origin, token: str, question: str, options: list[str]) -> str:
     loop = asyncio.get_running_loop()
     item = _Question(token=token, future=loop.create_future(), options=options)
     _QUESTIONS[qid] = item
-    text = _bubble_text(question, options)
-    item.bubble = await reply.safe_reply(origin, text, reply_markup=_markup(qid, options))
+    item.text = askshape.bubble_text(question, options)
+    keys = askshape.markup(qid, options)
+    item.bubble = await reply.safe_reply(origin, item.text, reply_markup=keys)
     answered = EXPIRED_TEXT
     if item.bubble is not None:
         msgmap.remember_ask(item.bubble.message_id, qid)
         answered = await _wait(item)
     _QUESTIONS.pop(qid, None)
-    await _close(item)
+    await askshape.close(item.bubble, item.text, answered)
     return answered
 
 

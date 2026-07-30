@@ -69,6 +69,16 @@ def recent_models(since_ms: float) -> list[tuple[str, int, float]]:
     return ranked
 
 
+def _catalogue_id(provider: str | None, model: str | None) -> str | None:
+    """`providerID` + `id` joined into the one id every other part of the bot uses — the picker,
+    the catalogue, the button labels. The store keeps the two halves apart in both places it
+    records a model, so the join is written once here."""
+    result = None
+    if provider and model:
+        result = f"{provider}/{model}"
+    return result
+
+
 def model_of(model_json: str | None) -> str | None:
     """session.model is JSON `{"id","providerID","variant"}`; the catalogue id that both
     `opencode models` and models.json use is `providerID/id`."""
@@ -77,8 +87,7 @@ def model_of(model_json: str | None) -> str | None:
         obj = json.loads(model_json)
         model = obj.get("id")
         provider = obj.get("providerID")
-        if model and provider:
-            result = f"{provider}/{model}"
+        result = _catalogue_id(provider, model)
     return result
 
 
@@ -118,6 +127,20 @@ def _last_assistant(session_id: str) -> tuple[str, dict] | None:
             found = (mid, data)
             break
     return found
+
+
+def last_model(session_id: str) -> str | None:
+    """Which model actually answered last in this session. The JSONL stream names a model NOWHERE
+    — not on the text lines, not on step_finish — so a bot answer's footer had no model to print
+    at all (Lucas, live 2026-07-29). The assistant message in the store does carry it."""
+    message = _last_assistant(session_id)
+    result = None
+    if message is not None:
+        _mid, data = message
+        provider = data.get("providerID")
+        model = data.get("modelID")
+        result = _catalogue_id(provider, model)
+    return result
 
 
 def last_turn(session_id: str) -> tuple[str, int | None]:
