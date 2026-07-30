@@ -142,7 +142,7 @@ note rather than reasoned about; specs in AD-21 / AD-22, regression in
   question it exists for: what reached the session.
 - **Picker stopped reshuffling itself** on every pick (AD-22).
 
-Still open from the same test: **[b3] context % over 100%** — see [KNOWN-BUGS.md](KNOWN-BUGS.md).
+Still open from the same test: **[b3] context % over 100%** — see [BUGS.md](BUGS.md).
 And **submenu latency has no remaining fix**: after F3c a tap is one round trip, measured at
 ~200 ms Recife→Telegram, and forcing IPv4 was tested and is *slower* than the IPv6 default
 (203 vs 191 ms median). Lucas asked whether it could change fast even if the backend lags — it

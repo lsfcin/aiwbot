@@ -229,7 +229,7 @@ concrete session's cost makes it worth more than it costs.
 All three closed by P3 — see [HISTORY.md](HISTORY.md). Kept as the record of what the audit found:
 long answers could vanish entirely (blind HTML chunking), `/resume N` made one numeral name two
 different sessions across pages, and anchor messages carried no mode toggle. Future audits log here
-first, then move to KNOWN-BUGS.md with a `bN` id if they survive the round they were found in.
+first, then move to BUGS.md with a `bN` id if they survive the round they were found in.
 
 ## Housekeeping
 - [~] **`frontend/` file count** — partly addressed by P2, but along a seam this note didn't name.

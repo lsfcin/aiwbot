@@ -1,5 +1,5 @@
 # test_b1_table_bold.py — regression spec for [b1]: tables and bold not rendering in Telegram.
-# Both halves of the report came from constructs found in REAL agent answers (KNOWN-BUGS asked
+# Both halves of the report came from constructs found in REAL agent answers (BUGS asked
 # for exactly that), not from hand-written shapes: a pipe-table with markdown in its cells, and
 # the `**bold *italic***` run whose crossed tags made Telegram strip a whole message's markup.
 import re
