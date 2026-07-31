@@ -27,83 +27,13 @@ away-from-PC capable. **show-me** and **Phase D** stay parked past the line: sho
 artifacts (Lucas 2026-07-23), and Phase D is a structural rewrite that buys cost/latency, not a new
 capability.
 
-> **~~F0~~ → ~~F1~~ → ~~F2~~ → ~~F3~~ → ~~F5 answer shape~~ → F4 streaming → ask_user**
-> ┃ *line* ┃ ~~show-me~~ · ~~Phase D~~
->
-> Next up: **F4** — the finish line itself, and the only thing left before it. Everything
-> else is shipped; b3 closed 2026-07-27 (SPECS AD-24).
-
-| Stage | Contents | Why here |
-|-------|----------|----------|
-| **F0** | stale-checkbox sweep, dedupe contradictions | free, and stops the roadmap lying |
-| **F1** | [b1] tables/bold, [b2] opencode error surfacing | bugs taxing *every* reply — best value/hour |
-| **F2** | phrase style + emoji, `bote`→`bot`, transcript echo, reply affordance | one branch of papercuts; transcript echo is also the **instrument** for F3b |
-| **F3** | NL harness+model parse, audio cadence, button latency | features; F3b needs F2's echo to tune against |
-| **F4** | live streaming (`stream-json`) → `ask_user` | heavy, strict order: ask_user needs streaming plumbing |
-
-Earlier P-numbers keep their names so old notes resolve; their design is SPECS AD-10…AD-17.
-
-### F4 — staged plan, settled 2026-07-27
-
-Lucas asked for this one to be planned properly, with checkpoints, because it is the biggest change
-in the project. Scratch copy at `~/.claude/plans/sry-for-the-interruption-piped-dewdrop.md`; this is
-the canonical home.
-
-**The architectural crux, resolved.** linuz90's `ask_user` works only because it runs the Agent SDK
-`query()` **in-process** — its MCP tool handler can await a button press in the same process.
-aiwbot is a **subprocess** CLI, the opposite shape, and a stdio MCP server spawned by the CLI would
-be a child of the CLI, unable to reach the bot's Telegram state. Resolution, verified against
-`claude --help`: the daemon hosts an **HTTP MCP server in-process** and each turn passes
-`--mcp-config '<json>' --strict-mcp-config` pointing at `http://127.0.0.1:<port>/mcp/<turn_token>`.
-The handler runs *inside the daemon*, so it blocks the agent's turn exactly like the in-process
-version — **no Phase D rewrite**, and `opencode mcp` exists so provider-agnosticism holds.
-
-**Measured 2026-07-27, do not re-derive:**
-- `--output-format stream-json --verbose` → JSONL `system` / `assistant` (one *completed* message) /
-  `rate_limit_event` / `result`. Too coarse alone: a single-message answer shows nothing until the end.
-- `+ --include-partial-messages` → `type:"stream_event"` wrapping Anthropic SSE;
-  `event.delta = {"type":"text_delta","text":…}`. This is what gives token-level streaming.
-- `aiohttp` 3.13.5 installed, `mcp` SDK not — MCP over HTTP is plain JSON-RPC 2.0, **no new dep**.
-- **`split_html` is prefix-stable** — property-probed, 43 prefixes, 0 violations. `split_html(prefix)[:-1]`
-  is always a prefix of `split_html(full)` when `prefix` ends at a line boundary. This is what makes
-  mid-stream bubble sealing *compatible* with AD-23 rather than in conflict with it, and it makes
-  AD-23 stronger: bubbles get anchored the moment they are born, so Lucas can reply to bubble 1
-  while bubble 3 is still being written.
-- `format_body`'s fence regex needs both fences and `inline.convert` only emits balanced tags, so a
-  partial render never produces broken HTML — only HTML that may later change.
-
-**Decisions (Lucas):** all stages 0–5 · merge `feature/*` → `develop` after each approved checkpoint ·
-`ask_user` waits **1 h** then returns *text* (never an MCP error), pending a probe of the CLI's own
-tool timeout · streaming behind `TurnOptions.stream`, default off until Stage 3 passes ·
-token-level granularity · a mid-stream error **appends** a bubble, never deletes read text.
+### F4 — shipped through Stage 4; Stage 5 is what is left
+Design and measurements: SPECS AD-24…AD-33. Streaming and `ask_user` are live on both providers.
 
 **Live now:** `"stream": "true"` in `~/.config/aiwbot/config.json` defaults; ask is on by default.
-Rollbacks, least drastic first: `"ask": "false"` + restart (turns invoked exactly as in Stage 3) →
+Rollbacks, least drastic first: `"ask": "false"` + restart (turns invoked as they were before ask) →
 `painter.STREAM_SEAL = False` (one freezing bubble, live text kept) → `"stream": "false"` + restart
-(back to Stage 1). None of them is a code change.
-
-| Stage | Goal | Checkpoint |
-|---|---|---|
-| **0** ✔ | split `bot.py` → `turnrun.py`, zero behaviour change | everything looks exactly as before |
-| **1** ✔ | streaming seam in the backend, still batch-delivered | log shows frames ticking; Telegram identical |
-| **2** ✔ | live bubble: throttled painter, pin held below | text grows ~every 3 s, footer+keyboard at the end |
-| **3** ✔ | seal bubbles mid-stream (full AD-23 under streaming) | confirmed in chat 2026-07-28 |
-| **4** ✔ | `ask_user` MCP transport, probe-gated | confirmed in chat 2026-07-29 — a real interview ran |
-| **5** | `ask_user` in anger, close F4 | a task that matters, away from the PC (below) |
-
-Key risks pre-empted: 64 KB subprocess stream limit (`limit=1<<20`); stderr pipe fills and hangs the
-child (sibling drain task); occupancy read before the transcript flushes would silently regress b3
-(`await proc.wait()` before yielding the result event); 429 pile-up (in-flight guard that *drops*
-rather than queues, plus self-tuning backoff); `bot.py` 198/200 and `claude.py` 194/200 both split
-**before** gaining code.
-
-The measured CLI facts Stage 5 still needs: the 60 s tool timeout is lifted by `MCP_TOOL_TIMEOUT`,
-`initialize` repeats, and plan mode refuses MCP. Design: SPECS AD-26…AD-30.
-
-**Plan mode: settled as option A** (2026-07-29) — ask works in build mode only, the bot coerces every
-turn to build, and the panel no longer offers the choice (AD-28). Option B, re-implementing
-`mode=plan` as `bypassPermissions --tools "Read,Grep,Glob"`, is verified to work and deliberately not
-taken: it changes what a mode Lucas uses daily means. Revisit only if a future CLI lifts the block.
+(back to batch delivery). None of them is a code change.
 
 ### F4 Stage 5 — the last one: `ask_user` in anger
 Not a demo. A genuinely underspecified task handed over while away from the PC, letting the agent
@@ -155,12 +85,6 @@ concrete session's cost makes it worth more than it costs.
       `--attach` server (only if per-message cost annoys); copilot backend; retire/thin the workspace
       bot to INBOX-only capture. Biggest structural rewrite — last on purpose.
 
-## Usability bugs found in the live bot (audit 2026-07-23)
-All three closed by P3. Kept as the record of what the audit found:
-long answers could vanish entirely (blind HTML chunking), `/resume N` made one numeral name two
-different sessions across pages, and anchor messages carried no mode toggle. Future audits log here
-first, then move to BUGS.md with a `bN` id if they survive the round they were found in.
-
 ## Housekeeping
 - [~] **`frontend/` file count** — partly addressed by P2, but along a seam this note didn't name.
       What actually hit the 200-line block was `sessions.py`, so the cut was by responsibility
@@ -173,18 +97,12 @@ first, then move to BUGS.md with a `bN` id if they survive the round they were f
       layout, not relief — and each package costs a facade plus a CONTEXT.md — so it is churn with
       no behaviour change. Worth doing when the audio work or a third picker makes the flat
       directory genuinely hard to read, not before.
-- [~] **`backend/opencode.py` is at 188/200** after the ask config landed, and `claude.py` at 176.
+- [~] **`backend/opencode.py` is at 193/200** after the ask config landed, and `claude.py` at 176.
       Both warn, neither blocks. The seam the next touch should cut along is already visible: the
       **config/env** half (`_ask_config`, `env`, `supports_ask`, the timeout) is a different
       responsibility from the **parsing** half (`parse_events`, `LineStream`, `_line_to_event`), and
       claude already splits exactly that way (`claudeparse.py`). Do it when something needs adding,
       not now — an empty split is churn.
-- [x] **`bot.py`'s size** — resolved: F4 split it into `turnrun.py`, and `painter.py`'s three later
-      breaches went to `cadence.py` / `anchor.py` / `bubbles.py` / `landing.py`. Original note:
-      **`bot.py` was at 198 LOC** (200 is the hard gate) after F3c's startup warm and the voice
-      echo change — two lines of headroom left, so the next touch pays for the split. F4 puts
-      streaming into exactly this file, so it *will* breach. Split when F4 starts, not now — the
-      seam F4 introduces is what should decide where the cut goes.
 
 ## Rejected
 Tried or measured, then dropped — recorded so a dead idea does not resurface looking new.

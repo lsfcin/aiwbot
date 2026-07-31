@@ -1,7 +1,9 @@
 # aiwbot — Known Bugs
 
 Log as `- [ ] [bN] <symptom> — <where>`; a FIXED flip needs a `tests/**/b<N>-*`
-regression test (see code/VERIFY.md).
+regression test (see code/VERIFY.md). A fixed bug's entry is DELETED — its regression spec is the
+durable proof it is dead, not prose. Findings from a live audit start as notes in the session and
+earn a `bN` here only if they survive the round they were found in.
 
 ## Open
 _(none.)_ b1, b2 fixed 2026-07-26; b3 2026-07-27 (context % measured spend, not occupancy);

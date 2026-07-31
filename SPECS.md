@@ -27,9 +27,18 @@ both ids now happen to be stable. **Edge case**: plain `--resume` IS refused if 
 concurrently open live elsewhere (interactive VSCode / a still-running agent) — the frontend detects
 the busy/not-found error and shows a "close it there first" message rather than a raw error.
 
-### AD-4 — cwd must be pinned on dispatch
+### AD-4 — cwd must be pinned on dispatch — and `PWD` with it
 Subprocesses run with explicit `cwd` (not the daemon's inherited $HOME) or the session registers under
 the wrong directory and becomes invisible to later lookups. Carried from the workspace-bot cwd bug.
+
+**Necessary but not sufficient — corrected 2026-07-29 by b4.** `cwd=` on the subprocess sets the
+real working directory, and opencode reads **`$PWD`** in preference to it. Under systemd, `PWD` is
+whatever the daemon inherited (`/home/lucas`), so every Telegram opencode turn ran its file and shell
+tools there AND filed its session there, while `/resume` listed `/mnt/workspace` — for weeks, silently,
+with Lucas's own prompts landing in his home directory. `proc.child_env` now forces `PWD` to the
+turn's cwd for every child, applied AFTER each backend's own knobs so no provider can override it.
+The general rule: a child inherits two answers to "where am I" and they must not be allowed to
+disagree.
 
 ### AD-5 — Telegram `InlineKeyboardButton` labels don't render multi-line
 Discovered live (2026-07-22): a `\n` inside a button's `text` doesn't produce a multi-line button —
@@ -640,6 +649,11 @@ it contradicted three of the audit's guesses. Everything below is from the binar
   built around is claude's alone.
 - `OPENCODE_ENABLE_QUESTION_TOOL` exists (opencode's own native question tool, off by default) and
   must stay off: its question goes to the TUI, which for a headless bot turn is nowhere.
+- **Its streaming is COARSE**, measured on the first live streamed turn: one `text` part per STEP,
+  never per token (arrivals at 11.8 s / 15.5 s / 35.0 s of one turn; a short single-step answer is
+  exactly one event at the end). So a streamed opencode turn grows bubble-per-step where a claude
+  turn grows continuously. Nothing to fix — throttle, sealing and pacing all treat whole segments
+  correctly (`partial=False`) — but do not promise the two providers feel the same.
 
 Two seam consequences, both of which are why this is a decision and not a patch. `CliBackend.env()`
 takes no options, so a **per-turn** env value has nowhere to come from — it becomes `env(options)`,
