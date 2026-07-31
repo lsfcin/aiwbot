@@ -132,57 +132,11 @@ Nothing to do. Re-check if a future Bot API adds the entities.
       transcript echo of a long voice note. Not scheduled; it interacts with AD-23's splitting,
       so decide it after F4 lands rather than tangling two shape changes at once.
 
-### opencode parity — audited AND closed 2026-07-29
-Asked directly ("is it properly wired to opencode, including the interview part?"), so the audit
-answered from the code rather than from what the seam promises. Everything frontend-side was already
-genuinely provider-agnostic: the painter, segments, counters, the transcript lead, pacing, the panel,
-`guarded`, the voice feedback. Three gaps were real; all three are closed, each measured live before
-it was written (SPECS AD-31). Cost of the whole thing: ~$0.15 in probes, live checks and one smoke.
-
-- [x] **`ask_user` works on opencode.** It was claude-only because `OpencodeBackend` never overrode
-      `supports_ask`. The probe overturned three of the audit's own guesses: there is **no
-      `--mcp-config` flag at all** (so no temp file either — the config rides in
-      `OPENCODE_CONFIG_CONTENT`), the tool call dies at **60 s with no env var to lift it** (the
-      per-server `timeout` does), and `opencode mcp add` writes the USER's global config. `askserver`
-      needed no behaviour change, exactly as predicted; the **seam** did, twice:
-      `TurnOptions.mcp_config` (claude's JSON under an agnostic name) became `ask_url`, and
-      `env()` became `env(options)` because opencode's config has no flag to ride on and a
-      backend-held turn would break the moment two turns overlap. Verified live end to end through
-      the REAL `askserver`: question at 10.8 s carrying both options, answer held **65 s — past the
-      old ceiling — and the turn's final text was the answer**.
-- [x] **The retry set now speaks both providers.** `transient` matched `529` / `overloaded` / `rate
-      limit` / `timed out`, and opencode's real overload text (captured live for b2) is
-      `ResourceExhausted: Worker local total request limit reached (48/48)` — none of them, so the
-      retry was claude-only *in practice*. Its vocabulary is in, with a free test that runs the
-      whole path (`error` line → `DispatchError` → `transient`) rather than the marker alone.
-- [x] **opencode streaming has now run live, and it is COARSE.** `LineStream` works, but the grain
-      is one text part **per step**, never per token: measured arrivals at 11.8 s / 15.5 s / 35.0 s
-      of one turn, and a short single-step answer arrives as exactly ONE event at the end. So a
-      streamed opencode turn grows in bubbles-per-step where a claude turn grows continuously —
-      worth knowing before promising Lucas the same liveness on both. Nothing to fix: the throttle,
-      sealing and pacing all treat whole segments correctly (`partial=False`), which is why the
-      parser needed no work.
-- [x] **Its `plan` agent stays unreachable from the bot — decided, not merely unbuilt** (Lucas,
-      2026-07-29: *leave it global*). AD-28 coerces every turn to build for claude's sake, and
-      **measured the same day, `opencode run --agent plan` called the ask tool and completed the
-      round trip** — so the coercion is claude's constraint applied to everyone, and that is the
-      accepted price: one meaning of `mode` across providers, and the panel level AD-28 deleted
-      stays deleted. Revisit only if planning from the phone becomes something he actually wants.
-
-#### What closing it changed, and what is still owed
-The seam moved twice (`ask_url`, `env(options)`), `askserver` kept its behaviour and gave up only
-claude's JSON wrapper, and five free tests landed in `tests/test_f7_opencode_ask.py`:
-374 → 378 green with b4's spec. The paid side ran too — `make smoke` ALL PASS on both providers,
-plus the streamed and interviewed opencode turns above.
-
-Still owed, and the reason this is not signed off:
-- [ ] **The interviewed turn has not been seen IN TELEGRAM.** It was verified through the real
-      `askserver` from a script, which proves the transport but not the shape — and per AD-30 two
-      bugs this session passed every assertion in their own file and were caught only by reading
-      the bubbles. **The daemon is still running the old code**: picking this up needs a restart,
-      which kills whatever conversation Lucas has open, so it waits for his word.
-- [ ] **b4 is fixed in the repo, not in the process.** Every opencode turn from the live daemon is
-      still being filed under `/home/lucas` until the same restart.
+### opencode parity — closed 2026-07-29
+Done and live: `ask_user` on both providers, opencode's overload wording in the retry set,
+streaming run live (coarse — one text part per STEP, never per token), and its `plan` agent
+left unreachable on purpose (Lucas: leave the coercion global). What the probes measured is
+in SPECS AD-31…AD-33; what they cost was ~$0.15. Nothing open here.
 
 ### Past the finish line — parked, not scheduled (Lucas 2026-07-26)
 Both survive here because they are real gaps, not because they are queued. Promote one only when a

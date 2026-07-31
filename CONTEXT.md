@@ -18,15 +18,15 @@ before any Telegram wiring.
 | [`frontend/`](frontend/CONTEXT.md) | Telegram frontend on the AgentBackend seam — /new + reply-to-continue + INBOX ca |
 | [`tests/`](tests/CONTEXT.md) | Free unit tests — pure-logic fixtures/parsers/formatting, no network or cost. |
 
-| File | Interface | API | Description |
-|------|-----------|-----|-------------|
-| [`BUGS.md`](BUGS.md) | — | — | aiwbot — Known Bugs |
-| [`README.md`](README.md) | — | — | aiwbot |
-| [`REFS.md`](REFS.md) | — | — | aiwbot — References |
-| [`ROADMAP-p2.md`](ROADMAP-p2.md) | — | — | aiwbot — P2: backend + model + effort selection |
-| [`ROADMAP-p3.md`](ROADMAP-p3.md) | — | — | aiwbot — P3: Telegram output fidelity + `/resume` stability |
-| [`ROADMAP.md`](ROADMAP.md) | — | — | aiwbot — Roadmap |
-| [`SPECS.md`](SPECS.md) | — | — | aiwbot — Specs |
-| [`conftest.py`](conftest.py) | — | — | conftest.py — pytest anchor: puts the project root on sys.path so `backend` imports resolve. |
-| [`proto.py`](proto.py) | — | — | proto.py — live smoke: run one prompt through each backend + prove single-lineage resume. ~$0.10/run. |
+| File | Description |
+|------|-------------|
+| [`BUGS.md`](BUGS.md) | aiwbot — Known Bugs |
+| [`README.md`](README.md) | aiwbot |
+| [`REFS.md`](REFS.md) | aiwbot — References |
+| [`ROADMAP-p2.md`](ROADMAP-p2.md) | aiwbot — P2: backend + model + effort selection |
+| [`ROADMAP-p3.md`](ROADMAP-p3.md) | aiwbot — P3: Telegram output fidelity + `/resume` stability |
+| [`ROADMAP.md`](ROADMAP.md) | aiwbot — Roadmap |
+| [`SPECS.md`](SPECS.md) | aiwbot — Specs |
+| [`conftest.py`](conftest.py) | conftest.py — pytest anchor: puts the project root on sys.path so `backend` imports resolve. |
+| [`proto.py`](proto.py) | proto.py — live smoke: run one prompt through each backend + prove single-lineage resume. ~$0.10/run. |
 <!-- routing:end -->

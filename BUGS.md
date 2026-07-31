@@ -4,23 +4,10 @@ Log as `- [ ] [bN] <symptom> — <where>`; a FIXED flip needs a `tests/**/b<N>-*
 regression test (see code/VERIFY.md).
 
 ## Open
-- [x] **[b4] FIXED 2026-07-29 — every opencode turn ran in the daemon's LAUNCH directory, not the
-      workspace.** Found while checking opencode streaming: a turn given
-      `cwd=/mnt/workspace` reported `pwd` as the directory its parent process happened to be in.
-      Cause: opencode trusts **`PWD`** over its real working directory, and `PWD` was inherited from
-      the daemon — so with the daemon started from `/home/lucas`, its file and shell tools worked
-      there AND the session was FILED there, while `/resume` (which lists per directory) asked for
-      `/mnt/workspace` and never showed it. Visible in the store as Lucas's own Telegram prompts
-      filed under `/home/lucas`: *"oi"*, *"teste, tá funcionando?"*, *"claudsonner me ajuda a
-      procurar um chuveiro"*. Fix: `proc.child_env` forces `PWD` to the turn's cwd for every child,
-      after the backend's own knobs, so no provider can disagree with the seam.
-      Spec: `tests/test_b4_opencode_cwd.py`. claude was never affected (it uses its real cwd), but
-      it is pinned the same way — the driver owns this, not one backend's override.
-      **The running daemon keeps the old behaviour until it is restarted.**
-
-Earlier: b1, b2 fixed 2026-07-26; **b3 fixed 2026-07-27** (context % over 100%: the
-numerator summed every API request in the turn, so it measured spend, not occupancy). Each has
-its regression spec under `tests/test_b<N>_*.py`.
+_(none.)_ b1, b2 fixed 2026-07-26; b3 2026-07-27 (context % measured spend, not occupancy);
+**b4 2026-07-29, live since the daemon restart** — opencode trusts `$PWD` over its real working
+directory, so every Telegram turn ran its tools in the daemon's launch directory and filed its
+session there. Each has its regression spec under `tests/test_b<N>_*.py`.
 
 
 ## Residual (by design)
