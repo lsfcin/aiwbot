@@ -3,8 +3,8 @@
 # of each, and `·` never opening a line. What a bubble is made of, not how it is split.
 import asyncio
 from frontend import answer, painter, phrases, reply
-from .chatkit import Bubble, Origin
-from .streamkit import Clock
+from ..chatkit import Bubble, Origin
+from ..streamkit import Clock
 
 
 def _chunks(n: int, size: int = 500) -> list[str]:

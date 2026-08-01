@@ -3,7 +3,7 @@
 # act on, never in an MCP error, because an error aborts the turn and loses its work.
 import asyncio
 from frontend import ask, askserver
-from .chatkit import Origin
+from ..chatkit import Origin
 
 _TOKEN = "abc123"
 

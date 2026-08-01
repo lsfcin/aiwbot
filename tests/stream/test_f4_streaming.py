@@ -3,7 +3,7 @@
 import asyncio
 from frontend import answer, cadence, markdown, painter, reply
 from frontend.htmlsplit import split_html
-from .streamkit import Clock
+from ..streamkit import Clock
 
 
 class _Chat:

@@ -1,7 +1,7 @@
 # test_voice_echo_and_picker.py — Lucas's 2026-07-27 live test: STT conditioning prompt shape,
 # the transcript echo, and a picker that stops reshuffling itself under his thumb.
 from frontend import answer, hotwords, panelmenu, phrases, startword
-from .panelkit import texts as _texts
+from ..panelkit import texts as _texts
 
 # Longest run of words the prompt may go without a punctuation mark. The bug was a 26-word bare
 # list; real sentences in Lucas's register sit well under this.

@@ -5,7 +5,7 @@ from backend.opencode import parse_events, OpencodeBackend
 import backend.ocstore as OC
 from backend.base import check_contract
 
-_FIX = pathlib.Path(__file__).parent / "fixtures" / "opencode_pong.jsonl"
+_FIX = pathlib.Path(__file__).parent.parent / "fixtures" / "opencode_pong.jsonl"
 
 
 def _events():

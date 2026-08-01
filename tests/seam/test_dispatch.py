@@ -6,7 +6,7 @@ from backend.claude import parse_events as claude_parse
 from backend.opencode import parse_events as opencode_parse
 from frontend.dispatch import DispatchError, events_to_result
 
-_FIX = pathlib.Path(__file__).parent / "fixtures"
+_FIX = pathlib.Path(__file__).parent.parent / "fixtures"
 
 
 def test_claude_fixture_consolidates_to_result():

@@ -8,9 +8,9 @@ from backend.claude import ClaudeBackend
 from backend.claudeparse import StreamParser
 from backend.opencode import OpencodeBackend
 from frontend.dispatch import join_texts
-from .streamkit import FakeStream, deltas, result
+from ..streamkit import FakeStream, deltas, result
 
-_FIX = pathlib.Path(__file__).parent / "fixtures"
+_FIX = pathlib.Path(__file__).parent.parent / "fixtures"
 # Captured live 2026-07-27 from `claude -p "count from 1 to 12, one number per line"
 # --output-format stream-json --verbose --include-partial-messages`.
 _STREAM = (_FIX / "claude_stream.jsonl").read_text()

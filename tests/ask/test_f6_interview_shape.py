@@ -4,8 +4,8 @@
 # question — and the status line must not sit there claiming work that is blocked on him.
 import asyncio
 from frontend import painter
-from .chatkit import Bubble, Origin
-from .streamkit import Clock
+from ..chatkit import Bubble, Origin
+from ..streamkit import Clock
 
 _PARA = "palavra " * 60 + "\n\n"
 

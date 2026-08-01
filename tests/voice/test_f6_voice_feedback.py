@@ -3,7 +3,7 @@
 # seconds, and silence for that long reads as being ignored.
 import asyncio
 from frontend import bot, turnrun
-from .test_route_text import FakeMsg, FakeReplyAnchor
+from ..chatkit import FakeMsg, FakeReplyAnchor
 
 
 def test_a_voice_note_is_acknowledged_before_the_transcription_runs(store, monkeypatch):

@@ -1,6 +1,6 @@
 # test_panel.py — free unit test: panel effects — scopes, applying a choice, hidden dims.
 from frontend import choices, keyboard, msgmap, panel, panelmenu, registry
-from .panelkit import FAVS as _FAVS, labels as _labels, texts as _texts, data as _data
+from ..panelkit import FAVS as _FAVS, labels as _labels, texts as _texts, data as _data
 
 
 

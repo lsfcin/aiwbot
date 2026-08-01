@@ -4,8 +4,8 @@ import asyncio
 import random
 from frontend import painter, reply
 from frontend.htmlsplit import split_html
-from .chatkit import Bubble, Origin
-from .streamkit import Clock
+from ..chatkit import Bubble, Origin
+from ..streamkit import Clock
 
 _WORDS = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota"]
 

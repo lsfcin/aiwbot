@@ -3,7 +3,7 @@
 # and once he answered, nothing in the chat said what he had answered.
 import asyncio
 from frontend import ask, askserver, phrases
-from .chatkit import Origin
+from ..chatkit import Origin
 
 _TOKEN = "abc123"
 _OPTIONS = ["Cada mensagem vira sessão nova no opencode",

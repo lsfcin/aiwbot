@@ -3,7 +3,7 @@ import pathlib
 from backend.claude import parse_events, ClaudeBackend
 from backend.base import check_contract, TurnOptions
 
-_FIX = pathlib.Path(__file__).parent / "fixtures" / "claude_pong.json"
+_FIX = pathlib.Path(__file__).parent.parent / "fixtures" / "claude_pong.json"
 
 
 def _events():

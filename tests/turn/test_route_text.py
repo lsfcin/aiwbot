@@ -2,16 +2,7 @@
 # empty-transcript guard, and the C5 spoken-flag threading into run_and_deliver.
 import asyncio
 from frontend import bot, msgmap, phrases, registry, turnrun
-
-
-class FakeReplyAnchor:
-    def __init__(self, message_id):
-        self.message_id = message_id
-
-
-class FakeMsg:
-    def __init__(self, reply_to_message_id=None):
-        self.reply_to_message = FakeReplyAnchor(reply_to_message_id) if reply_to_message_id else None
+from ..chatkit import FakeMsg
 
 
 def test_route_text_bot_prefix_starts_new_session_with_spoken_flag(store, monkeypatch):

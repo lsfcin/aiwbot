@@ -1,6 +1,6 @@
 # test_panelmenu.py — free unit test: panel layout — rows, controls, ordering, paging.
 from frontend import choices, keyboard, panel, panelmenu, registry
-from .panelkit import FAVS as _FAVS, labels as _labels, texts as _texts, data as _data
+from ..panelkit import FAVS as _FAVS, labels as _labels, texts as _texts, data as _data
 
 
 

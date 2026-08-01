@@ -5,8 +5,8 @@
 import asyncio
 from telegram.constants import ChatAction
 from frontend import cadence, painter
-from .chatkit import Bubble, Origin
-from .streamkit import Clock
+from ..chatkit import Bubble, Origin
+from ..streamkit import Clock
 
 
 def _paced(gap: float, deltas: int = 24):
