@@ -2,8 +2,8 @@
 from __future__ import annotations
 from telegram.constants import ChatAction
 from telegram.error import TelegramError
-from . import answer
-from .htmlsplit import split_html, strip_tags
+from .stream import answer
+from .text import split_html, strip_tags
 
 TELEGRAM_MSG_LIMIT = 4096
 # Lucas, 2026-07-27: a long answer should arrive as several bubbles even when one would fit —

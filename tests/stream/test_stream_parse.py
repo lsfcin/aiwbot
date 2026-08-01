@@ -7,7 +7,7 @@ from backend.base import AgentEvent, check_contract
 from backend.providers.claude import ClaudeBackend
 from backend.providers.claudeparse import StreamParser
 from backend.providers.opencode import OpencodeBackend
-from frontend.dispatch import join_texts
+from frontend.turn.dispatch import join_texts
 from ..streamkit import FakeStream, deltas, result
 
 _FIX = pathlib.Path(__file__).parent.parent / "fixtures"

@@ -1,5 +1,5 @@
 # test_speech.py — free unit test: markdown answer -> prose a TTS voice can read (F3b).
-from frontend.speech import to_speech
+from frontend.voice.speech import to_speech
 
 
 def test_html_entities_come_back_as_characters():

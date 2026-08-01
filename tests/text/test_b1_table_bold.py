@@ -3,8 +3,8 @@
 # for exactly that), not from hand-written shapes: a pipe-table with markdown in its cells, and
 # the `**bold *italic***` run whose crossed tags made Telegram strip a whole message's markup.
 import re
-from frontend.markdown import format_body
-from frontend.inline import convert
+from frontend.text.markdown import format_body
+from frontend.text.inline import convert
 
 _TAG = re.compile(r"<(/?)([a-zA-Z-]+)(?:\s[^>]*)?>")
 

@@ -3,7 +3,8 @@
 # trips (222 ms median each from Lucas's machine). These assert the count, which is the only
 # part we control — a client renders an inline keyboard from server state, so one is the floor.
 import asyncio
-from frontend import choices, msgmap, panel, registry
+from frontend.select import choices, panel
+from frontend.session import msgmap, registry
 from ..panelkit import Fake
 
 

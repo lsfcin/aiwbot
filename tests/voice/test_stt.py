@@ -1,6 +1,6 @@
 # test_stt.py — free unit test: STT wrapper (C1 transcription, C3 fail-safe, C6 no live calls).
 import pathlib
-from frontend import stt
+from frontend.voice import stt
 
 # Confident enough to keep. Real transcripts of Lucas's voice notes measured -0.153..-0.482.
 _GOOD = -0.3
@@ -47,7 +47,7 @@ def test_the_jargon_rides_in_initial_prompt_not_the_hotwords_arg():
 def test_transcribe_lazily_loads_model_and_prompt(monkeypatch):
     model = FakeModel([FakeSegment("oi bot")])
     monkeypatch.setattr(stt, "_model", lambda: model)
-    monkeypatch.setattr("frontend.hotwords.as_prompt", lambda: "Bot, roda. aiwbot")
+    monkeypatch.setattr("frontend.voice.hotwords.as_prompt", lambda: "Bot, roda. aiwbot")
     result = stt.transcribe(pathlib.Path("/tmp/x.ogg"))
     assert result.strip() == "oi bot"
 

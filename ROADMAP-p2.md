@@ -68,11 +68,11 @@ values the CLI will reject.
 
 - [x] **1 — seam.** `TurnOptions` gains `model` + `effort`. New `backend/caps.py` with
       `Capabilities(modes, favourites, groups)`; seam gains `capabilities()` and `efforts(model)`,
-      defaulting to empty in `CliBackend`. New `backend/catalog.py` memoizes `opencode models` and
+      defaulting to empty in `CliBackend`. New `backend/providers/catalog.py` memoizes `opencode models` and
       reads `models.json` for `reasoning_options` + `limit.context`.
 - [x] **2 — build_args.** claude maps `--model`/`--effort`; opencode maps `-m`/`--variant`/
       `--agent build|plan` (closing the mode gap AD-10 found) and `--title` for new sessions.
-- [x] **3 — panel.** `frontend/panel.py`: the D1 state machine over `p:*` callback_data, with a
+- [x] **3 — panel.** `frontend/select/panel.py`: the D1 state machine over `p:*` callback_data, with a
       shared paginated keyboard helper. Per-session settings persisted through a generalized
       `sessions.setting_for`/`set_setting` (`mode_for`/`set_mode` refactored onto it, not copied).
 - [x] **4 — wiring.** `bot.py` threads the session's model/effort into `TurnOptions`; a pending

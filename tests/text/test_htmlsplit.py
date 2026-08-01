@@ -1,5 +1,5 @@
 # test_htmlsplit.py — free unit test: chunking formatted HTML without breaking a tag.
-from frontend.htmlsplit import split_html, strip_tags
+from frontend.text.htmlsplit import split_html, strip_tags
 
 
 def test_short_text_is_one_chunk():

@@ -2,8 +2,8 @@
 # "bote" mishearing. Each choice below was made by Lucas against a live Telegram prototype
 # (2026-07-26), so these tests pin decisions, not guesses.
 from frontend import phrases
-from frontend.startword import strip_prefix
-from frontend import answer
+from frontend.turn.startword import strip_prefix
+from frontend.stream import answer
 
 _BANKS = [phrases.CAPTURE_ACKS, phrases.WORKING_PHRASES, phrases.NEW_EMPTY_PROMPT_PHRASES,
           phrases.ERROR_PHRASES, phrases.UNKNOWN_CMD_PHRASES,

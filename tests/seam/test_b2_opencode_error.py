@@ -7,7 +7,7 @@ import pytest
 from backend.providers.opencode import parse_events
 from backend.proc import events_from_run
 from backend.base import AgentEvent, check_contract
-from frontend.dispatch import events_to_result, DispatchError
+from frontend.turn.dispatch import events_to_result, DispatchError
 
 _FIXTURE = pathlib.Path(__file__).parent.parent / "fixtures" / "opencode_error.jsonl"
 _REAL_MESSAGE = "Unexpected server error. Check server logs for details."

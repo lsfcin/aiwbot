@@ -2,7 +2,8 @@
 # (Lucas, 2026-07-28: "demora para aparecer qualquer feedback"). The download plus whisper take
 # seconds, and silence for that long reads as being ignored.
 import asyncio
-from frontend import bot, turnrun
+from frontend import bot
+from frontend.turn import runner
 from ..chatkit import FakeMsg, FakeReplyAnchor
 
 
@@ -48,14 +49,14 @@ def test_the_status_bubble_becomes_the_turns_working_message(store, monkeypatch)
         edited.append(text)
         return True
 
-    monkeypatch.setattr(turnrun.reply, "edit_text", fake_edit)
+    monkeypatch.setattr(runner.reply, "edit_text", fake_edit)
 
     async def fake_safe_reply(msg, text, reply_markup=None):
         raise AssertionError("a second status bubble was sent")
 
-    monkeypatch.setattr(turnrun.reply, "safe_reply", fake_safe_reply)
+    monkeypatch.setattr(runner.reply, "safe_reply", fake_safe_reply)
     existing = FakeReplyAnchor(7)
-    result = asyncio.run(turnrun._working(FakeMsg(), existing))
+    result = asyncio.run(runner._working(FakeMsg(), existing))
     assert result is existing
     assert edited, "the status was left saying it was still transcribing"
 
@@ -78,7 +79,7 @@ def _turn(monkeypatch, failures, streamed_text=""):
     async def fake_turn(prompt, **kw):
         attempts.append(prompt)
         if len(attempts) <= len(failures):
-            raise turnrun.dispatch.DispatchError(failures[len(attempts) - 1])
+            raise runner.dispatch.DispatchError(failures[len(attempts) - 1])
         return _Result()
 
     async def fake_edit(message, text, markup=None):
@@ -92,13 +93,13 @@ def _turn(monkeypatch, failures, streamed_text=""):
     async def no_sleep(seconds):
         return None
 
-    monkeypatch.setattr(turnrun.dispatch, "turn", fake_turn)
-    monkeypatch.setattr(turnrun.reply, "edit_text", fake_edit)
-    monkeypatch.setattr(turnrun.reply, "deliver", fake_deliver)
-    monkeypatch.setattr(turnrun.asyncio, "sleep", no_sleep)
-    monkeypatch.setattr(turnrun.turnhelpers, "persist_turn", lambda *a, **kw: None)
-    monkeypatch.setattr(turnrun.msgmap, "remember_reply", lambda *a: None)
-    asyncio.run(turnrun.run_and_deliver(FakeMsg(), FakeReplyAnchor(7), "faz isso", session_id=None,
+    monkeypatch.setattr(runner.dispatch, "turn", fake_turn)
+    monkeypatch.setattr(runner.reply, "edit_text", fake_edit)
+    monkeypatch.setattr(runner.reply, "deliver", fake_deliver)
+    monkeypatch.setattr(runner.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(runner.helpers, "persist_turn", lambda *a, **kw: None)
+    monkeypatch.setattr(runner.msgmap, "remember_reply", lambda *a: None)
+    asyncio.run(runner.run_and_deliver(FakeMsg(), FakeReplyAnchor(7), "faz isso", session_id=None,
                                         backend_name="claude", title=None, scope="s1"))
     return attempts, said
 
@@ -120,7 +121,7 @@ def test_a_failure_about_the_request_itself_is_not_retried(store, monkeypatch):
 
 def test_retrying_gives_up_and_says_so(store, monkeypatch):
     attempts, said = _turn(monkeypatch, ["529 overloaded"] * 9)
-    assert len(attempts) == turnrun.RETRIES + 1
+    assert len(attempts) == runner.RETRIES + 1
     assert any("erro" in text or "falhou" in text or "quebrou" in text for text in said)
 
 
@@ -128,16 +129,16 @@ def test_the_status_bubble_shows_the_transcript_before_the_answer_exists(store, 
     """Lucas, 2026-07-29: once the transcription is done it can already be shown — seeing what was
     heard should not wait for the reply. So the bubble that said "transcrevendo…" becomes the
     quoted transcript plus "trabalhando…", and the painter keeps writing into that same bubble."""
-    from frontend import answer
+    from frontend.stream import answer
     edited = []
 
     async def fake_edit(message, text, markup=None):
         edited.append(text)
         return True
 
-    monkeypatch.setattr(turnrun.reply, "edit_text", fake_edit)
+    monkeypatch.setattr(runner.reply, "edit_text", fake_edit)
     lead = answer.quote("me explica o ciclo da água")
-    asyncio.run(turnrun._working(FakeMsg(), FakeReplyAnchor(7), lead))
+    asyncio.run(runner._working(FakeMsg(), FakeReplyAnchor(7), lead))
     assert edited, "the status never changed"
     assert edited[0].startswith(lead)
     assert "ciclo da água" in edited[0]

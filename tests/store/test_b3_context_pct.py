@@ -6,7 +6,7 @@ import asyncio
 from backend.base import AgentEvent
 from backend.providers.claude import parse_events
 from backend.cli import CliBackend
-from frontend.format import context_pct
+from frontend.text.format import context_pct
 
 # One tool-using turn: three requests, each re-reading a context that only grew a little.
 _REQUESTS = [180_000, 190_000, 200_000]

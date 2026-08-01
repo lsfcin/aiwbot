@@ -2,7 +2,7 @@
 # The index is fixed here so the test neither shells opencode nor reads its sqlite — it pins
 # the PARSING, and backend_names() (used for harness self-aliases) is pure, no I/O.
 import pytest
-from frontend import directives
+from frontend.turn import directives
 
 _INDEX = [
     ("claude", "sonnet"), ("claude", "opus"), ("claude", "fable"),

@@ -9,7 +9,7 @@ single agent. Reuses the workspace Telegram bot's plumbing for capture/allowlist
 ## Architecture
 - `backend/base.py` — `AgentEvent`, `AgentBackend` protocol, `check_contract`, `try_json`.
 - `backend/cli.py` — `CliBackend`: the one subprocess-driven `send()` loop.
-- `backend/claude.py` / `backend/opencode.py` — subclasses: `build_args` + pure `parse_events`.
+- `backend/providers/claude.py` / `backend/providers/opencode.py` — subclasses: `build_args` + pure `parse_events`.
 - `backend/__init__.py` — facade + `get_backend(name)` registry.
 - `proto.py` — live smoke harness. `tests/` — free fixture-driven parser tests.
 

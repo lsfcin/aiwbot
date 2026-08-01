@@ -1,7 +1,9 @@
 # test_f4_frames.py — F4 Stage 2: what may be RENDERED mid-stream, and the guarantee that a
 # streamed turn still ends as byte-for-byte the answer today's code ships.
-from frontend import answer, markdown, reply
-from frontend.htmlsplit import split_html
+from frontend.stream import answer
+from frontend.text import markdown
+from frontend import reply
+from frontend.text.htmlsplit import split_html
 
 
 # --- what may be rendered mid-stream ---------------------------------------------------------

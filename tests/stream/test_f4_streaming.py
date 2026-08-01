@@ -1,8 +1,10 @@
 # test_f4_streaming.py — F4 Stage 2: the live bubble. Throttle mechanics, the pin, and the
 # guarantee that a streamed turn still ends as byte-for-byte today's answer.
 import asyncio
-from frontend import answer, cadence, markdown, painter, reply
-from frontend.htmlsplit import split_html
+from frontend.stream import answer, cadence, painter
+from frontend.text import markdown
+from frontend import reply
+from frontend.text.htmlsplit import split_html
 from ..streamkit import Clock
 
 

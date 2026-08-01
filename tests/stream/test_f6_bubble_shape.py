@@ -2,7 +2,8 @@
 # transcript quoted INSIDE every bubble instead of in one of its own, a position marker at the end
 # of each, and `·` never opening a line. What a bubble is made of, not how it is split.
 import asyncio
-from frontend import answer, painter, phrases, reply
+from frontend.stream import answer, painter
+from frontend import phrases, reply
 from ..chatkit import Bubble, Origin
 from ..streamkit import Clock
 
@@ -133,7 +134,7 @@ def test_a_row_holds_only_as_many_buttons_as_fit_uncut():
     """Telegram truncates a label that does not fit — it never wraps — so four phrase-length
     options across came out as "Coding loca…" on Lucas's phone (2026-07-28). Width per button is
     what decides the row, and the longest label decides the width."""
-    from frontend import keyboard
+    from frontend.select import keyboard
     assert keyboard.per_row(["sim", "não"]) == keyboard.MAX_PER_ROW
     assert keyboard.per_row(["opus", "sonnet", "fable"]) == keyboard.MAX_PER_ROW
     assert keyboard.per_row(["Coding local day-to-day", "Mobile/remoto"]) == 1
@@ -144,7 +145,7 @@ def test_a_long_option_stays_whole_in_the_message_and_in_the_answer():
     """Revised 2026-07-29: clipping the label was the wrong half to give up — Lucas could not read
     the option at all. The button is now its NUMBER, the sentence is written out in the message,
     and the tap still carries an index, so the agent hears back exactly what it wrote."""
-    from frontend import ask, askserver
+    from frontend.interview import ask, askserver
     origin = Origin()
     ask.register("tok", origin)
     spelled = "Coding local day-to-day com bastante refactor e revisão"

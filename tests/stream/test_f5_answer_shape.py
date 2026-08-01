@@ -2,8 +2,9 @@
 # Lucas, INBOX 2026-07-26: "partir a resposta em várias mensagens pra parecer mais como uma
 # conversação, desde que me permitisse, respondendo qualquer uma delas, continuar na mesma sessão."
 import asyncio
-from frontend import answer, reply
-from frontend.htmlsplit import split_html, strip_tags
+from frontend.stream import answer
+from frontend import reply
+from frontend.text.htmlsplit import split_html, strip_tags
 
 _PARA = "Uma frase que ocupa algum espaço na mensagem e segue adiante."
 
@@ -104,6 +105,6 @@ def test_the_footer_title_runs_to_five_words():
 
 
 def test_the_resume_picker_title_budget_is_unchanged():
-    from frontend.format import title_words, TITLE_CHARS
+    from frontend.text.format import title_words, TITLE_CHARS
     assert title_words("um dois tres quatro cinco seis") == "UM DOIS TRES"
     assert len(title_words("palavralonga " * 6, 5)) <= TITLE_CHARS + 1

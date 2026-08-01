@@ -10,8 +10,10 @@ root: `conftest.py` and the three kits (`chatkit` Telegram fakes, `panelkit` key
 *what it asserts*, not by which release named it — a `test_f6_*` file sits with the behaviour it
 pins, so a bug in the live bubble is one directory to read, not a grep across the whole suite.
 
-Two directories cover the backend seam (`seam/`, `store/`); the other six mirror the frontend's
-own responsibilities, so a source directory and its tests carry the same name.
+Two directories cover the backend seam (`seam/` the contract and its parsers, `store/` what a
+provider already wrote for itself); the other seven carry the same names as
+[`frontend/`](../frontend/CONTEXT.md)'s own surfaces, so a source directory and its tests are
+one word apart.
 
 A subdirectory under `WARN_FILES` folds back into this table unless it carries its own
 `CONTEXT.md`, so each one declares itself and this table went 51 rows → 12. Moving files
@@ -27,9 +29,10 @@ cross-directory import and they moved to `chatkit.py`, where they belonged.
 
 | Subdirectory | Description |
 |--------------|-------------|
-| [`ask/`](ask/CONTEXT.md) | The agent interviewing Lucas mid-turn: the broker, the transport, and the chat i |
+| [`interview/`](interview/CONTEXT.md) | The agent asking Lucas a question mid-turn: the broker, the transport, and the b |
 | [`seam/`](seam/CONTEXT.md) | The AgentBackend seam: a CLI's output becomes AgentEvents, and a turn's options  |
-| [`select/`](select/CONTEXT.md) | Choosing the target — harness, model, effort, session — and remembering the choi |
+| [`select/`](select/CONTEXT.md) | The picker keyboards: which grid a tap opens, and what one tap costs. |
+| [`session/`](session/CONTEXT.md) | Which session a message belongs to, and everything the bot remembers about it. |
 | [`store/`](store/CONTEXT.md) | What a provider already wrote: its session store, its transcript, its model cata |
 | [`stream/`](stream/CONTEXT.md) | The answer arriving live: deltas, repaint rate, and bubbles sealed as they are b |
 | [`text/`](text/CONTEXT.md) | Agent markdown becomes Telegram HTML: blocks, inline spans, tables, chunking, bu |

@@ -4,7 +4,7 @@
 # looked like it did nothing — "o tempo entre bubbles não funcionou".
 import asyncio
 from telegram.constants import ChatAction
-from frontend import cadence, painter
+from frontend.stream import cadence, painter
 from ..chatkit import Bubble, Origin
 from ..streamkit import Clock
 

@@ -1,6 +1,6 @@
 # test_tts.py — free unit test: TTS wrapper (C5 voice reply) + local OGG/Opus encode (C6, no live calls).
 import numpy as np
-from frontend import tts
+from frontend.voice import tts
 
 
 def test_encode_ogg_produces_a_real_ogg_container():

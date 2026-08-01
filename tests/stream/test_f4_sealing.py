@@ -2,8 +2,9 @@
 # that safe. If the first test here fails, Stage 3 is wrong and Stage 2 still ships.
 import asyncio
 import random
-from frontend import painter, reply
-from frontend.htmlsplit import split_html
+from frontend.stream import painter
+from frontend import reply
+from frontend.text.htmlsplit import split_html
 from ..chatkit import Bubble, Origin
 from ..streamkit import Clock
 

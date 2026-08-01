@@ -1,6 +1,6 @@
 # test_markdown.py — free unit test: block + inline markdown -> Telegram HTML.
-from frontend.markdown import format_body
-from frontend.inline import convert
+from frontend.text.markdown import format_body
+from frontend.text.inline import convert
 
 
 def test_h1_and_h2_are_bold_caps():

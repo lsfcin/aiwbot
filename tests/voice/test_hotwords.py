@@ -1,5 +1,5 @@
 # test_hotwords.py — free unit test: hotwords is explicit editable data (C4), not inline in stt.py.
-from frontend import hotwords
+from frontend.voice import hotwords
 
 
 def test_hotwords_is_a_nonempty_list_of_strings():

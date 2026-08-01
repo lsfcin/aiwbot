@@ -1,6 +1,6 @@
 # test_format.py — free unit test: markdown/table -> Telegram HTML conversion.
-from frontend import answer
-from frontend.format import format_body, session_block, reattach_cmd, title_words, title_from_prompt, response_preview, relative_time, short_model, clip_chars, PREVIEW_CHARS, TITLE_CHARS
+from frontend.stream import answer
+from frontend.text.format import format_body, session_block, reattach_cmd, title_words, title_from_prompt, response_preview, relative_time, short_model, clip_chars, PREVIEW_CHARS, TITLE_CHARS
 
 
 def test_plain_markdown_to_html():

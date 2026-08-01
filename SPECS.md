@@ -44,7 +44,7 @@ disagree.
 Discovered live (2026-07-22): a `\n` inside a button's `text` doesn't produce a multi-line button —
 Telegram clients render everything as one line and truncate it. Any "rich" per-item display (title +
 preview + meta) has to live in the *message text* instead, where `\n` works normally; buttons stay
-single-line tap targets, order-matched to a numbered list in the text (see `frontend/resume.py`).
+single-line tap targets, order-matched to a numbered list in the text (see `frontend/session/resume.py`).
 
 ### AD-6 — Session listing sources from each backend's own store, not a private registry
 The `/resume` picker aggregates `AgentBackend.list_sessions(cwd)` across backends so it sees sessions
@@ -286,7 +286,7 @@ therefore show two buttons reading `glm-5.2` that do different things. So a mode
 `<provider>·<model>`, with two-letter provider abbreviations (`opencode`/`openrouter` share a
 four-letter prefix, so the map is chosen data, not a mechanical prefix).
 
-The budget is about twelve characters. `frontend/labels.py` spends it progressively, and **a name
+The budget is about twelve characters. `frontend/select/labels.py` spends it progressively, and **a name
 that already fits is never touched** — an abbreviation you have to decode costs more than a long
 name you can read:
 
@@ -320,7 +320,7 @@ Telegram has no table syntax at all. Boxing a table in `<pre>` (the original b1 
 on both axes a table has: `<pre>` escapes its contents, so cell markdown freezes into literal
 `**`; and it does not wrap, so it overflows. Measured over 412 tables from real agent answers,
 **95% carried inline markdown** and **0 of 412** fit a phone-width monospace bubble (median widest
-row 151 chars) — so there is no narrow case worth a second code path. `frontend/table.py` renders
+row 151 chars) — so there is no narrow case worth a second code path. `frontend/text/table.py` renders
 each row as a labelled block (`<b>name</b>` then `header: value` lines), labelling values only when
 a row has siblings to tell apart. See BUGS b1, fixed 2026-07-26.
 

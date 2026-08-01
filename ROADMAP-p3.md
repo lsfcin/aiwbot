@@ -14,7 +14,7 @@ because it is cheap and touches every single message.
 | `#`/`##` headings | **bold caps**, `###`+ plain bold — two visible levels | bold-only, glyph prefix |
 | scope | markdown + HTML-safe delivery + `/resume` | opencode parity moved to P2 |
 
-## Part 1 — markdown gaps (`frontend/markdown.py`)
+## Part 1 — markdown gaps (`frontend/text/markdown.py`)
 Extend `format_body`; keep its ordering (fences extracted first, then block handling, then inline) —
 that is what protects code content.
 
@@ -39,10 +39,10 @@ Inline order after `html.escape`: `**bold**` → `~~strike~~` → code spans (al
 - Links: `<a href="…">`, URL attribute-escaped, `http`/`https`/`tg` only. Bare URLs left alone —
   Telegram auto-links them.
 
-**Size guard**: 56 LOC now, hard gate 200. Past ~160, split inline conversion into `frontend/inline.py`.
+**Size guard**: 56 LOC now, hard gate 200. Past ~160, split inline conversion into `frontend/text/inline.py`.
 R5 (≤40 lines/function) pushes the block dispatcher toward a table of line-matchers, not an if-chain.
 
-## Part 2 — HTML-safe delivery (`frontend/htmlsplit.py` new, `frontend/reply.py`)
+## Part 2 — HTML-safe delivery (`frontend/text/htmlsplit.py` new, `frontend/reply.py`)
 - `split_html(text, limit)` — split on line boundaries, never mid-line; carry a tag stack so anything
   open at a boundary is closed at the chunk end and reopened at the next chunk's start. One line longer
   than the limit is the only hard split, done inside `<pre>`.
@@ -50,7 +50,7 @@ R5 (≤40 lines/function) pushes the block dispatcher toward a table of line-mat
 - `reply._chunks` → `split_html`. `safe_reply` gains a last resort: on an entity/parse error, resend
   once with `parse_mode=None` over `strip_tags(...)`. **A degraded message beats a silent drop.**
 
-## Part 3 — `/resume` stability (`frontend/resume.py`, `frontend/format.py`)
+## Part 3 — `/resume` stability (`frontend/session/resume.py`, `frontend/text/format.py`)
 - **Fixed 5 slots.** `_keyboard` always emits `‹ N N N ›`; at the ends `callback_data="noop:"` and the
   handler answers silently (dismisses the spinner, nothing else). Register `noop` in `bot.py`'s pattern:
   `^(resume|page|noop):`. *If a dead tap reads as broken live, a one-word toast in `query.answer()` is a

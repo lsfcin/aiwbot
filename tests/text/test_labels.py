@@ -1,5 +1,6 @@
 # test_labels.py — free unit test: fitting a model id into a button label.
-from frontend import config, labels
+from frontend import config
+from frontend.select import labels
 
 
 def _no_aliases(monkeypatch):
