@@ -1,10 +1,11 @@
 # opencode.py — OpencodeBackend: normalizes `opencode run --format json` (JSONL stream).
 from __future__ import annotations
 import json
-from . import binaries, catalog, ocstore
-from .base import ASK_SERVER_NAME, AgentEvent, TurnOptions, add_flag, try_json
-from .caps import Capabilities
-from .cli import CliBackend
+from .. import binaries
+from . import catalog, ocstore
+from ..base import ASK_SERVER_NAME, AgentEvent, TurnOptions, add_flag, try_json
+from ..caps import Capabilities
+from ..cli import CliBackend
 
 _MODES = ("build", "plan")
 # Measured 2026-07-29 (AD-31): the CLI cancels an MCP tool call at ~60 s, and unlike claude it has

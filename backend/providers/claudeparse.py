@@ -2,7 +2,7 @@
 # Split out of claude.py for F4: that file was 194/200 and a stream parser does not fit under the
 # gate. claude.py keeps the backend class and its store reads; parsing lives here.
 from __future__ import annotations
-from .base import AgentEvent, try_json
+from ..base import AgentEvent, try_json
 
 # What a streaming line can be. Measured live 2026-07-27 against
 # `claude -p --output-format stream-json --verbose --include-partial-messages`:

@@ -4,9 +4,9 @@ import asyncio
 import json
 import pathlib
 from backend.base import AgentEvent, check_contract
-from backend.claude import ClaudeBackend
-from backend.claudeparse import StreamParser
-from backend.opencode import OpencodeBackend
+from backend.providers.claude import ClaudeBackend
+from backend.providers.claudeparse import StreamParser
+from backend.providers.opencode import OpencodeBackend
 from frontend.dispatch import join_texts
 from ..streamkit import FakeStream, deltas, result
 

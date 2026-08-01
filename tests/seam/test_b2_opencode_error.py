@@ -4,7 +4,7 @@
 # streams a type=error line AND exits 0 — the pair that made the old code fall silent.
 import pathlib
 import pytest
-from backend.opencode import parse_events
+from backend.providers.opencode import parse_events
 from backend.proc import events_from_run
 from backend.base import AgentEvent, check_contract
 from frontend.dispatch import events_to_result, DispatchError

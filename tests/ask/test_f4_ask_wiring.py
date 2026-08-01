@@ -5,7 +5,7 @@
 import asyncio
 import json
 from backend import TurnOptions
-from backend.claude import ClaudeBackend
+from backend.providers.claude import ClaudeBackend
 from backend.cli import CliBackend
 from frontend import ask, askserver
 

@@ -5,9 +5,9 @@
 import json
 import pytest
 from backend import TurnOptions
-from backend import opencode
-from backend.claude import ClaudeBackend
-from backend.opencode import OpencodeBackend
+from backend.providers import opencode
+from backend.providers.claude import ClaudeBackend
+from backend.providers.opencode import OpencodeBackend
 from frontend import ask, askserver, dispatch, turnhelpers
 
 _TOKEN = "abc123"

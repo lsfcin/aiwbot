@@ -1,7 +1,7 @@
 # transcript.py — read a claude .jsonl transcript from the tail for title/preview/context %.
 from __future__ import annotations
 import pathlib
-from .base import try_json
+from ..base import try_json
 
 _AI_TITLE = '"type":"ai-title"'
 _ASSISTANT = '"type":"assistant"'

@@ -1,5 +1,5 @@
 # test_transcript.py — free unit test: tail-scan a claude .jsonl for title/preview/model.
-from backend import transcript
+from backend.providers import transcript
 
 
 def _lines(*raw: str) -> list[str]:

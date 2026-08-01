@@ -1,7 +1,7 @@
 # test_target.py — free unit test: model/effort reach the argv, and each backend's declaration.
 from backend import TurnOptions, get_backend
-from backend.claude import ClaudeBackend
-from backend.opencode import OpencodeBackend
+from backend.providers.claude import ClaudeBackend
+from backend.providers.opencode import OpencodeBackend
 
 
 def _claude_args(options):
@@ -56,7 +56,7 @@ def test_opencode_titles_a_new_session_instead_of_resuming():
 def test_opencode_effort_is_per_model(monkeypatch):
     """A model with no declared effort must offer none — the vocabularies are per model."""
     backend = OpencodeBackend()
-    import backend.catalog as catalog
+    import backend.providers.catalog as catalog
     monkeypatch.setattr(catalog, "efforts", lambda model: ["minimal", "high"])
     assert backend.efforts("any/model") == ["minimal", "high"]
     assert backend.efforts(None) == []
@@ -65,7 +65,7 @@ def test_opencode_effort_is_per_model(monkeypatch):
 def test_every_registered_backend_declares_its_capabilities(monkeypatch):
     """`_ids` is pinned so the suite never shells out to `opencode models` (1.1 s, and the
     result would depend on which providers this machine happens to have configured)."""
-    import backend.catalog as catalog
+    import backend.providers.catalog as catalog
     monkeypatch.setattr(catalog, "_ids", ["opencode/a"])
     for name in ("claude", "opencode"):
         caps = get_backend(name).capabilities()

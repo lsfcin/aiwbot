@@ -1,5 +1,5 @@
 # test_catalog.py — free unit test: opencode catalogue — effort vocabularies, groups, favourites.
-import backend.catalog as catalog
+import backend.providers.catalog as catalog
 
 _META = {
     "anthropic": {"models": {

@@ -1,6 +1,6 @@
 # test_parse_claude.py — free unit test: claude fixture -> normalized AgentEvents satisfy the contract.
 import pathlib
-from backend.claude import parse_events, ClaudeBackend
+from backend.providers.claude import parse_events, ClaudeBackend
 from backend.base import check_contract, TurnOptions
 
 _FIX = pathlib.Path(__file__).parent.parent / "fixtures" / "claude_pong.json"
@@ -79,7 +79,7 @@ def test_build_args_new_without_title_omits_name():
 
 
 def test_list_sessions_reads_store(tmp_path, monkeypatch):
-    import backend.claude as C
+    import backend.providers.claude as C
     sid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     line = '{"type":"last-prompt","lastPrompt":"olá mundo"}\n'
     (tmp_path / f"{sid}.jsonl").write_text(line)
@@ -93,7 +93,7 @@ def test_list_sessions_reads_store(tmp_path, monkeypatch):
 def test_list_sessions_prefers_ai_title_over_prompt(tmp_path, monkeypatch):
     # AD-7: the latest `ai-title` is Claude Code's real picker title; the opening
     # prompt is only a fallback when no ai-title exists.
-    import backend.claude as C
+    import backend.providers.claude as C
     sid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     prompt = '{"type":"last-prompt","lastPrompt":"## RESUME — ugly"}\n'
     title = '{"type":"ai-title","aiTitle":"Nice AI Title"}\n'
@@ -106,7 +106,7 @@ def test_list_sessions_prefers_ai_title_over_prompt(tmp_path, monkeypatch):
 def test_list_sessions_enriches_preview_and_model(tmp_path, monkeypatch):
     # Phase 3: the picker's 3-line entry needs a last-response preview + model, derived
     # from the transcript so VSCode sessions (no bot registry) also get them.
-    import backend.claude as C
+    import backend.providers.claude as C
     sid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     title = '{"type":"ai-title","aiTitle":"Nice"}\n'
     asst = '{"type":"assistant","message":{"model":"claude-sonnet-5","content":[{"type":"text","text":"the last answer here"}]}}\n'
@@ -118,7 +118,7 @@ def test_list_sessions_enriches_preview_and_model(tmp_path, monkeypatch):
 
 
 def test_list_sessions_missing_dir_is_empty(tmp_path, monkeypatch):
-    import backend.claude as C
+    import backend.providers.claude as C
     monkeypatch.setattr(C, "_project_dir", lambda cwd: tmp_path / "nope")
     assert ClaudeBackend().list_sessions("/x") == []
 
@@ -129,7 +129,7 @@ def test_the_result_object_gives_the_window_but_never_the_occupancy():
     transcripts sum to 6190% and 32533% of the window that way. The window is static metadata
     and stays; occupancy comes from the transcript via ClaudeBackend.occupancy."""
     import json
-    from backend.claude import parse_events
+    from backend.providers.claude import parse_events
     obj = {"type": "result", "session_id": "s1", "result": "hi", "total_cost_usd": 0.1,
            "modelUsage": {"claude-opus-4-8": {"inputTokens": 2, "cacheReadInputTokens": 11036,
                                               "cacheCreationInputTokens": 13092,

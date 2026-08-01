@@ -2,10 +2,10 @@
 # Not a parser bug: opencode's JSONL never says which model ran. So the model is read from its own
 # store after the turn, exactly as occupancy already is (b3/AD-24).
 import json
-from backend import ocstore
+from backend.providers import ocstore
 from backend.base import AgentEvent
 from backend.cli import CliBackend
-from backend.opencode import OpencodeBackend, parse_events
+from backend.providers.opencode import OpencodeBackend, parse_events
 
 _MODEL = "nvidia/deepseek-ai/deepseek-v4-flash"
 _CWD = "/mnt/workspace"

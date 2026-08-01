@@ -4,7 +4,7 @@
 # the window was. Measured over Lucas's real transcripts, those sums reach 6190% and 32533%.
 import asyncio
 from backend.base import AgentEvent
-from backend.claude import parse_events
+from backend.providers.claude import parse_events
 from backend.cli import CliBackend
 from frontend.format import context_pct
 

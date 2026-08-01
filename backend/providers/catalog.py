@@ -4,7 +4,8 @@ import json
 import pathlib
 import subprocess
 import time
-from . import binaries, ocstore
+from .. import binaries
+from . import ocstore
 
 # The offline declaration opencode ships: every provider it knows (3311+ models), each model
 # carrying `reasoning_options` and `limit.context`. Free to read, no network, no key.

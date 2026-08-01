@@ -1,7 +1,7 @@
 # test_ocstore.py — free unit test: opencode sqlite reads — last assistant turn + occupancy.
 import json
 import sqlite3
-import backend.ocstore as ocstore
+import backend.providers.ocstore as ocstore
 
 _ASSISTANT = {"role": "assistant",
               "tokens": {"total": 10434, "input": 6467, "output": 63,

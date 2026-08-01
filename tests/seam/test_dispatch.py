@@ -2,8 +2,8 @@
 import pathlib
 import pytest
 from backend.base import AgentEvent
-from backend.claude import parse_events as claude_parse
-from backend.opencode import parse_events as opencode_parse
+from backend.providers.claude import parse_events as claude_parse
+from backend.providers.opencode import parse_events as opencode_parse
 from frontend.dispatch import DispatchError, events_to_result
 
 _FIX = pathlib.Path(__file__).parent.parent / "fixtures"

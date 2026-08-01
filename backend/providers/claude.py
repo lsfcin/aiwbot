@@ -2,13 +2,14 @@
 from __future__ import annotations
 import json
 import pathlib
-from . import binaries, transcript
-from .base import ASK_SERVER_NAME, AgentEvent, TurnOptions, add_flag, try_json
+from .. import binaries
+from . import transcript
+from ..base import ASK_SERVER_NAME, AgentEvent, TurnOptions, add_flag, try_json
 # Parsing lives in claudeparse (F4: this file was 194/200 and a stream parser does not
 # fit). Re-exported so `from backend.claude import parse_events` keeps working.
 from .claudeparse import StreamParser, parse_events  # noqa: F401
-from .caps import Capabilities
-from .cli import CliBackend
+from ..caps import Capabilities
+from ..cli import CliBackend
 
 _PROJECTS = ".claude/projects"
 # The one entrypoint value the native picker lists. "cli" is rejected (falls back to sdk-cli).

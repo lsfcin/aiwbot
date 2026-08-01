@@ -1,8 +1,8 @@
 # test_parse_opencode.py — free unit test: opencode JSONL fixture -> AgentEvents satisfy the contract.
 import pathlib
 import sqlite3
-from backend.opencode import parse_events, OpencodeBackend
-import backend.ocstore as OC
+from backend.providers.opencode import parse_events, OpencodeBackend
+import backend.providers.ocstore as OC
 from backend.base import check_contract
 
 _FIX = pathlib.Path(__file__).parent.parent / "fixtures" / "opencode_pong.jsonl"

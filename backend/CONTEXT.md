@@ -1,8 +1,25 @@
 # backend
 > Provider-agnostic seam: each coding-agent CLI → normalized AgentEvent stream; one class per provider.
 
+## Shape — the root is provider-agnostic, `providers/` is where a provider's name may appear
+
+Split 2026-08-01 at 12 files. The root holds only what every backend shares and no provider
+owns: the seam contract (`base`, `caps`), the single subprocess-driven `send()` loop (`cli`),
+and the plumbing under it (`proc`, `binaries`). **A file at this level that names claude or
+opencode is in the wrong directory** — that is the whole point of the boundary, and it is
+cheaper to see as a path than to enforce by review.
+
+`providers/` holds one class per CLI plus the records that CLI keeps for itself: claude's
+stream parser and `.jsonl` transcript, opencode's sqlite store and model catalogue. The
+registry that maps a name to a class stays in this facade, so adding a provider touches
+`providers/` and one line here.
+
 <!-- routing:start -->
 ## Routing
+
+| Subdirectory | Description |
+|--------------|-------------|
+| [`providers/`](providers/CONTEXT.md) | One class per coding-agent CLI, plus the records that CLI keeps: its parser, its |
 
 | File | API | Description |
 |------|-----|-------------|
@@ -10,12 +27,6 @@
 | [`base.py`](base.py) | `AgentEvent`, `TurnOptions`, `add_flag`, `AgentBackend`, `try_json` | base.py — the provider-agnostic seam: AgentEvent + AgentBackend contract + shared primitives. |
 | [`binaries.py`](binaries.py) | `resolve`, `find` | binaries.py — resolve a CLI's executable: PATH first, then the places its installer puts it. |
 | [`caps.py`](caps.py) | `Capabilities` | caps.py — capability declaration: what modes/models a backend may actually be offered. |
-| [`catalog.py`](catalog.py) | `metadata`, `efforts`, `context_window`, `model_ids`, `groups` | catalog.py — opencode's model catalogue: configured ids + per-model effort/context metadata. |
-| [`claude.py`](claude.py) | `ClaudeBackend`, `build_args`, `capabilities`, `efforts`, `last_response` | claude.py — ClaudeBackend: normalizes `claude -p --output-format json` (single result object). |
-| [`claudeparse.py`](claudeparse.py) | `parse_events`, `StreamParser`, `feed`, `finish` | claudeparse.py — claude's output → AgentEvents, both shapes: one result object, and stream-json. |
 | [`cli.py`](cli.py) | `CliBackend`, `build_args`, `parse`, `list_sessions`, `last_response` | cli.py — CliBackend: the single subprocess-driven send() loop; subclasses supply build_args + parse. |
-| [`ocstore.py`](ocstore.py) | `session_rows`, `recent_models`, `model_of`, `context_used`, `last_model` | ocstore.py — read-only reads of opencode's sqlite store: session rows + last assistant answer. |
-| [`opencode.py`](opencode.py) | `parse_events`, `LineStream`, `OpencodeBackend`, `feed`, `finish` | opencode.py — OpencodeBackend: normalizes `opencode run --format json` (JSONL stream). |
 | [`proc.py`](proc.py) | `run_capture`, `child_env`, `stream_lines`, `silent_run`, `events_from_run` | proc.py — subprocess driver + run-result → events handling (shared by all CLI backends). |
-| [`transcript.py`](transcript.py) | `tail_lines`, `latest_ai_title`, `last_response_text`, `last_context_used`, `last_model` | transcript.py — read a claude .jsonl transcript from the tail for title/preview/context %. |
 <!-- routing:end -->
