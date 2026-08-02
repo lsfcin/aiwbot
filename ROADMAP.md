@@ -97,7 +97,7 @@ concrete session's cost makes it worth more than it costs.
       layout, not relief — and each package costs a facade plus a CONTEXT.md — so it is churn with
       no behaviour change. Worth doing when the audio work or a third picker makes the flat
       directory genuinely hard to read, not before.
-- [~] **`backend/opencode.py` is at 193/200** after the ask config landed, and `claude.py` at 176.
+- [~] **`backend/providers/opencode.py` is at 193/200** after the ask config landed, and `claude.py` at 176.
       Both warn, neither blocks. The seam the next touch should cut along is already visible: the
       **config/env** half (`_ask_config`, `env`, `supports_ask`, the timeout) is a different
       responsibility from the **parsing** half (`parse_events`, `LineStream`, `_line_to_event`), and

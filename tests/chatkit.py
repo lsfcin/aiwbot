@@ -47,6 +47,20 @@ class Chat:
         self.actions.append(action)
 
 
+class FakeReplyAnchor:
+    """The message a reply hangs off — all the router reads of it is the id."""
+
+    def __init__(self, message_id):
+        self.message_id = message_id
+
+
+class FakeMsg:
+    """An incoming message, seen only as "does it reply to something, and to what"."""
+
+    def __init__(self, reply_to_message_id=None):
+        self.reply_to_message = FakeReplyAnchor(reply_to_message_id) if reply_to_message_id else None
+
+
 class Origin:
     """Lucas's own message: new bubbles are sent as replies to it."""
 

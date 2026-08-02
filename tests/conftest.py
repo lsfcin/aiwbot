@@ -1,6 +1,7 @@
 # conftest.py — fixtures shared by the panel tests: an in-memory config and a fake backend.
 import pytest
-from frontend import choices, config
+from frontend.select import choices
+from frontend import config
 from .panelkit import Fake
 
 

@@ -3,7 +3,13 @@ from __future__ import annotations
 import asyncio
 from telegram import BotCommand, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from . import ask, askserver, choices, config, format, inbox, msgmap, panel, panelmenu, phrases, registry, reply, resume, startword, stt, turnhelpers, turnrun
+from .interview import ask, askserver
+from .select import choices, panel, panelmenu
+from . import config, inbox, phrases, reply
+from .text import format
+from .session import msgmap, registry, resume
+from .turn import startword, helpers, runner
+from .voice import stt
 
 WORKSPACE_DIR = config.WORKSPACE_DIR
 
@@ -21,7 +27,7 @@ async def _cmd_new(msg, arg: str) -> None:
     config bubble instead of an error: adjust harness/model/effort on it, then reply with the
     prompt. Telegram allows exactly one reply_markup per message, so this bubble carries the
     keyboard and gives up ForceReply's auto-focus — Lucas's call, 2026-07-23."""
-    backend_name, prompt = turnhelpers.parse_new_arg(arg)
+    backend_name, prompt = helpers.parse_new_arg(arg)
     if backend_name:
         registry.set_setting(registry.NEW, "backend", backend_name)
     if not prompt.strip():
@@ -31,7 +37,7 @@ async def _cmd_new(msg, arg: str) -> None:
         if asked is not None:
             msgmap.remember_pending_new(asked.message_id)
         return
-    await turnrun.start_new(msg, prompt)
+    await runner.start_new(msg, prompt)
 
 
 async def _route_text(msg, text: str, context, *, spoken: bool = False, working=None) -> None:
@@ -48,16 +54,16 @@ async def _route_text(msg, text: str, context, *, spoken: bool = False, working=
             return
         sid = msgmap.session_for_reply(replied_to)
         if sid:
-            await turnrun.handle_reply_continue(msg, sid, text, spoken=spoken, working=working)
+            await runner.handle_reply_continue(msg, sid, text, spoken=spoken, working=working)
             return
         awaiting = msgmap.pending_new(replied_to)
         if awaiting:
-            await turnrun.start_new(msg, text, spoken=spoken, working=working)
+            await runner.start_new(msg, text, spoken=spoken, working=working)
             return
     bot_prompt = _strip_bot_prefix(text)
     if bot_prompt is not None:
-        prompt = turnhelpers.apply_directives(bot_prompt)
-        await turnrun.start_new(msg, prompt, spoken=spoken, working=working)
+        prompt = helpers.apply_directives(bot_prompt)
+        await runner.start_new(msg, prompt, spoken=spoken, working=working)
         return
     inbox.append_entry(inbox.build_entry(text, None, forwarded=msg.forward_origin is not None))
     await reply.safe_reply(msg, format.plain(phrases.pick(phrases.CAPTURE_ACKS)))
@@ -113,13 +119,13 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     msg = update.message
     _log_entities(msg)
     if msg.text and msg.text.startswith("/"):
-        context.application.create_task(turnrun.guarded(_dispatch_command(msg.text, msg), msg))
+        context.application.create_task(runner.guarded(_dispatch_command(msg.text, msg), msg))
         return
     if msg.text:
-        context.application.create_task(turnrun.guarded(_route_text(msg, msg.text, context, spoken=False), msg))
+        context.application.create_task(runner.guarded(_route_text(msg, msg.text, context, spoken=False), msg))
         return
     if msg.voice is not None:
-        context.application.create_task(turnrun.guarded(_handle_voice(msg, context), msg))
+        context.application.create_task(runner.guarded(_handle_voice(msg, context), msg))
         return
     forwarded = msg.forward_origin is not None
     if msg.photo:
