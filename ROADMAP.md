@@ -86,18 +86,7 @@ concrete session's cost makes it worth more than it costs.
       bot to INBOX-only capture. Biggest structural rewrite — last on purpose.
 
 ## Housekeeping
-- [~] **`frontend/` file count** — partly addressed by P2, but along a seam this note didn't name.
-      What actually hit the 200-line block was `sessions.py`, so the cut was by responsibility
-      rather than by layer: `registry.py` (bot-owned per-session state — knobs, titles, message
-      maps) vs `sessions.py` (cross-backend listing), plus `keyboard.py` for the inline-keyboard
-      primitives both pickers now share and `panelmenu.py` for the panel's states. 17 files, none
-      near the gate.
-      Still open, and now optional: grouping them into `tg/` (`reply`, `htmlsplit`, `keyboard`),
-      `text/` (`format`, `markdown`, `inline`, `phrases`) and an interaction package. That buys
-      layout, not relief — and each package costs a facade plus a CONTEXT.md — so it is churn with
-      no behaviour change. Worth doing when the audio work or a third picker makes the flat
-      directory genuinely hard to read, not before.
-- [~] **`backend/providers/opencode.py` is at 193/200** after the ask config landed, and `claude.py` at 176.
+- [~] **`backend/providers/opencode.py` is at 194/200** after the ask config landed, and `claude.py` at 176.
       Both warn, neither blocks. The seam the next touch should cut along is already visible: the
       **config/env** half (`_ask_config`, `env`, `supports_ask`, the timeout) is a different
       responsibility from the **parsing** half (`parse_events`, `LineStream`, `_line_to_event`), and
