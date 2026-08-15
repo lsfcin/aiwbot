@@ -69,6 +69,27 @@ R5 (≤40 lines/function) pushes the block dispatcher toward a table of line-mat
 - **Mode toggle on anchors.** `_anchor` sends a repliable message with no BUILD/PLAN button. Attach
   `mode.toggle_markup(sid, sessions.mode_for(sid))` — both helpers already exist.
 
+## Part 4 — answer what `/resume` does to a session that is still running
+Everything above makes `/resume` *look* stable. This is whether it *is*, and it is unanswered.
+Lucas, INBOX 2026-08-15, held back from triage twice for want of a route:
+
+> *"tô com medo de dar um resume nas sessões pra ver o que tá acontecendo em uma das sessões da IA
+> que está rodando no computador… de alguma forma quebrar a sessão que tá rodando, ou caso eu
+> continue o trabalho naquela sessão aqui no bot do telegram, que seja avançado aqui no bot, não
+> apareça lá no claude code do meu computador, tanto na extensão do VS Code, quanto no terminal."*
+
+Two distinct questions, and the fear is that they have different answers:
+1. **Does resuming a live session damage it?** Reading a running session's state from the bot must
+   be side-effect free, or `/resume` is unsafe to even look with.
+2. **Is the lineage shared or forked?** If work continued in Telegram is invisible to the desktop
+   session, the two diverge silently — the worst failure mode, because nothing reports it.
+
+The workflow he actually wants is stated plainly and should be the acceptance test: **start on the
+desktop → continue in the bot → come back to the desktop**, with one history. Our design is
+single-lineage plain-resume (see [REFS.md](REFS.md), the linuz90 read), which *should* give that —
+but "should" is why this is written down instead of assumed. Establish the real behaviour before
+building anything on it; if resume forks, say so in the UI rather than letting the user discover it.
+
 ## Verification
 **Free:** `make test`. New `tests/test_markdown.py` (keeps `test_format.py` small): one test per
 conversion rule; `split_html` closing/reopening tags across a boundary; `strip_tags`; `clip_chars` at
