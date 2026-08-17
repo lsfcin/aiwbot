@@ -6,7 +6,17 @@ durable proof it is dead, not prose. Findings from a live audit start as notes i
 earn a `bN` here only if they survive the round they were found in.
 
 ## Open
-_(none.)_ b1, b2 fixed 2026-07-26; b3 2026-07-27 (context % measured spend, not occupancy);
+- [ ] [b5] `/resume` anchor arrives with no last answer, so the message is only the reattach
+  command — `frontend/session/sessions.py` `last_response`. Live 2026-08-17 on session
+  `949a9cc6` ("PLAN WOS ROADMAP"): `_anchor` does ask for the body
+  (`resume.py:143`), `session_block` appends it only `if body` and prints the
+  `claude --resume <sid>` line unconditionally (`frontend/text/format.py:103`), so an empty
+  `last_response` degrades the anchor into a bare shell command. Lucas: *"n entendi nada. ao meu
+  ver era pra aparecer a última resposta da sessão"*. **Find why it returned empty for that
+  session before touching the fallback** — a transcript this workspace wrote the same day is the
+  easy case, so an empty answer there means the reader is wrong, not the session.
+
+_(previously)_ b1, b2 fixed 2026-07-26; b3 2026-07-27 (context % measured spend, not occupancy);
 **b4 2026-07-29, live since the daemon restart** — opencode trusts `$PWD` over its real working
 directory, so every Telegram turn ran its tools in the daemon's launch directory and filed its
 session there. Each has its regression spec under `tests/test_b<N>_*.py`.

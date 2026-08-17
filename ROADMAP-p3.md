@@ -90,6 +90,18 @@ single-lineage plain-resume (see [REFS.md](REFS.md), the linuz90 read), which *s
 but "should" is why this is written down instead of assumed. Establish the real behaviour before
 building anything on it; if resume forks, say so in the UI rather than letting the user discover it.
 
+## Part 5 — the reattach command is unlabelled, and reads as the answer
+`session_block` prints `claude --resume <sid>` on every anchor with nothing saying what it is or
+who it is for (`frontend/text/format.py:103`). Its docstring knows — it is the only way out of the
+bot for a session Claude Code's own picker will not list — but that reasoning reaches nobody
+holding the phone. Lucas, INBOX 2026-08-17, on being shown one: *"n entendi nada."*
+
+The fix is a label, not a removal: the command earns its place for the residual sessions in
+[BUGS.md](BUGS.md) § Residual. **Sequence it after `[b5]`** — the same message was missing its body
+that day, and a bare unexplained command is a different complaint from a command *above* the answer
+it belongs to. Fixing the body may be the whole cure; decide the label once it can be seen in the
+shape the user actually gets.
+
 ## Verification
 **Free:** `make test`. New `tests/test_markdown.py` (keeps `test_format.py` small): one test per
 conversion rule; `split_html` closing/reopening tags across a boundary; `strip_tags`; `clip_chars` at

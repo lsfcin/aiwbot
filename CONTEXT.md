@@ -14,14 +14,14 @@ before any Telegram wiring.
 
 | Subdirectory | Description |
 |--------------|-------------|
-| [`backend/`](backend/CONTEXT.md) | Provider-agnostic seam: each coding-agent CLI → normalized AgentEvent stream; on |
-| [`frontend/`](frontend/CONTEXT.md) | Telegram frontend on the AgentBackend seam — /new + reply-to-continue + INBOX ca |
+| [`backend/`](backend/CONTEXT.md) | Provider-agnostic seam: each coding-agent CLI → normalized AgentEvent stream… |
+| [`frontend/`](frontend/CONTEXT.md) | Telegram frontend on the AgentBackend seam — /new + reply-to-continue + INBOX… |
 | [`tests/`](tests/CONTEXT.md) | Free unit tests — pure-logic fixtures/parsers/formatting, no network or cost. |
 
 | File | Description |
 |------|-------------|
 | [`BUGS.md`](BUGS.md) | aiwbot — Known Bugs |
-| [`README.md`](README.md) | aiwbot |
+| [`README.md`](README.md) | Provider-agnostic bot: drive swappable coding agents (claude · opencode ·… |
 | [`REFS.md`](REFS.md) | aiwbot — References |
 | [`ROADMAP-p2.md`](ROADMAP-p2.md) | aiwbot — P2: backend + model + effort selection |
 | [`ROADMAP-p3.md`](ROADMAP-p3.md) | aiwbot — P3: Telegram output fidelity + `/resume` stability |
@@ -29,4 +29,5 @@ before any Telegram wiring.
 | [`SPECS.md`](SPECS.md) | aiwbot — Specs |
 | [`conftest.py`](conftest.py) | conftest.py — pytest anchor: puts the project root on sys.path so `backend` imports resolve. |
 | [`proto.py`](proto.py) | proto.py — live smoke: run one prompt through each backend + prove single-lineage resume. ~$0.10/run. |
+| [`requirements.txt`](requirements.txt) | requirements.txt — aiwbot's own additional runtime deps, installed into the shared workspace |
 <!-- routing:end -->
