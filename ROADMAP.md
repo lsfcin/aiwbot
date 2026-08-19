@@ -7,7 +7,7 @@ sync but lock us 100% into Claude Code — against the provider-agnostic princip
 single-lineage, with a swappable backend seam (linuz90's architecture, rebuilt in Python). Providers
 become interchangeable data. Full design + research: brain/goals/workspace-os.md.
 
-Design of everything already shipped lives in [SPECS.md](SPECS.md) (AD-1…AD-31); the P2/P3 plans
+Design of everything already shipped lives in the [SPECS.md](SPECS.md) family (AD-1…AD-33); the P2/P3 plans
 in [ROADMAP-p2.md](ROADMAP-p2.md) / [ROADMAP-p3.md](ROADMAP-p3.md).
 
 ### Known limits (won't chase)

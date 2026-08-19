@@ -1,6 +1,6 @@
 # aiwbot — P2: backend + model + effort selection
 
-Plan for the P2 line in [ROADMAP.md](ROADMAP.md). Extends [SPECS.md](SPECS.md) AD-10 with the
+Plan for the P2 line in [ROADMAP.md](ROADMAP.md). Extends [SPECS-capability.md](SPECS-capability.md) AD-10 with the
 surfaces measured on 2026-07-23 and records the UX decisions Lucas made the same day.
 
 ## Why this ranks here

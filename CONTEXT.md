@@ -26,6 +26,12 @@ before any Telegram wiring.
 | [`ROADMAP-p2.md`](ROADMAP-p2.md) | aiwbot — P2: backend + model + effort selection |
 | [`ROADMAP-p3.md`](ROADMAP-p3.md) | aiwbot — P3: Telegram output fidelity + `/resume` stability |
 | [`ROADMAP.md`](ROADMAP.md) | aiwbot — Roadmap |
+| [`SPECS-capability.md`](SPECS-capability.md) | What a backend declares it can do, and how mode, model and effort are offered. |
+| [`SPECS-questions.md`](SPECS-questions.md) | An agent that asks: how the question is carried, positioned, and answered. |
+| [`SPECS-seam.md`](SPECS-seam.md) | The one interface every coding-agent CLI becomes, and what it must pin. |
+| [`SPECS-sessions.md`](SPECS-sessions.md) | Where a session lives, who can see it, and how a resume keeps one lineage. |
+| [`SPECS-streaming.md`](SPECS-streaming.md) | How an answer arrives bubble by bubble, what is sealed, and what spend means. |
+| [`SPECS-telegram.md`](SPECS-telegram.md) | Panels, buttons, tables and speech-to-text: what the chat client can render. |
 | [`SPECS.md`](SPECS.md) | aiwbot — Specs |
 | [`conftest.py`](conftest.py) | conftest.py — pytest anchor: puts the project root on sys.path so `backend` imports resolve. |
 | [`proto.py`](proto.py) | proto.py — live smoke: run one prompt through each backend + prove single-lineage resume. ~$0.10/run. |
