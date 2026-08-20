@@ -20,7 +20,7 @@ before any Telegram wiring.
 
 | File | Description |
 |------|-------------|
-| [`BUGS.md`](BUGS.md) | aiwbot — Known Bugs |
+| [`ISSUES.md`](ISSUES.md) | aiwbot — Issues |
 | [`README.md`](README.md) | Provider-agnostic bot: drive swappable coding agents (claude · opencode ·… |
 | [`REFS.md`](REFS.md) | aiwbot — References |
 | [`ROADMAP-p2.md`](ROADMAP-p2.md) | aiwbot — P2: backend + model + effort selection |

@@ -97,7 +97,7 @@ bot for a session Claude Code's own picker will not list — but that reasoning 
 holding the phone. Lucas, INBOX 2026-08-17, on being shown one: *"n entendi nada."*
 
 The fix is a label, not a removal: the command earns its place for the residual sessions in
-[BUGS.md](BUGS.md) § Residual. **Sequence it after `[b5]`** — the same message was missing its body
+[ISSUES.md](ISSUES.md) § Residual. **Sequence it after `[b5]`** — the same message was missing its body
 that day, and a bare unexplained command is a different complaint from a command *above* the answer
 it belongs to. Fixing the body may be the whole cure; decide the label once it can be seen in the
 shape the user actually gets.

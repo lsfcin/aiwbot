@@ -1,4 +1,4 @@
-# aiwbot — Known Bugs
+# aiwbot — Issues
 
 Log as `- [ ] [bN] <symptom> — <where>`; a FIXED flip needs a `tests/**/b<N>-*`
 regression test (see code/VERIFY.md). A fixed bug's entry is DELETED — its regression spec is the
@@ -16,10 +16,10 @@ earn a `bN` here only if they survive the round they were found in.
   session before touching the fallback** — a transcript this workspace wrote the same day is the
   easy case, so an empty answer there means the reader is wrong, not the session.
 
-_(previously)_ b1, b2 fixed 2026-07-26; b3 2026-07-27 (context % measured spend, not occupancy);
-**b4 2026-07-29, live since the daemon restart** — opencode trusts `$PWD` over its real working
-directory, so every Telegram turn ran its tools in the daemon's launch directory and filed its
-session there. Each has its regression spec under `tests/test_b<N>_*.py`.
+b1–b4 are closed and each is held by a regression spec under `tests/test_b<N>_*.py`; read the spec
+rather than a summary of it. One of them still shapes the section below: **b4 was opencode trusting
+`$PWD` over its real working directory**, so turns ran their tools in the daemon's launch directory
+and filed their sessions there.
 
 
 ## Residual (by design)
