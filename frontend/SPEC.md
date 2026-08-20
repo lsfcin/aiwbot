@@ -44,6 +44,6 @@ Test coverage: `tests/test_stt.py` (C1 transcription success, C3 empty/exception
 - Hotwords from `hotwords.as_prompt()` — workspace jargon list fed to faster-whisper's `hotwords=` (C4).
 
 ## Notes
-- Provenance: `.loop/audio-in-out/` (3-arch.md architecture, 3b-contracts.md contracts). Corrected boundary: `inbox.save_media` is `async` and its real signature is `save_media(file_id: str, context, suffix: str) -> pathlib.Path` — the voice branch must `await inbox.save_media(voice.file_id, context, ".ogg")` before transcription (whisper needs the file on disk).
+- Provenance: `.craft/audio-in-out/` (3-arch.md architecture, 3b-contracts.md contracts). Corrected boundary: `inbox.save_media` is `async` and its real signature is `save_media(file_id: str, context, suffix: str) -> pathlib.Path` — the voice branch must `await inbox.save_media(voice.file_id, context, ".ogg")` before transcription (whisper needs the file on disk).
 - `soundfile` is a top-level import (C6 installs it); only `faster_whisper`/`kokoro` are lazy.
 - Sibling contracts: `dispatch.pyi`, `inbox.pyi`, `format.pyi`, `phrases.pyi` (existing frontend interfaces).
