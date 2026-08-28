@@ -5,11 +5,11 @@
 <!-- routing:start -->
 ## Routing
 
-| File | API | Description |
-|------|-----|-------------|
-| [`__init__.py`](__init__.py) | — | **facade** — __init__.py — facade: the audio-in-out pipeline: what the bot hears, and what it says back. |
-| [`hotwords.py`](hotwords.py) | `as_prompt` | hotwords.py — explicit editable data (C4): what the STT is primed with before it listens. |
-| [`speech.py`](speech.py) | `to_speech` | speech.py — an agent's markdown answer -> prose a TTS voice can actually read aloud. |
-| [`stt.py`](stt.py) | `confident`, `run`, `transcribe` | stt.py — STT wrapper: faster-whisper large-v3-turbo, lazy-loaded; fails safe to "" (C1, C3). |
-| [`tts.py`](tts.py) | `encode_ogg`, `synthesize` | tts.py — TTS wrapper: Kokoro-82M pf_dora voice, lazy-loaded; local OGG/Opus encode (C5, C6). |
+| File | Interface | API | Description |
+|------|-----------|-----|-------------|
+| [`__init__.py`](__init__.py) | — | — | **facade** — __init__.py — facade: the audio-in-out pipeline: what the bot hears, and what it says back. |
+| [`hotwords.py`](hotwords.py) | — | `as_prompt` | hotwords.py — explicit editable data (C4): what the STT is primed with before it listens. Kept as data, not inline in stt.py, so it can be tuned without touching wrapper logic. |
+| [`speech.py`](speech.py) | — | `to_speech` | speech.py — an agent's markdown answer -> prose a TTS voice can actually read aloud. |
+| [`stt.py`](stt.py) | [`stt.pyi`](stt.pyi) | `run`, `transcribe` | stt.py — aiwbot's binding of the shared STT: workspace vocabulary primed in (C1, C3, C4). The wrapper itself moved to core/tools/audio/stt.py — the bot is no longer the only thing here that listens. What stays aiwbot's is `hotwords`: priming is domain data, not wrapper logic. The public surface below is unchanged on purpose; SPEC.md is locked on `run(path, model)`. |
+| [`tts.py`](tts.py) | — | `encode_ogg`, `synthesize` | tts.py — TTS wrapper: Kokoro-82M pf_dora voice, lazy-loaded; local OGG/Opus encode (C5, C6). |
 <!-- routing:end -->
