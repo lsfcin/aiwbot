@@ -1,6 +1,0 @@
-from . import config as config
-
-BUDGET: int
-
-def provider_short(provider: str) -> str: ...
-def model_label(model_id: str | None, budget: int = ..., qualify: bool = True) -> str | None: ...

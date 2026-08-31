@@ -1,9 +1,0 @@
-from _typeshed import Incomplete
-
-class Anchors:
-    on_bubble: Incomplete
-    session_id: str | None
-    pending: list
-    def __init__(self, on_bubble=None) -> None: ...
-    def note_session(self, session_id: str | None) -> None: ...
-    def add(self, bubble) -> None: ...
