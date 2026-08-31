@@ -286,7 +286,7 @@ Clean.
 
 *promote when the work is green, or say which reason applies — /roundup Phase 5*
 
-- code/aiwbot — feature/resume-lineage-question is 6 ahead of main
+- code/aiwbot — feature/resume-lineage-question is 7 ahead of main
 
 ### Remote branches already merged into their base
 
