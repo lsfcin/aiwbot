@@ -1,0 +1,3 @@
+HELP_TEXT: str
+
+def pick(bank: list[str], **kw) -> str: ...
